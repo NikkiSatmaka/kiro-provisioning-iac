@@ -48,6 +48,46 @@ run = "uv lock"
 description = "Verify AWS auth with the project profile"
 run = "aws sts get-caller-identity"
 
-[tasks.mcp]
-description = "Run the AWS MCP proxy locally (same command Kiro uses)"
-run = "uvx mcp-proxy-for-aws@latest https://aws-mcp.us-east-1.api.aws/mcp --metadata INSTALL_SOURCE=aws-cli"
+# --- Provisioning entrypoints ------------------------------------------------
+# See iac/RUNBOOK.md. These drive only the AUTOMATABLE steps; the entrypoint
+# prints the console-only steps (MFA optional, enable Kiro, assign tier,
+# one-time passwords) as a checklist. Nothing mutates the account by default:
+#   - provision-plan is a safe DRY RUN (tofu init + plan, reports only).
+#   - provision applies (tofu apply) and still prompts for approval.
+# Run them yourself when ready; they are not automatic.
+
+[tasks.provision-plan]
+description = "DRY RUN: tofu init + plan for the IdC provisioning (no changes)"
+dir = "iac/scripts"
+run = "python provision.py"
+
+[tasks.provision]
+description = "Apply: create IdC instance + users + groups + memberships, then render credentials (prompts to approve)"
+dir = "iac/scripts"
+run = "python provision.py --apply"
+
+[tasks.provision-render]
+description = "Re-render output/credentials.md from an existing manifest (pass --sign-in-url / --otp-csv as needed)"
+dir = "iac/scripts"
+run = "python provision.py --render-only"
+
+# --- Teardown entrypoints ----------------------------------------------------
+# See iac/TEARDOWN.md. Nothing here mutates the account by default:
+#   - teardown-plan is a safe DRY RUN (Option A discovery, reports only).
+#   - teardown-tofu runs `tofu destroy` (Option B) and still prompts for yes.
+# Run them yourself when you are ready to clean up; they are not automatic.
+
+[tasks.teardown-plan]
+description = "DRY RUN: discover what teardown would delete (Option A, no changes)"
+dir = "iac/scripts"
+run = "python teardown.py"
+
+[tasks.teardown-run]
+description = "Option A fallback: delete IdC users/groups/memberships + instance (prompts to confirm)"
+dir = "iac/scripts"
+run = "python teardown.py --delete --delete-instance"
+
+[tasks.teardown-tofu]
+description = "Option B primary: tofu destroy (needs remote state or local state; prompts to confirm)"
+dir = "iac/terraform"
+run = "tofu destroy"

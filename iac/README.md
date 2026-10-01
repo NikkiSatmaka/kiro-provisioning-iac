@@ -1,7 +1,7 @@
 # Kiro Subscription Provisioning (IAM Identity Center — account instance)
 
 Reusable Infrastructure-as-Code (**OpenTofu**) + Python tooling to provision
-**Kiro enterprise subscriptions** for a team in a single AWS account, using an
+**Kiro subscriptions for a team** in a single AWS account, using an
 **IAM Identity Center _account instance_** as the identity source.
 
 The identity users this creates are intended for **Kiro login only** — they are
@@ -92,7 +92,7 @@ Source (rephrased for compliance):
 
 ### 1. Enabling Kiro + assigning a subscription tier to a group
 
-The Kiro enterprise onboarding ("Onboard your team to Kiro" / "Enable small
+The Kiro team onboarding ("Onboard your team to Kiro" / "Enable small
 teams") provisions a Kiro profile and service-linked role, and the
 tier-assignment ("Add group" → pick Pro / Pro+ / Pro Max / Power) is driven
 through the **Kiro console**. The underlying API (`q:CreateAssignment`) is

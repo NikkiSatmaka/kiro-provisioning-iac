@@ -1,0 +1,111 @@
+# kiro-provisioning-iac
+
+Reusable Infrastructure-as-Code (**OpenTofu**) and Python tooling to provision
+**Kiro subscriptions for a team** in a single AWS account, using an
+**IAM Identity Center _account instance_** as the identity source.
+
+The identities this creates are meant for **Kiro login only** — they get no AWS
+account access (no permission sets, no account assignments).
+
+> ⚠️ **Nothing here runs automatically.** Every step is manual or driven by an
+> explicit entrypoint you invoke. The automated parts stop exactly where AWS
+> stops exposing an API, then hand you a precise console checklist.
+
+---
+
+## What it does
+
+For a given account, region, and requested count `N`, the tooling creates an IdC
+account instance, `N` users, `M` groups, and their memberships via OpenTofu,
+then walks you through the console-only steps AWS does not expose as a stable
+API (making MFA optional, enabling Kiro, assigning a subscription tier, and
+generating per-user passwords). It finishes by rendering a credentials Markdown
+file for distribution.
+
+A full explanation of **what gets provisioned and why**, including the account
+instance rationale and the hard AWS platform limits, lives in
+**[`iac/README.md`](./iac/README.md)**.
+
+## Documentation
+
+| Doc | Purpose |
+| --- | ------- |
+| [`iac/README.md`](./iac/README.md) | Concepts: what is provisioned, why an account instance, what AWS won't automate, reusability knobs |
+| [`iac/RUNBOOK.md`](./iac/RUNBOOK.md) | End-to-end run order, including the console-only steps |
+| [`iac/TEARDOWN.md`](./iac/TEARDOWN.md) | Cleanup: remote-state `tofu destroy` (primary) + state-free script (fallback) |
+
+## Repo layout
+
+```
+.
+├── README.md                 ← you are here (repo overview)
+├── mise.toml                 ← toolchain (python, opentofu, aws-cli, uv) + task runner
+├── pyproject.toml / uv.lock  ← Python deps (boto3) managed by uv
+├── .env.example              ← per-run settings template (AWS_PROFILE / AWS_REGION)
+├── .aws/                     ← project-local AWS config/credentials (git-ignored secrets)
+├── creds/                    ← raw setup credentials (git-ignored)
+└── iac/
+    ├── README.md             ← concepts + reusability
+    ├── RUNBOOK.md            ← run order
+    ├── TEARDOWN.md           ← cleanup
+    ├── terraform/            ← OpenTofu config (account instance, users, groups, memberships)
+    ├── scripts/              ← provision.py, teardown.py, OTP + credentials renderer
+    ├── config/               ← non-secret run settings template
+    └── output/               ← generated manifest + credentials (git-ignored)
+```
+
+## Prerequisites
+
+- [mise](https://mise.jdx.dev/) to manage the toolchain and run tasks.
+- AWS credentials for the target **child/member** account (placed in the
+  project-local `.aws/`), with the org management account already permitting
+  member-account IdC instances (see RUNBOOK step 0).
+
+mise installs the pinned tools — Python 3.12, OpenTofu 1.12, the AWS CLI, and
+uv — and creates the `.venv`.
+
+## Quick start
+
+```bash
+# 1. Install the toolchain + create the Python venv
+mise install
+
+# 2. Sync Python dependencies into .venv
+mise run setup
+
+# 3. Point the repo at your account/region (git-ignored)
+cp .env.example .env    # then edit AWS_PROFILE / AWS_REGION
+
+# 4. Confirm AWS auth resolves to the intended account
+mise run verify         # aws sts get-caller-identity
+```
+
+Everything that changes between projects — region, profile, user/group
+prefixes, counts, membership strategy, Kiro tier — is a variable. Region and
+profile live in the git-ignored `.env`; the rest live in the OpenTofu variables.
+See [`iac/README.md`](./iac/README.md#reusability) for the full list.
+
+## Common tasks
+
+The mise tasks wrap the entrypoints. None mutate the account without a prompt;
+the `*-plan` tasks are safe dry runs.
+
+```bash
+mise run provision-plan   # DRY RUN: tofu init + plan, no changes
+mise run provision        # Apply: create IdC instance + users + groups, then render credentials (prompts)
+mise run provision-render # Re-render output/credentials.md from an existing manifest
+
+mise run teardown-plan    # DRY RUN: discover what teardown would delete (no changes)
+mise run teardown-tofu    # tofu destroy (primary path; needs remote state)
+mise run teardown-run     # state-free fallback: delete users/groups/instance (confirms)
+```
+
+Follow [`iac/RUNBOOK.md`](./iac/RUNBOOK.md) for the full step-by-step order,
+including the console-only steps the tooling cannot perform.
+
+## Security notes
+
+- `.env`, `.aws/credentials`, `creds/`, and anything under `iac/output/`
+  (generated manifests and credentials) are **git-ignored**. Keep them that way.
+- Generated `output/credentials.md` and `output/otps.csv` contain sign-in
+  secrets — distribute securely and delete them after use.

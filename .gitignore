@@ -1,0 +1,14 @@
+# Raw credentials provided for setup — never commit
+creds/
+
+# Project-local AWS credentials (contains secret access key)
+.aws/credentials
+
+# mise local/secret overrides
+mise.local.toml
+.mise.local.toml
+
+# Python project virtualenv (managed by mise/uv; recreated via `mise install`)
+.venv/
+__pycache__/
+*.pyc

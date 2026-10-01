@@ -1,0 +1,41 @@
+# mise config scoped to this project.
+# Loaded automatically when you cd into this directory (requires `mise activate`
+# in your shell rc, or use `mise exec` / `mise run`).
+#
+# Quick start:
+#   mise install        # install all tools below + create the Python venv
+#   mise run setup      # sync Python deps into .venv via uv
+#   mise run verify     # confirm AWS auth with the project profile
+
+[tools]
+python = "3.12"
+opentofu = "1.12"
+aws-cli = "latest"
+uv = "latest"
+
+[env]
+_.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
+
+# Point the AWS CLI/SDKs at project-local config so the profile is scoped here
+# and your global ~/.aws is left untouched.
+AWS_CONFIG_FILE = "{{config_root}}/.aws/config"
+AWS_SHARED_CREDENTIALS_FILE = "{{config_root}}/.aws/credentials"
+AWS_PROFILE = "workshop-kiro-aop"
+AWS_REGION = "ap-southeast-1"
+AWS_DEFAULT_REGION = "ap-southeast-1"
+
+[tasks.setup]
+description = "Install locked Python dependencies into .venv"
+run = "uv sync"
+
+[tasks.lock]
+description = "Resolve and update uv.lock from pyproject.toml"
+run = "uv lock"
+
+[tasks.verify]
+description = "Verify AWS auth with the project profile"
+run = "aws sts get-caller-identity"
+
+[tasks.mcp]
+description = "Run the AWS MCP proxy locally (same command Kiro uses)"
+run = "uvx mcp-proxy-for-aws@latest https://aws-mcp.us-east-1.api.aws/mcp --metadata INSTALL_SOURCE=aws-cli"

@@ -1,7 +1,7 @@
 [project]
 name = "kiro-provisioning-iac"
 version = "0.1.0"
-description = "Reusable IaC + Python tooling to provision Kiro subscriptions for a team via IAM Identity Center."
+description = "Reusable IaC + Python tooling to provision Kiro enterprise subscriptions via IAM Identity Center."
 readme = "iac/README.md"
 requires-python = ">=3.12,<3.15"
 dependencies = [

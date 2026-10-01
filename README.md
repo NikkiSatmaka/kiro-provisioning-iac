@@ -1,7 +1,7 @@
 # kiro-provisioning-iac
 
 Reusable Infrastructure-as-Code (**OpenTofu**) and Python tooling to provision
-**Kiro subscriptions for a team** in a single AWS account, using an
+**Kiro enterprise subscriptions** for a team in a single AWS account, using an
 **IAM Identity Center _account instance_** as the identity source.
 
 The identities this creates are meant for **Kiro login only** — they get no AWS

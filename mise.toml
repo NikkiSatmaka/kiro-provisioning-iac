@@ -20,7 +20,7 @@ _.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
 # and your global ~/.aws is left untouched.
 AWS_CONFIG_FILE = "{{config_root}}/.aws/config"
 AWS_SHARED_CREDENTIALS_FILE = "{{config_root}}/.aws/credentials"
-AWS_PROFILE = "workshop-kiro-aop"
+AWS_PROFILE = "kiro-provisioning"
 AWS_REGION = "ap-southeast-1"
 AWS_DEFAULT_REGION = "ap-southeast-1"
 

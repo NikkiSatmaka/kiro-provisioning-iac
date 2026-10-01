@@ -8,6 +8,11 @@ creds/
 mise.local.toml
 .mise.local.toml
 
+# Per-run / per-account settings sourced by mise. The template (.env.example)
+# stays tracked; the real .env is local-only.
+.env
+!.env.example
+
 # Python project virtualenv (managed by mise/uv; recreated via `mise install`)
 .venv/
 __pycache__/

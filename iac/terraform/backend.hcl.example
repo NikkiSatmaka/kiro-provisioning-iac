@@ -1,0 +1,16 @@
+# Partial backend config for the main OpenTofu config.
+#
+#   cp backend.hcl.example backend.hcl   # then paste real values
+#   tofu init -backend-config=backend.hcl
+#
+# Get these values from the bootstrap config:
+#   cd backend-bootstrap && tofu output backend_hcl
+#
+# backend.hcl is git-ignored (it names your account's bucket). This .example is
+# tracked as the template.
+
+bucket         = "CHANGE-ME-kiro-tofu-state-<ACCOUNT_ID>"
+key            = "kiro-subscriptions/terraform.tfstate"
+region         = "CHANGE-ME-region"   # match AWS_REGION in .env; `tofu output backend_hcl` fills this in
+dynamodb_table = "kiro-tofu-locks"
+encrypt        = true

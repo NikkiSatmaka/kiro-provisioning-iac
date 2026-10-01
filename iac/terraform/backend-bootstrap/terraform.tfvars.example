@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars and edit. terraform.tfvars is git-ignored.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+
+# Region/profile usually come from the environment (mise sources them from the
+# git-ignored .env). Leave aws_region empty to inherit AWS_REGION.
+# Uncomment to pin instead. Keep region the SAME as the main config.
+# aws_region  = "ap-southeast-1"
+# aws_profile = "kiro-provisioning"
+
+# REQUIRED: a globally-unique S3 bucket name. Include your account id or org
+# name so it does not collide with another AWS customer's bucket.
+state_bucket_name = "CHANGE-ME-kiro-tofu-state-<ACCOUNT_ID>"
+
+# Lock table name (unique within the account/region is enough).
+lock_table_name = "kiro-tofu-locks"
+
+# Leave false normally. Set true ONLY when you intend to destroy the backend
+# and are OK deleting all stored state versions.
+force_destroy = false

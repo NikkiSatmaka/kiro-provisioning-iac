@@ -1,0 +1,44 @@
+# Copy to terraform.tfvars and edit per project. terraform.tfvars is git-ignored.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+
+# ---- Provider / environment -------------------------------------------------
+# Usually left to the environment (mise sources AWS_PROFILE / AWS_REGION from
+# the git-ignored .env). Leave aws_region empty to inherit AWS_REGION.
+# Uncomment to pin explicitly instead.
+# aws_region  = "ap-southeast-1"
+# aws_profile = "kiro-provisioning"
+
+instance_name = "kiro-login"
+
+# ---- Naming -----------------------------------------------------------------
+user_prefix      = "kiro-user-"
+group_prefix     = "kiro-team-"
+sequence_padding = 2   # => 01, 02, ...
+sequence_start   = 1
+
+# ---- Counts -----------------------------------------------------------------
+user_count  = 10
+group_count = 1
+
+# ---- User attributes --------------------------------------------------------
+# For the one-time-password (OTP) flow these can be placeholders.
+# For the "send email" flow they MUST be real, reachable inboxes.
+email_domain          = "example.invalid"
+display_name_template = "Kiro User {seq}"
+
+# ---- Membership strategy ----------------------------------------------------
+#   all_in_first | round_robin | none
+membership_strategy = "all_in_first"
+
+# ---- Kiro tier --------------------------------------------------------------
+#   PRO | PRO_PLUS | PRO_MAX | POWER
+# NOTE: tier is applied to groups by the console/scripts, not by OpenTofu.
+kiro_tier = "PRO"
+
+# ---- Tags -------------------------------------------------------------------
+default_tags = {
+  Project   = "kiro-subscriptions"
+  ManagedBy = "opentofu"
+  Purpose   = "kiro-login-only"
+}

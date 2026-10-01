@@ -1,0 +1,45 @@
+# ---- Generated credentials / secrets (NEVER commit) ----
+# The rendered credentials file and any collected one-time passwords.
+output/credentials.md
+output/manifest.json
+output/*.csv
+output/otps.csv
+# Keep the directory and the template/placeholder tracked.
+!output/.gitkeep
+!output/credentials.template.md
+
+# ---- Local, per-project config ----
+config/settings.env
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
+terraform/backend-bootstrap/terraform.tfvars
+terraform/backend-bootstrap/*.auto.tfvars
+
+# ---- Remote backend wiring (account-specific; keep the .example tracked) ----
+# backend.hcl names your account's state bucket; backend.tf is the activated
+# copy of backend.tf.example. Both are per-account, not committed.
+terraform/backend.hcl
+terraform/backend.tf
+
+# ---- OpenTofu / Terraform state & working dirs ----
+# State can contain user/group IDs — treat as sensitive. (No passwords are ever
+# in state.)
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/crash.log
+terraform/override.tf
+terraform/override.tf.json
+terraform/*_override.tf
+terraform/*_override.tf.json
+# Bootstrap config keeps its own local state — ignore it the same way.
+terraform/backend-bootstrap/.terraform/
+terraform/backend-bootstrap/*.tfstate
+terraform/backend-bootstrap/*.tfstate.*
+# Keep the dependency lock files tracked (reproducible provider versions).
+!terraform/.terraform.lock.hcl
+!terraform/backend-bootstrap/.terraform.lock.hcl
+
+# ---- Python ----
+__pycache__/
+*.pyc

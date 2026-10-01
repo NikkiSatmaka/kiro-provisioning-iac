@@ -21,8 +21,15 @@ _.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
 AWS_CONFIG_FILE = "{{config_root}}/.aws/config"
 AWS_SHARED_CREDENTIALS_FILE = "{{config_root}}/.aws/credentials"
 AWS_PROFILE = "kiro-provisioning"
-AWS_REGION = "ap-southeast-1"
-AWS_DEFAULT_REGION = "ap-southeast-1"
+# Region is the one value most likely to change per run. It is read from the
+# environment so you can override it WITHOUT editing this committed file:
+#   - set KIRO_AWS_REGION in your shell, or
+#   - add it to mise.local.toml (git-ignored) under [env], e.g.
+#       [env]
+#       KIRO_AWS_REGION = "us-east-1"
+# The fallback below is only a default for when nothing is set.
+AWS_REGION = "{{ env.KIRO_AWS_REGION | default(value='ap-southeast-1') }}"
+AWS_DEFAULT_REGION = "{{ env.KIRO_AWS_REGION | default(value='ap-southeast-1') }}"
 
 [tasks.setup]
 description = "Install locked Python dependencies into .venv"

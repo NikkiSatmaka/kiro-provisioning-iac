@@ -15,11 +15,12 @@ terraform/*.auto.tfvars
 terraform/backend-bootstrap/terraform.tfvars
 terraform/backend-bootstrap/*.auto.tfvars
 
-# ---- Remote backend wiring (account-specific; keep the .example tracked) ----
-# backend.hcl names your account's state bucket; backend.tf is the activated
-# copy of backend.tf.example. Both are per-account, not committed.
+# ---- Remote backend wiring ----
+# backend.tf is TRACKED and value-free (the partial `backend "s3" {}` block);
+# it is NOT ignored. backend.hcl names your account's state bucket and is
+# account-specific — it is auto-written by `mise run backend-bootstrap` (or
+# copied from the tracked backend.hcl.example template), so it stays ignored.
 terraform/backend.hcl
-terraform/backend.tf
 
 # ---- OpenTofu / Terraform state & working dirs ----
 # State can contain user/group IDs — treat as sensitive. (No passwords are ever

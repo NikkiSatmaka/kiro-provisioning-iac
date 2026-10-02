@@ -112,7 +112,7 @@ account-specific backend.hcl. Fix (copy-paste):
   mise run backend-bootstrap          # prompts to approve
 
   # Prefer manual control? Instead of the above, copy the template and edit it:
-  #   cp iac/terraform/backend.hcl.example iac/terraform/backend.hcl
+  #   cp subscription/terraform/backend.hcl.example subscription/terraform/backend.hcl
 
   # Then re-run provisioning (mise handles `tofu init -backend-config=backend.hcl`):
   mise run provision-plan             # or: mise run provision

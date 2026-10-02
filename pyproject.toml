@@ -2,10 +2,10 @@
 name = "kiro-provisioning-iac"
 version = "0.1.0"
 description = "Reusable IaC + Python tooling to provision Kiro enterprise subscriptions via IAM Identity Center."
-readme = "iac/README.md"
+readme = "subscription/README.md"
 requires-python = ">=3.12,<3.15"
 dependencies = [
-    # AWS SDK for Python, used by the provisioning/teardown scripts in iac/scripts.
+    # AWS SDK for Python, used by the provisioning/teardown scripts in subscription/scripts.
     "boto3>=1.35",
 ]
 

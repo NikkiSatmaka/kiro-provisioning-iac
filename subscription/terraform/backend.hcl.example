@@ -13,7 +13,7 @@
 # `backend "s3" {}` block that these values complete.
 
 bucket         = "kiro-tofu-state-<ACCOUNT_ID>"   # derived default; your 12-digit account id
-key            = "kiro-subscriptions/terraform.tfstate"
+key            = "subscription/terraform.tfstate"
 region         = "<AWS_REGION>"                    # match AWS_REGION in .env (e.g. us-east-1)
 dynamodb_table = "kiro-tofu-locks"
 encrypt        = true

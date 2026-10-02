@@ -12,8 +12,6 @@ output/otps.csv
 config/settings.env
 terraform/terraform.tfvars
 terraform/*.auto.tfvars
-terraform/backend-bootstrap/terraform.tfvars
-terraform/backend-bootstrap/*.auto.tfvars
 
 # ---- Remote backend wiring ----
 # backend.tf is TRACKED and value-free (the partial `backend "s3" {}` block);
@@ -33,13 +31,8 @@ terraform/override.tf
 terraform/override.tf.json
 terraform/*_override.tf
 terraform/*_override.tf.json
-# Bootstrap config keeps its own local state — ignore it the same way.
-terraform/backend-bootstrap/.terraform/
-terraform/backend-bootstrap/*.tfstate
-terraform/backend-bootstrap/*.tfstate.*
-# Keep the dependency lock files tracked (reproducible provider versions).
+# Keep the dependency lock file tracked (reproducible provider versions).
 !terraform/.terraform.lock.hcl
-!terraform/backend-bootstrap/.terraform.lock.hcl
 
 # ---- Python ----
 __pycache__/

@@ -19,23 +19,25 @@
 #
 # ORDER OF OPERATIONS (normally via `mise run backend-bootstrap`)
 # ---------------------------------------------------------------
-#   cd iac/terraform/backend-bootstrap
+#   cd backend/terraform
 #   tofu init
 #   tofu apply                                     # bucket name auto-derived
-#   tofu output -raw backend_hcl > ../backend.hcl  # mise does this for you
+#   tofu output -raw backend_hcl > ../../subscription/terraform/backend.hcl  # mise does this for you
 #
 # The bucket name needs NO human input: it is derived deterministically from the
 # account id as "kiro-tofu-state-<ACCOUNT_ID>" (globally unique). Set
 # var.state_bucket_name in terraform.tfvars only to OVERRIDE that default.
 #
-# Then in ../ (the main config): backend.tf is tracked + value-free; backend.hcl
-# (auto-written above, or copied from backend.hcl.example) carries the values.
+# This writes into the SIBLING subscription/ stack: subscription/terraform/
+# backend.tf is tracked + value-free; subscription/terraform/backend.hcl
+# (auto-written above, or copied from backend.hcl.example) carries the values
+# that its `tofu init -backend-config=backend.hcl` reads.
 #
 # TEARDOWN
 # --------
-# Destroy the MAIN config first (so its state is empty / no longer needed),
-# migrate the main config back to local state, THEN destroy this bootstrap:
-#   cd iac/terraform/backend-bootstrap && tofu destroy
+# Destroy the subscription stack first (so its state is empty / no longer
+# needed), migrate it back to local state, THEN destroy this bootstrap:
+#   cd backend/terraform && tofu destroy
 # The bucket has force_destroy=false by default to prevent accidental loss of
 # state; flip var.force_destroy=true only when you intend to delete it.
 

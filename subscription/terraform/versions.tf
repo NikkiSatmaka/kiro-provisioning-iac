@@ -26,7 +26,7 @@ terraform {
   # in the tracked backend.tf. Set it up before provisioning (RUNBOOK step 1b);
   # the backend spans these files:
   #
-  #   backend-bootstrap/     creates the S3 bucket + DynamoDB lock table (run once)
+  #   ../../backend/terraform/  sibling stack: creates the S3 bucket + DynamoDB lock table (run once)
   #   backend.tf             tracked, value-free `backend "s3" {}` (partial config)
   #   backend.hcl            git-ignored; auto-written by `mise run backend-bootstrap`
   #                          (or copy backend.hcl.example and edit it by hand)

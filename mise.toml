@@ -36,6 +36,10 @@ AWS_REGION = { default = "us-east-1" }
 # Mirror AWS_REGION so the two never diverge, whatever .env/shell set it to.
 AWS_DEFAULT_REGION = "{{ env.AWS_REGION }}"
 
+# =============================================================================
+# === shared / toolchain ===
+# =============================================================================
+
 [tasks.setup]
 description = "Install locked Python dependencies into .venv"
 run = "uv sync"
@@ -62,21 +66,25 @@ aws configure --profile "$AWS_PROFILE"
 description = "Verify AWS auth with the project profile"
 run = "aws sts get-caller-identity"
 
-# --- Remote state backend (one-time, run BEFORE provisioning) ----------------
+# =============================================================================
+# === backend/ stack ===
+# =============================================================================
+# Remote state backend (one-time, run BEFORE the subscription stack).
 # Remote S3 state is REQUIRED. `tofu destroy` only deletes what is in its state,
 # and local state is git-ignored, so teardown from a fresh clone a month later
 # would orphan everything. These tasks create the S3 bucket + DynamoDB lock
-# table (the bootstrap config keeps its OWN local state — chicken-and-egg) and
-# then WRITE iac/terraform/backend.hcl for you from the bootstrap output — the
-# bucket name is derived from your account id, so there is nothing to fill in.
-# backend.tf is tracked + value-free, so no activation copy is needed; see
-# iac/RUNBOOK.md step 1b. provision.py fails closed until backend.hcl exists.
-# Prefer manual control? `cp iac/terraform/backend.hcl.example backend.hcl` and
-# edit it instead — the escape hatch backend.hcl.example exists for exactly that.
+# table (the backend/ stack keeps its OWN local state — chicken-and-egg) and
+# then WRITE subscription/terraform/backend.hcl for you from the bootstrap
+# output — the bucket name is derived from your account id, so there is nothing
+# to fill in. subscription/terraform/backend.tf is tracked + value-free, so no
+# activation copy is needed; see subscription/RUNBOOK.md step 1b. provision.py
+# fails closed until backend.hcl exists. Prefer manual control?
+# `cp subscription/terraform/backend.hcl.example subscription/terraform/backend.hcl`
+# and edit it instead — the escape hatch backend.hcl.example exists for that.
 
 [tasks.backend-bootstrap-plan]
 description = "DRY RUN: tofu init + plan for the S3 state bucket + lock table (creates nothing)"
-dir = "iac/terraform/backend-bootstrap"
+dir = "backend/terraform"
 run = """
 set -eu
 tofu init -input=false
@@ -84,24 +92,24 @@ tofu plan
 """
 
 [tasks.backend-bootstrap]
-description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write ../backend.hcl (prompts to approve)."
-dir = "iac/terraform/backend-bootstrap"
+description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write subscription/terraform/backend.hcl (prompts to approve)."
+dir = "backend/terraform"
 run = """
 set -eu
 tofu init -input=false
 tofu apply
 # Only reached after a clean apply (set -eu). The bootstrap dir is
-# iac/terraform/backend-bootstrap, so ../backend.hcl is iac/terraform/backend.hcl
-# — exactly where the main config's `tofu init -backend-config=backend.hcl`
-# reads it. `-raw` emits the heredoc body without surrounding quotes.
-tofu output -raw backend_hcl > ../backend.hcl
-echo "wrote iac/terraform/backend.hcl"
-cat ../backend.hcl
+# backend/terraform, so ../../subscription/terraform/backend.hcl is where the
+# subscription stack's `tofu init -backend-config=backend.hcl` reads it.
+# `-raw` emits the heredoc body without surrounding quotes.
+tofu output -raw backend_hcl > ../../subscription/terraform/backend.hcl
+echo "wrote subscription/terraform/backend.hcl"
+cat ../../subscription/terraform/backend.hcl
 """
 
 [tasks.backend-destroy]
 description = "Delete the S3 state bucket + lock table (empties versioned state automatically; prompts to confirm)"
-dir = "iac/terraform/backend-bootstrap"
+dir = "backend/terraform"
 run = """
 set -eu
 # Apply force_destroy=true to the bucket FIRST so the provider is allowed to
@@ -112,27 +120,30 @@ tofu apply -var force_destroy=true
 tofu destroy -var force_destroy=true
 """
 
-# --- Provisioning entrypoints ------------------------------------------------
-# See iac/RUNBOOK.md. These drive only the AUTOMATABLE steps; the entrypoint
-# prints the console-only steps (MFA optional, enable Kiro, assign tier,
-# one-time passwords) as a checklist. Nothing mutates the account by default:
+# =============================================================================
+# === subscription/ stack ===
+# =============================================================================
+# Provisioning entrypoints — see subscription/RUNBOOK.md. These drive only the
+# AUTOMATABLE steps; the entrypoint prints the console-only steps (MFA optional,
+# enable Kiro, assign tier, one-time passwords) as a checklist. Nothing mutates
+# the account by default:
 #   - provision-plan is a safe DRY RUN (tofu init + plan, reports only).
 #   - provision applies (tofu apply) and still prompts for approval.
 # Run them yourself when ready; they are not automatic.
 
 [tasks.provision-plan]
 description = "DRY RUN: tofu init + plan for the IdC provisioning (no changes)"
-dir = "iac/scripts"
+dir = "subscription/scripts"
 run = "python provision.py"
 
 [tasks.provision]
 description = "Apply: create IdC instance + users + groups + memberships, then render credentials (prompts to approve)"
-dir = "iac/scripts"
+dir = "subscription/scripts"
 run = "python provision.py --apply"
 
 [tasks.provision-render]
 description = "Re-render output/credentials.md from an existing manifest (pass --sign-in-url / --otp-csv as needed)"
-dir = "iac/scripts"
+dir = "subscription/scripts"
 run = "python provision.py --render-only"
 
 # Render output/credentials.md after you have filled in output/otps.csv with the
@@ -142,7 +153,7 @@ run = "python provision.py --render-only"
 # custom vanity subdomain by appending: -- --sign-in-url https://your.awsapps.com/start
 [tasks.credentials]
 description = "Render output/credentials.md from output/otps.csv (sign-in URL comes from the manifest)"
-dir = "iac/scripts"
+dir = "subscription/scripts"
 run = """
 set -eu
 if [ ! -f ../output/otps.csv ]; then
@@ -159,23 +170,23 @@ fi
 python provision.py --render-only --otp-csv ../output/otps.csv "$@"
 """
 
-# --- Teardown entrypoints ----------------------------------------------------
-# See iac/TEARDOWN.md. Nothing here mutates the account by default:
+# Teardown entrypoints — see subscription/TEARDOWN.md. Nothing here mutates the
+# account by default:
 #   - teardown-plan is a safe DRY RUN (Option A discovery, reports only).
 #   - teardown-tofu runs `tofu destroy` (Option B) and still prompts for yes.
 # Run them yourself when you are ready to clean up; they are not automatic.
 
 [tasks.teardown-plan]
 description = "DRY RUN: discover what teardown would delete (Option A, no changes)"
-dir = "iac/scripts"
+dir = "subscription/scripts"
 run = "python teardown.py"
 
 [tasks.teardown-run]
 description = "Option A fallback: delete IdC users/groups/memberships + instance (prompts to confirm)"
-dir = "iac/scripts"
+dir = "subscription/scripts"
 run = "python teardown.py --delete --delete-instance"
 
 [tasks.teardown-tofu]
 description = "Option B primary: tofu destroy (needs remote state or local state; prompts to confirm)"
-dir = "iac/terraform"
+dir = "subscription/terraform"
 run = "tofu destroy"

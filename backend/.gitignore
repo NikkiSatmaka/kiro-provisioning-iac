@@ -1,0 +1,9 @@
+# backend/ keeps its OWN local state (it bootstraps the shared S3 bucket).
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
+terraform/crash.log
+# Keep the provider lock file tracked (reproducible versions).
+!terraform/.terraform.lock.hcl

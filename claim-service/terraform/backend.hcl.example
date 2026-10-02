@@ -1,0 +1,17 @@
+# Template for the git-ignored backend.hcl (copy + edit by hand).
+#
+#   cp backend.hcl.example backend.hcl   # then set <account_id>
+#   tofu init -backend-config=backend.hcl
+#
+# This stack REUSES the shared state bucket created by the `backend/` stack
+# — do NOT create a new bucket. Isolation comes from the distinct
+# `key` below (claim-service/terraform.tfstate), so `tofu destroy` on this
+# stack can never touch the identities in `subscription/`'s own state.
+#
+# backend.hcl is git-ignored (it names your account's bucket); this .example is
+# the tracked template. backend.tf (tracked, value-free) supplies the partial
+# `backend "s3" {}` block that these values complete.
+
+bucket = "kiro-tofu-state-<account_id>"          # shared bucket; your 12-digit account id
+key    = "claim-service/terraform.tfstate"       # distinct key => isolated from subscription/
+region = "ap-southeast-1"

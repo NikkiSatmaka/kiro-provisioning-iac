@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Claim your Kiro credential</title>
+  <style>
+    /*
+     * Styling follows the AWS Cloudscape Design System visual language
+     * (the system the AWS console is built on): light surfaces, the Cloudscape
+     * color tokens, the Amazon Ember font stack (with Helvetica/Arial
+     * fallbacks, since Amazon Ember is not redistributable), a flat container,
+     * 4px radii, and action-blue primary actions. Hand-written CSS keeps the
+     * page a single self-contained file with no React, no CDN, and no build so
+     * it can be embedded into the Lambda binary and served inline.
+     */
+    :root {
+      --color-background-layout: #f2f3f3;      /* console body grey */
+      --color-background-container: #ffffff;   /* panel surface */
+      --color-background-input: #ffffff;
+      --color-background-input-disabled: #e9ebed;
+      --color-text-heading: #0f1b2a;           /* squid ink */
+      --color-text-body: #16191f;
+      --color-text-label: #414d5c;
+      --color-text-secondary: #5f6b7a;
+      --color-border-divider: #e9ebed;
+      --color-border-container: #d5dbdb;
+      --color-border-input: #7d8998;
+      --color-action: #0972d3;                 /* AWS link / primary blue */
+      --color-action-hover: #033160;
+      --color-action-active: #033160;
+      --color-focus-ring: #0972d3;
+      --color-success-text: #037f0c;
+      --color-success-bg: #f2fcf3;
+      --color-success-border: #037f0c;
+      --color-error-text: #d91515;
+      --color-error-bg: #fff7f7;
+      --color-error-border: #d91515;
+      --font-family-base: "Amazon Ember", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --radius: 4px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 48px 16px;
+      background: var(--color-background-layout);
+      color: var(--color-text-body);
+      font-family: var(--font-family-base);
+      font-size: 14px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app { width: 100%; max-width: 480px; }
+
+    /* Top service bar, echoing the console's dark header strip. */
+    .service-bar {
+      background: var(--color-text-heading);
+      color: #ffffff;
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 12px 20px;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .service-bar .mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px; height: 22px;
+      border-radius: 3px;
+      background: #ff9900;              /* AWS marigold */
+      color: #0f1b2a;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .service-bar .svc { font-weight: 700; }
+    .service-bar .env { color: #a7b0ba; font-weight: 400; }
+
+    /* Cloudscape container: flat panel, 1px border, header separated by a rule. */
+    .container {
+      background: var(--color-background-container);
+      border: 1px solid var(--color-border-container);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+    .container-header {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--color-border-divider);
+    }
+    .container-header h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-text-heading);
+    }
+    .container-header p {
+      margin: 4px 0 0;
+      font-size: 14px;
+      color: var(--color-text-secondary);
+    }
+    .container-body { padding: 20px; }
+
+    .form-field { margin-bottom: 20px; }
+    .form-field > label {
+      display: block;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--color-text-label);
+      margin-bottom: 4px;
+    }
+    .form-field .description {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      margin: 0 0 6px;
+    }
+    input[type="email"],
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--color-text-body);
+      background: var(--color-background-input);
+      border: 1px solid var(--color-border-input);
+      border-radius: var(--radius);
+      transition: border-color 70ms linear;
+    }
+    input::placeholder { color: #9ba7b6; }
+    input:focus {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 1px;
+      border-color: var(--color-action);
+    }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding-top: 4px;
+    }
+    button[type="submit"] {
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      background: var(--color-action);
+      border: 1px solid var(--color-action);
+      border-radius: var(--radius);
+      padding: 8px 20px;
+      cursor: pointer;
+      transition: background-color 70ms linear, border-color 70ms linear;
+    }
+    button[type="submit"]:hover:not(:disabled) {
+      background: var(--color-action-hover);
+      border-color: var(--color-action-hover);
+    }
+    button[type="submit"]:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 2px;
+    }
+    button[type="submit"]:disabled {
+      background: #d9dde1;
+      border-color: #d9dde1;
+      color: #ffffff;
+      cursor: default;
+    }
+
+    /* Result region: Cloudscape alert + key-value pairs. */
+    .result { margin-top: 20px; }
+    .hidden { display: none; }
+
+    .alert {
+      display: flex;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      border: 1px solid;
+      font-size: 14px;
+    }
+    .alert .alert-icon {
+      flex: 0 0 auto;
+      width: 16px; height: 16px;
+      margin-top: 1px;
+      font-weight: 700;
+      line-height: 16px;
+      text-align: center;
+      border-radius: 50%;
+    }
+    .alert.error {
+      background: var(--color-error-bg);
+      border-color: var(--color-error-border);
+      color: var(--color-text-body);
+    }
+    .alert.error .alert-icon { color: var(--color-error-text); }
+
+    .success-panel {
+      border: 1px solid var(--color-success-border);
+      border-radius: var(--radius);
+      background: var(--color-success-bg);
+      overflow: hidden;
+    }
+    .success-panel .success-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--color-border-divider);
+      background: #ffffff;
+    }
+    .success-panel .success-head .tick {
+      color: var(--color-success-text);
+      font-weight: 700;
+    }
+    .success-panel .success-head h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-text-heading);
+    }
+    /* Cloudscape key-value pairs: label above value, stacked rows. */
+    .kv { margin: 0; padding: 16px; display: grid; gap: 14px; }
+    .kv .kv-pair { display: flex; flex-direction: column; gap: 2px; }
+    .kv dt {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--color-text-secondary);
+    }
+    .kv dd {
+      margin: 0;
+      font-size: 14px;
+      color: var(--color-text-body);
+      word-break: break-all;
+    }
+    .kv dd.mono {
+      font-family: "Amazon Ember Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .kv dd a { color: var(--color-action); }
+    .kv dd a:hover { color: var(--color-action-hover); }
+
+    .footnote {
+      margin: 16px 0 0;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="service-bar">
+      <span class="mark" aria-hidden="true">K</span>
+      <span class="svc">Kiro</span>
+      <span class="env">Workshop credential claim</span>
+    </div>
+
+    <main class="container">
+      <div class="container-header">
+        <h1>Claim your credential</h1>
+        <p>Enter your email and the workshop code to receive your Kiro sign-in details.</p>
+      </div>
+      <div class="container-body">
+        <form id="claim-form" novalidate>
+          <div class="form-field">
+            <label for="email">Email</label>
+            <p class="description" id="email-desc">Used once to issue your credential. One credential per email.</p>
+            <input id="email" name="email" type="email" autocomplete="email"
+                   inputmode="email" placeholder="you@example.com"
+                   aria-describedby="email-desc" required />
+          </div>
+          <div class="form-field">
+            <label for="workshop-code">Workshop code</label>
+            <p class="description" id="code-desc">Shared by your workshop facilitator.</p>
+            <input id="workshop-code" name="workshop_code" type="text"
+                   autocomplete="off" placeholder="Enter the code"
+                   aria-describedby="code-desc" required />
+          </div>
+          <div class="actions">
+            <button id="submit-btn" type="submit">Claim credential</button>
+          </div>
+        </form>
+
+        <div id="result" class="result hidden" role="status" aria-live="polite"></div>
+      </div>
+    </main>
+
+    <p class="footnote">Styled with the AWS Cloudscape design language.</p>
+  </div>
+
+  <script>
+    (function () {
+      var form = document.getElementById("claim-form");
+      var submitBtn = document.getElementById("submit-btn");
+      var result = document.getElementById("result");
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function showError(message) {
+        result.className = "result";
+        result.innerHTML =
+          '<div class="alert error" role="alert">' +
+          '<span class="alert-icon" aria-hidden="true">!</span>' +
+          "<span>" + escapeHtml(message) + "</span>" +
+          "</div>";
+      }
+
+      function showCredential(cred) {
+        var url = String(cred.sign_in_url || "");
+        var urlCell = /^https?:\/\//i.test(url)
+          ? '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">' +
+            escapeHtml(url) + "</a>"
+          : escapeHtml(url);
+        result.className = "result";
+        result.innerHTML =
+          '<div class="success-panel">' +
+          '<div class="success-head">' +
+          '<span class="tick" aria-hidden="true">&#10003;</span>' +
+          "<h2>You're all set</h2>" +
+          "</div>" +
+          '<dl class="kv">' +
+          '<div class="kv-pair"><dt>Username</dt><dd class="mono">' + escapeHtml(cred.username) + "</dd></div>" +
+          '<div class="kv-pair"><dt>One-time password</dt><dd class="mono">' + escapeHtml(cred.otp) + "</dd></div>" +
+          '<div class="kv-pair"><dt>Sign-in URL</dt><dd class="mono">' + urlCell + "</dd></div>" +
+          '<div class="kv-pair"><dt>Region</dt><dd class="mono">' + escapeHtml(cred.region) + "</dd></div>" +
+          "</dl>" +
+          "</div>";
+      }
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        result.className = "result hidden";
+        result.innerHTML = "";
+        submitBtn.disabled = true;
+
+        var payload = {
+          email: document.getElementById("email").value,
+          workshop_code: document.getElementById("workshop-code").value
+        };
+
+        fetch(window.location.href, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        })
+          .then(function (response) {
+            return response
+              .json()
+              .catch(function () {
+                return {};
+              })
+              .then(function (data) {
+                return { ok: response.ok, data: data };
+              });
+          })
+          .then(function (res) {
+            if (res.ok && res.data && res.data.username) {
+              showCredential(res.data);
+            } else {
+              var message =
+                (res.data && res.data.error) ||
+                "Something went wrong. Please try again.";
+              showError(message);
+            }
+          })
+          .catch(function () {
+            showError("Network error. Please check your connection and try again.");
+          })
+          .then(function () {
+            submitBtn.disabled = false;
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

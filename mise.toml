@@ -32,7 +32,7 @@ AWS_SHARED_CREDENTIALS_FILE = "{{config_root}}/.aws/credentials"
 # Fallbacks only. `.env` (or the shell) overrides these; `default` keeps any
 # existing non-empty value and applies the fallback only when unset.
 AWS_PROFILE = { default = "kiro-provisioning" }
-AWS_REGION = { default = "ap-southeast-1" }
+AWS_REGION = { default = "us-east-1" }
 # Mirror AWS_REGION so the two never diverge, whatever .env/shell set it to.
 AWS_DEFAULT_REGION = "{{ env.AWS_REGION }}"
 

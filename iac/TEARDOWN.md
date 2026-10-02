@@ -154,7 +154,7 @@ Behavior:
 ```bash
 # Example: custom prefixes / explicit region, non-interactive
 python teardown.py --user-prefix acme-dev- --group-prefix acme-team- \
-    --region ap-southeast-1 --delete --delete-instance --yes
+    --region us-east-1 --delete --delete-instance --yes
 ```
 
 The script prints the same manual cleanup steps when it finishes.

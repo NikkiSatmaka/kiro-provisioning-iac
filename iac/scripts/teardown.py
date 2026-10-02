@@ -45,7 +45,7 @@ USAGE
 
   # Dry run against specific prefixes / region:
   python teardown.py --user-prefix kiro-user- --group-prefix kiro-team- \
-      --region ap-southeast-1
+      --region us-east-1
 
   # Actually delete users, groups, memberships (keep the instance):
   python teardown.py --delete

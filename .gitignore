@@ -17,3 +17,7 @@ mise.local.toml
 .venv/
 __pycache__/
 *.pyc
+
+# Git worktrees for AI-assisted / parallel development live here. The worktree
+# directories are backed by the shared .git store and must never be committed.
+.worktrees/

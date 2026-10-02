@@ -14,7 +14,7 @@ aws-cli = "latest"
 uv = "latest"
 
 [env]
-_.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
+_.python.venv = { path = ".venv", create = true }
 
 # All per-run / per-account values live in a single git-ignored `.env` file at
 # the repo root. Copy the template and edit it — nothing else here needs touching:

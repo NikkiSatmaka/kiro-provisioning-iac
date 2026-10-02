@@ -24,17 +24,21 @@ file for distribution.
 
 A full explanation of **what gets provisioned and why**, including the account
 instance rationale and the hard AWS platform limits, lives in
-**[`iac/README.md`](./iac/README.md)**.
+**[`subscription/README.md`](./subscription/README.md)**.
 
 ## Documentation
 
 | Doc | Purpose |
 | --- | ------- |
-| [`iac/README.md`](./iac/README.md) | Concepts: what is provisioned, why an account instance, what AWS won't automate, reusability knobs |
-| [`iac/RUNBOOK.md`](./iac/RUNBOOK.md) | End-to-end run order, including the console-only steps |
-| [`iac/TEARDOWN.md`](./iac/TEARDOWN.md) | Cleanup: remote-state `tofu destroy` (primary) + state-free script (fallback) |
+| [`backend/README.md`](./backend/README.md) | The shared remote-state backend: the S3 bucket + lock table the other stacks store state in |
+| [`subscription/README.md`](./subscription/README.md) | Concepts: what is provisioned, why an account instance, what AWS won't automate, reusability knobs |
+| [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) | End-to-end run order, including the console-only steps |
+| [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) | Cleanup: remote-state `tofu destroy` (primary) + state-free script (fallback) |
 
 ## Repo layout
+
+The repo is split into independent top-level stacks, each with its own OpenTofu
+state:
 
 ```
 .
@@ -44,7 +48,10 @@ instance rationale and the hard AWS platform limits, lives in
 ├── .env.example              ← per-run settings template (AWS_PROFILE / AWS_REGION)
 ├── .aws/                     ← project-local AWS config/credentials (git-ignored secrets)
 ├── creds/                    ← raw setup credentials (git-ignored)
-└── iac/
+├── backend/                  ← shared remote-state backend (LOCAL state, run once)
+│   ├── README.md             ← why it exists + how to run
+│   └── terraform/            ← S3 state bucket + DynamoDB lock table
+└── subscription/             ← IdC account instance + users + groups + Kiro subscription
     ├── README.md             ← concepts + reusability
     ├── RUNBOOK.md            ← run order
     ├── TEARDOWN.md           ← cleanup
@@ -53,6 +60,13 @@ instance rationale and the hard AWS platform limits, lives in
     ├── config/               ← non-secret run settings template
     └── output/               ← generated manifest + credentials (git-ignored)
 ```
+
+**Shared backend relationship.** `backend/` runs first and creates the S3 bucket
++ DynamoDB lock table, keeping its own **local** state (a remote backend can't
+create the bucket it stores state in — run it once per account). `subscription/`
+then consumes that bucket as its remote backend with the state key
+`subscription/terraform.tfstate`. Any future stack reuses the same bucket under
+its own distinct key.
 
 ## Prerequisites
 
@@ -84,14 +98,14 @@ mise run aws-configure   # runs `aws configure --profile <AWS_PROFILE>`
 mise run verify          # aws sts get-caller-identity
 
 # 6. Choose what to provision (git-ignored)
-cp iac/terraform/terraform.tfvars.example iac/terraform/terraform.tfvars
+cp subscription/terraform/terraform.tfvars.example subscription/terraform/terraform.tfvars
 #   then edit prefixes, counts, membership strategy, Kiro tier
 
 # 7. Set up the remote state backend (REQUIRED, one-time)
 mise run backend-bootstrap   # create the S3 state bucket + lock table AND
-#   write iac/terraform/backend.hcl (bucket name derived from your account id —
-#   nothing to fill in). backend.tf is already tracked, so there is no copy to
-#   do; see RUNBOOK step 1b. provision-plan / provision fail closed until
+#   write subscription/terraform/backend.hcl (bucket name derived from your
+#   account id — nothing to fill in). backend.tf is already tracked, so there is
+#   no copy to do; see RUNBOOK step 1b. provision-plan / provision fail closed until
 #   backend.hcl exists. (Manual escape hatch: cp backend.hcl.example backend.hcl.)
 ```
 
@@ -103,11 +117,12 @@ the keys land in the git-ignored project-local `.aws/credentials` under the
 Everything that changes between projects — region, profile, user/group
 prefixes, counts, membership strategy, Kiro tier — is a variable. Region and
 profile live in the git-ignored `.env`; the user/group prefixes, counts,
-membership strategy, and tier live in `iac/terraform/terraform.tfvars` (created
-in step 6 above). See [`iac/README.md`](./iac/README.md#reusability) for the
+membership strategy, and tier live in `subscription/terraform/terraform.tfvars`
+(created in step 6 above). See
+[`subscription/README.md`](./subscription/README.md#reusability) for the
 full list.
 
-With the backend set up, follow [`iac/RUNBOOK.md`](./iac/RUNBOOK.md) from
+With the backend set up, follow [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) from
 **Step 0** (the one-time org management-account toggle) through the required
 remote-state backend (Step 1b), provisioning, the console-only steps, and
 credential rendering.
@@ -130,12 +145,12 @@ mise run teardown-tofu    # tofu destroy (standard path; uses the required remot
 mise run teardown-run     # state-free fallback: delete users/groups/instance (confirms)
 ```
 
-Follow [`iac/RUNBOOK.md`](./iac/RUNBOOK.md) for the full step-by-step order,
+Follow [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) for the full step-by-step order,
 including the console-only steps the tooling cannot perform.
 
 ## Security notes
 
-- `.env`, `.aws/credentials`, `creds/`, and anything under `iac/output/`
+- `.env`, `.aws/credentials`, `creds/`, and anything under `subscription/output/`
   (generated manifests and credentials) are **git-ignored**. Keep them that way.
 - Generated `output/credentials.md` and `output/otps.csv` contain sign-in
   secrets — distribute securely and delete them after use.

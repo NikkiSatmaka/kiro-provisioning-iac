@@ -132,7 +132,7 @@ See [`RUNBOOK.md`](./RUNBOOK.md) for the exact clicks and the paste-back format.
 ## Repo layout
 
 ```
-iac/
+subscription/
 ├── README.md                 ← you are here
 ├── RUNBOOK.md                ← end-to-end run order + the console-only steps
 ├── TEARDOWN.md               ← cleanup: remote-state destroy (B) + fallback script (A)
@@ -145,7 +145,6 @@ iac/
 │   ├── outputs.tf            ← instance ARN, identity store id, names/ids, URLs
 │   ├── backend.tf            ← tracked, value-free S3 backend block (partial config)
 │   ├── backend.hcl.example   ← template for manual backend.hcl (normally auto-written by backend-bootstrap)
-│   ├── backend-bootstrap/    ← one-time: creates the S3 state bucket + lock table
 │   └── terraform.tfvars.example
 ├── scripts/
 │   ├── provision_passwords_and_output.py  ← OTP workflow + credentials MD writer
@@ -159,7 +158,11 @@ iac/
     └── credentials.template.md            ← shape of the generated MD
 ```
 
-Generated credential files land in `iac/output/` and are **git-ignored**.
+The shared OpenTofu state backend (the S3 bucket + DynamoDB lock table that hold
+this stack's `subscription/terraform.tfstate`) is the sibling top-level
+`../backend/` stack — run it once before provisioning (see `../backend/README.md`).
+
+Generated credential files land in `subscription/output/` and are **git-ignored**.
 
 ---
 

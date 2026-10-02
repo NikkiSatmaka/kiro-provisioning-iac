@@ -58,8 +58,8 @@ Create the state bucket + lock table and write `backend.hcl` in one step
 
 ```bash
 mise run backend-bootstrap      # creates bucket + lock table AND writes
-                                # iac/terraform/backend.hcl (bucket name derived
-                                # from your account id — nothing to fill in)
+                                # subscription/terraform/backend.hcl (bucket name
+                                # derived from your account id — nothing to fill in)
 ```
 
 `backend.tf` is tracked and value-free, so the S3 backend is already active;
@@ -73,7 +73,7 @@ the bootstrap only has to supply `backend.hcl`. From here, state lives in S3.
 exist, then init + destroy. Any of these gets you `backend.hcl`:
 
 ```bash
-git clone <repo> && cd <repo>/iac
+git clone <repo> && cd <repo>/subscription
 
 # (a) regenerate it — backend-bootstrap is idempotent (bucket already exists):
 mise run backend-bootstrap
@@ -106,8 +106,8 @@ tear the backend down last (optional):
 ```bash
 # force_destroy defaults to false. To delete a bucket that still holds state
 # versions, create the tfvars (the one case the bootstrap needs it) and set it:
-cp iac/terraform/backend-bootstrap/terraform.tfvars.example \
-   iac/terraform/backend-bootstrap/terraform.tfvars   # then set force_destroy = true
+cp backend/terraform/terraform.tfvars.example \
+   backend/terraform/terraform.tfvars   # then set force_destroy = true
 mise run backend-bootstrap   # apply the force_destroy flag first
 mise run backend-destroy     # deletes the state bucket + lock table
 ```
@@ -126,7 +126,7 @@ script only for the variants no task covers (keep-the-instance, custom
 prefixes):
 
 ```bash
-cd iac/scripts
+cd subscription/scripts
 # (project venv has boto3; from repo root `mise run setup` if needed)
 
 # 1. DRY RUN (default, safe) — see exactly what it would delete:
@@ -172,7 +172,7 @@ path:
 2. **Remove the Kiro IdC application assignment.** IAM Identity Center →
    Applications → remove the Kiro application / its assignments. This is the
    piece that lingers if you skip it.
-3. **Delete local secrets.** `rm -f iac/output/credentials.md iac/output/otps.csv`.
+3. **Delete local secrets.** `rm -f subscription/output/credentials.md subscription/output/otps.csv`.
 4. **Org toggle is irreversible.** The management account's "permit member
    account instances" setting (RUNBOOK step 0) cannot be turned back off. There
    is nothing to clean up — just know it stays enabled.

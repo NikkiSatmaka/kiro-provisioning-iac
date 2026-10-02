@@ -73,7 +73,7 @@ to edit (set `state_bucket_name` only to override the derived name).
 mise run backend-bootstrap-plan      # creates nothing
 
 # 2. Create the S3 bucket + DynamoDB lock table AND write backend.hcl.
-mise run backend-bootstrap           # prompts to approve; writes iac/terraform/backend.hcl
+mise run backend-bootstrap           # prompts to approve; writes subscription/terraform/backend.hcl
 
 # 3. Provision (mise runs `tofu init -backend-config=backend.hcl` for you).
 mise run provision-plan              # dry run; or `mise run provision` to apply
@@ -83,14 +83,14 @@ Prefer manual control? Instead of letting the bootstrap write it, copy the
 template and edit the two or three values by hand:
 
 ```bash
-cp iac/terraform/backend.hcl.example iac/terraform/backend.hcl   # then edit
+cp subscription/terraform/backend.hcl.example subscription/terraform/backend.hcl   # then edit
 ```
 
-The bootstrap config keeps its **own local state** on purpose (chicken-and-egg:
-it is what creates the bucket). Only the main config uses the S3 backend.
+The backend/ stack keeps its **own local state** on purpose (chicken-and-egg:
+it is what creates the bucket). Only the subscription stack uses the S3 backend.
 
 Verify:
-- `iac/terraform/backend.hcl` exists (git-ignored; `backend.tf` is tracked and
+- `subscription/terraform/backend.hcl` exists (git-ignored; `backend.tf` is tracked and
   already present).
 - `tofu init -backend-config=backend.hcl` reports the S3 backend is initialized.
 
@@ -100,7 +100,7 @@ Verify:
 
 ```bash
 # 1. Set your counts/prefixes/tier (no task — one-time copy + edit).
-cp iac/terraform/terraform.tfvars.example iac/terraform/terraform.tfvars
+cp subscription/terraform/terraform.tfvars.example subscription/terraform/terraform.tfvars
 
 # 2. Dry run — tofu init + plan (1 instance + N users + M groups + memberships).
 mise run provision-plan      # creates nothing
@@ -115,7 +115,7 @@ Step 1b) and **require** it — they fail closed if Step 1b was skipped.
 Prefer raw tofu? The equivalent by hand:
 
 ```bash
-cd iac/terraform
+cd subscription/terraform
 tofu init -backend-config=backend.hcl          # S3 backend from Step 1b
 tofu plan      # review: 1 instance + N users + M groups + memberships
 tofu apply     # creates them
@@ -132,7 +132,7 @@ What this creates:
 `mise run provision` already exports the manifest the scripts consume. To
 re-export it by hand:
 ```bash
-cd iac/terraform
+cd subscription/terraform
 tofu output -json provisioning_manifest > ../output/manifest.json
 ```
 
@@ -191,7 +191,7 @@ Two paths. The console path is the reliable one.
 ### 4a — (script, best-effort, opt-in) Try the API
 
 ```bash
-cd iac/scripts
+cd subscription/scripts
 python attempt_kiro_subscription.py --manifest ../output/manifest.json   # dry run
 python attempt_kiro_subscription.py --manifest ../output/manifest.json --attempt --tier PRO
 ```
@@ -220,7 +220,7 @@ one-time-password (OTP) flow, then render the Markdown.
 1. **(console)** IAM Identity Center → **Users**. For each user:
    **Reset password → Generate a one-time password → copy it.**
    (The alternative, "Send an email…", needs real inboxes.)
-2. Record them in a CSV (git-ignored) at `iac/output/otps.csv`:
+2. Record them in a CSV (git-ignored) at `subscription/output/otps.csv`:
    ```csv
    username,otp
    kiro-user-01,<otp>

@@ -50,9 +50,15 @@ resource "aws_identitystore_user" "this" {
     family_name = each.value.family_name
   }
 
-  emails {
-    value   = each.value.email
-    primary = true
+  # Email is optional and supplemental (var.user_emails). The block renders only
+  # for users that have an address; users without one stay anonymous. IAM
+  # Identity Center's CreateUser does not require an email.
+  dynamic "emails" {
+    for_each = each.value.email == null ? [] : [each.value.email]
+    content {
+      value   = emails.value
+      primary = true
+    }
   }
 }
 

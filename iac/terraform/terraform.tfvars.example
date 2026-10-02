@@ -22,9 +22,16 @@ user_count  = 10
 group_count = 1
 
 # ---- User attributes --------------------------------------------------------
-# For the one-time-password (OTP) flow these can be placeholders.
-# For the "send email" flow they MUST be real, reachable inboxes.
-email_domain          = "example.invalid"
+# Users are provisioned anonymously (username only) by default.
+#
+# Email is OPTIONAL and supplemental: set an address only for the users that
+# need one, keyed by the same padded sequence as the username ("01", "02", ...).
+# Keys must fall within user_count. Any user not listed stays anonymous.
+# Leave user_emails unset (empty) for the all-anonymous OTP flow.
+# user_emails = {
+#   "01" = "alice@corp.com"
+#   "03" = "carol@corp.com"
+# }
 display_name_template = "Kiro User {seq}"
 
 # ---- Membership strategy ----------------------------------------------------

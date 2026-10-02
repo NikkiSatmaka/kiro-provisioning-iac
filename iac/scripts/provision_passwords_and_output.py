@@ -18,7 +18,8 @@ So this script does NOT set passwords. It:
   2. Optionally reads a CSV of one-time passwords you collected from the console
      (username,otp) so they can be embedded in the output.
   3. Renders a single Markdown file with the sign-in URL, region, and a row per
-     user (username, email, group(s), password/OTP, status).
+     user (username, email, group(s), password/OTP, status). Email is optional;
+     anonymous users show a dash.
 
 NOTHING here calls a mutating AWS API. It is safe to run repeatedly.
 
@@ -160,7 +161,9 @@ def _render(manifest: dict, otps: dict[str, str], sign_in_url: str, note: str) -
     missing_otp = 0
     for i, (key, u) in enumerate(sorted(users.items()), start=1):
         uname = u.get("username", "")
-        email = u.get("email", "")
+        # email is optional (anonymous users have none). Null/missing => dash,
+        # so the table never prints a literal "None".
+        email = u.get("email") or "—"
         grp = ", ".join(g for g in user_groups.get(uname, []) if g) or "—"
         otp = otps.get(uname, "")
         if otp:

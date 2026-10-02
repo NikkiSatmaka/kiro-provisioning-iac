@@ -19,7 +19,7 @@ output "kiro_tier" {
 }
 
 output "users" {
-  description = "Created users: padded-sequence => { username, email, user_id }."
+  description = "Created users: padded-sequence => { username, email, user_id }. email is null for anonymous users."
   value = {
     for k, u in aws_identitystore_user.this :
     k => {

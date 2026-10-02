@@ -31,10 +31,12 @@ one.** **Option A (a state-free discovery script) is the fallback** for when
 
 ## The "different computer, a month later" problem
 
-`tofu destroy` only deletes what is in its **state**. By default this repo uses
-**local** state, which is git-ignored and does **not** travel with the repo. On
-a fresh clone, local state is empty, so `tofu destroy` would delete **nothing**
-and silently leave every user, group, and the instance orphaned.
+`tofu destroy` only deletes what is in its **state**. Local state is git-ignored
+and does **not** travel with the repo. On a fresh clone, local state is empty,
+so `tofu destroy` would delete **nothing** and silently leave every user, group,
+and the instance orphaned. That is why remote S3 state is **required** and set
+up at provision time (RUNBOOK step 1b) — `backend.tf` is tracked and active, so
+state always lives in S3.
 
 - **Option B solves this** by putting state in S3, so any machine with
   credentials can `tofu init` + `tofu destroy`.
@@ -51,47 +53,48 @@ as a safety net even if you forget.
 
 ### One-time setup at provision time
 
-1. **Create the state bucket + lock table** (its own tiny config with local
-   state — this is the chicken-and-egg bootstrap):
+Create the state bucket + lock table and write `backend.hcl` in one step
+(the bootstrap keeps its **own local state** — chicken-and-egg):
 
-   ```bash
-   cd iac/terraform/backend-bootstrap
-   cp terraform.tfvars.example terraform.tfvars   # set a GLOBALLY-UNIQUE bucket name
-   tofu init
-   tofu apply
-   tofu output backend_hcl        # prints a ready-to-paste backend config
-   ```
+```bash
+mise run backend-bootstrap      # creates bucket + lock table AND writes
+                                # iac/terraform/backend.hcl (bucket name derived
+                                # from your account id — nothing to fill in)
+```
 
-2. **Point the main config at that bucket** and migrate state into it:
-
-   ```bash
-   cd iac/terraform
-   cp backend.tf.example backend.tf           # activates the S3 backend (copy, keeps .example tracked)
-   cp backend.hcl.example backend.hcl         # paste the block from step 1
-   tofu init -backend-config=backend.hcl      # answer "yes" to migrate state
-   ```
-
-   From here, state lives in S3. `backend.hcl` and `backend.tf` are git-ignored
-   (account-specific); the `.example` templates stay tracked.
+`backend.tf` is tracked and value-free, so the S3 backend is already active;
+the bootstrap only has to supply `backend.hcl`. From here, state lives in S3.
+`backend.hcl` is git-ignored (account-specific); `backend.tf` and
+`backend.hcl.example` stay tracked.
 
 ### Teardown later, from any machine
 
+`backend.tf` is already in the clone (tracked). You only need `backend.hcl` to
+exist, then init + destroy. Any of these gets you `backend.hcl`:
+
 ```bash
-git clone <repo> && cd <repo>/iac/terraform
-cp backend.hcl.example backend.hcl    # fill in the bucket/table names (see note)
-cp backend.tf.example backend.tf
+git clone <repo> && cd <repo>/iac
+
+# (a) regenerate it — backend-bootstrap is idempotent (bucket already exists):
+mise run backend-bootstrap
+
+# (b) OR copy the template and fill in region (bucket is the derived default):
+cp terraform/backend.hcl.example terraform/backend.hcl   # edit region
+
+cd terraform
 tofu init -backend-config=backend.hcl
-tofu destroy                           # removes users, groups, memberships, instance
+tofu destroy                     # removes users, groups, memberships, instance
 ```
 
 `tofu destroy` reads the real state from S3 and deletes the IdC users, groups,
 memberships, and the account instance.
 
-> **You only need to remember three strings** to do this a month later: the
-> **bucket name**, the **lock table name**, and the **region**. Store them
-> somewhere durable (a password manager or team wiki). Everything else is in
-> the repo. If you lose them, you can still find the bucket in the S3 console,
-> or fall back to Option A.
+> **You barely need to remember anything** to do this a month later: the bucket
+> name is the derived default `kiro-tofu-state-<account-id>` (so just your
+> **account id**), the lock table is the default `kiro-tofu-locks`, and the
+> **region** matches your `.env`. Store the account id + region somewhere
+> durable if you like, or just regenerate `backend.hcl` with `mise run
+> backend-bootstrap`. If all else fails, fall back to Option A.
 
 ### After `tofu destroy`
 

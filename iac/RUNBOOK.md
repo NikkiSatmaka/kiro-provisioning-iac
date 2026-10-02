@@ -55,41 +55,43 @@ exports `AWS_PROFILE` / `AWS_REGION`. Default region when `.env` is absent:
 ## Step 1b — (IaC, one-time) Set up the remote S3 state backend (required)
 
 **This step is mandatory. Do it before Step 2.** `tofu destroy` can only delete
-what is in its state, and the default local state is git-ignored — it does not
-travel with the repo. If you tear down a month later from a fresh clone (or a
-different machine) without remote state, `tofu destroy` finds empty state and
-deletes nothing, orphaning every user, group, and the account instance. Putting
-state in S3 is what makes the "a month later, different computer" teardown work.
+what is in its state, and local state is git-ignored — it does not travel with
+the repo. If you tear down a month later from a fresh clone (or a different
+machine) without remote state, `tofu destroy` finds empty state and deletes
+nothing, orphaning every user, group, and the account instance. Putting state in
+S3 is what makes the "a month later, different computer" teardown work.
 
-Because the S3 backend needs a **globally-unique** bucket name you must choose,
-it cannot be set up silently: `provision.py` / `mise run provision-plan` **fail
-closed (exit non-zero)** until `backend.tf` + `backend.hcl` exist.
+`backend.tf` is tracked (value-free), so the S3 backend is already active in the
+config; `provision.py` / `mise run provision-plan` **fail closed (exit
+non-zero)** until the account-specific `backend.hcl` exists. The bootstrap
+writes `backend.hcl` for you — the bucket name is derived from your account id
+(`kiro-tofu-state-<ACCOUNT_ID>`), so there is nothing to fill in and no tfvars
+to edit (set `state_bucket_name` only to override the derived name).
 
 ```bash
 # 1. Dry run — see what the bucket + lock table bootstrap would create.
 mise run backend-bootstrap-plan      # creates nothing
 
-# 2. Pick a globally-unique bucket name (include your account id/org).
-cd iac/terraform/backend-bootstrap
-cp terraform.tfvars.example terraform.tfvars   # then set state_bucket_name
+# 2. Create the S3 bucket + DynamoDB lock table AND write backend.hcl.
+mise run backend-bootstrap           # prompts to approve; writes iac/terraform/backend.hcl
 
-# 3. Create the S3 bucket + DynamoDB lock table (prompts to approve).
-mise run backend-bootstrap           # also prints the backend_hcl block
-#   copy the printed `tofu output backend_hcl` block for the next step
+# 3. Provision (mise runs `tofu init -backend-config=backend.hcl` for you).
+mise run provision-plan              # dry run; or `mise run provision` to apply
+```
 
-# 4. Activate the backend in the MAIN config.
-cd ..                                # back in iac/terraform
-cp backend.tf.example backend.tf     # activates the S3 backend (copy, keeps .example tracked)
-cp backend.hcl.example backend.hcl   # then paste the backend_hcl block
-tofu init -backend-config=backend.hcl   # answer "yes" to migrate state to S3
+Prefer manual control? Instead of letting the bootstrap write it, copy the
+template and edit the two or three values by hand:
+
+```bash
+cp iac/terraform/backend.hcl.example iac/terraform/backend.hcl   # then edit
 ```
 
 The bootstrap config keeps its **own local state** on purpose (chicken-and-egg:
 it is what creates the bucket). Only the main config uses the S3 backend.
 
 Verify:
-- `iac/terraform/backend.tf` and `iac/terraform/backend.hcl` both exist (both
-  git-ignored).
+- `iac/terraform/backend.hcl` exists (git-ignored; `backend.tf` is tracked and
+  already present).
 - `tofu init -backend-config=backend.hcl` reports the S3 backend is initialized.
 
 ---

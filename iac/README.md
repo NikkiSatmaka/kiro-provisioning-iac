@@ -143,8 +143,8 @@ iac/
 │   ├── locals.tf             ← name generation (prefix + zero-padded sequence)
 │   ├── identity_center.tf    ← account instance + users + groups + memberships
 │   ├── outputs.tf            ← instance ARN, identity store id, names/ids, URLs
-│   ├── backend.tf.example    ← copy to backend.tf to activate the required remote S3 state
-│   ├── backend.hcl.example   ← copy to backend.hcl with your bucket/table names
+│   ├── backend.tf            ← tracked, value-free S3 backend block (partial config)
+│   ├── backend.hcl.example   ← template for manual backend.hcl (normally auto-written by backend-bootstrap)
 │   ├── backend-bootstrap/    ← one-time: creates the S3 state bucket + lock table
 │   └── terraform.tfvars.example
 ├── scripts/
@@ -208,8 +208,10 @@ defaults in `mise.toml` (`kiro-provisioning` / `ap-southeast-1`).
 
 1. **(Management account, one-time)** Permit member-account IdC instances.
 2. **(This repo, one-time)** Bootstrap the S3 remote state backend
-   (`mise run backend-bootstrap`) and activate it (`backend.tf` + `backend.hcl`)
-   — **required** before apply; `provision.py` fails closed without it.
+   (`mise run backend-bootstrap`), which creates the bucket + lock table and
+   writes `backend.hcl` for you (bucket name derived from your account id;
+   `backend.tf` is already tracked) — **required** before apply; `provision.py`
+   fails closed without it.
 3. **(This repo)** `tofu init -backend-config=backend.hcl && tofu plan && tofu
    apply` — creates the account instance, users, groups, memberships.
 4. **(Console, one-time)** Set MFA prompt to **Never (disabled)** so users are

@@ -1,6 +1,6 @@
 output "state_bucket_name" {
-  description = "Bucket name — paste into ../backend.hcl as `bucket`."
-  value       = aws_s3_bucket.state.id
+  description = "Derived (or overridden) state bucket name — the `bucket` in ../backend.hcl."
+  value       = local.state_bucket_name
 }
 
 output "lock_table_name" {
@@ -13,11 +13,12 @@ output "region" {
   value       = data.aws_region.current.region
 }
 
-# Copy-paste-ready backend.hcl body for the main config.
+# Ready-to-use backend.hcl body for the main config. `mise run backend-bootstrap`
+# writes this to ../backend.hcl via `tofu output -raw backend_hcl`.
 output "backend_hcl" {
-  description = "Paste this into ../backend.hcl (tofu init -backend-config=backend.hcl)."
+  description = "The full ../backend.hcl body (mise writes it for you; tofu init -backend-config=backend.hcl reads it)."
   value       = <<-EOT
-    bucket         = "${aws_s3_bucket.state.id}"
+    bucket         = "${local.state_bucket_name}"
     key            = "kiro-subscriptions/terraform.tfstate"
     region         = "${data.aws_region.current.region}"
     dynamodb_table = "${aws_dynamodb_table.locks.name}"

@@ -8,9 +8,11 @@
 # aws_region  = "ap-southeast-1"
 # aws_profile = "kiro-provisioning"
 
-# REQUIRED: a globally-unique S3 bucket name. Include your account id or org
-# name so it does not collide with another AWS customer's bucket.
-state_bucket_name = "CHANGE-ME-kiro-tofu-state-<ACCOUNT_ID>"
+# OPTIONAL: the state bucket name. Leave this commented out and the bootstrap
+# derives a deterministic, globally-unique name from your account id:
+#   kiro-tofu-state-<ACCOUNT_ID>
+# Uncomment and set a value ONLY to override that (must stay globally unique).
+# state_bucket_name = "acme-kiro-tofu-state-123456789012"
 
 # Lock table name (unique within the account/region is enough).
 lock_table_name = "kiro-tofu-locks"

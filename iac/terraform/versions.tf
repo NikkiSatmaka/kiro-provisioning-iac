@@ -21,18 +21,18 @@ terraform {
   }
 
   # ---------------------------------------------------------------------------
-  # Backend: LOCAL by default so the repo is runnable out of the box.
-  #
-  # For real projects — and ESPECIALLY so teardown works from a different
-  # machine later — switch to the remote S3 backend. It is opt-in and lives in
-  # separate files so this config stays runnable with no setup:
+  # Backend: remote S3 state is REQUIRED (it is what makes teardown work from a
+  # different machine later), and it is always active — the backend block lives
+  # in the tracked backend.tf. Set it up before provisioning (RUNBOOK step 1b);
+  # the backend spans these files:
   #
   #   backend-bootstrap/     creates the S3 bucket + DynamoDB lock table (run once)
-  #   backend.tf.example     rename to backend.tf to activate the S3 backend
-  #   backend.hcl.example    copy to backend.hcl with your bucket/table names
+  #   backend.tf             tracked, value-free `backend "s3" {}` (partial config)
+  #   backend.hcl            git-ignored; auto-written by `mise run backend-bootstrap`
+  #                          (or copy backend.hcl.example and edit it by hand)
   #
-  # See TEARDOWN.md ("Option B") for the full walkthrough. State contains user
-  # and group IDs — treat it as sensitive, but it holds NO passwords (those
-  # never touch state; see scripts/).
+  # See RUNBOOK.md step 1b and TEARDOWN.md ("Option B") for the full walkthrough.
+  # State contains user and group IDs — treat it as sensitive, but it holds NO
+  # passwords (those never touch state; see scripts/).
   # ---------------------------------------------------------------------------
 }

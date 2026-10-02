@@ -62,6 +62,48 @@ aws configure --profile "$AWS_PROFILE"
 description = "Verify AWS auth with the project profile"
 run = "aws sts get-caller-identity"
 
+# --- Remote state backend (one-time, run BEFORE provisioning) ----------------
+# Remote S3 state is REQUIRED. `tofu destroy` only deletes what is in its state,
+# and local state is git-ignored, so teardown from a fresh clone a month later
+# would orphan everything. These tasks create the S3 bucket + DynamoDB lock
+# table (the bootstrap config keeps its OWN local state — chicken-and-egg) and
+# then WRITE iac/terraform/backend.hcl for you from the bootstrap output — the
+# bucket name is derived from your account id, so there is nothing to fill in.
+# backend.tf is tracked + value-free, so no activation copy is needed; see
+# iac/RUNBOOK.md step 1b. provision.py fails closed until backend.hcl exists.
+# Prefer manual control? `cp iac/terraform/backend.hcl.example backend.hcl` and
+# edit it instead — the escape hatch backend.hcl.example exists for exactly that.
+
+[tasks.backend-bootstrap-plan]
+description = "DRY RUN: tofu init + plan for the S3 state bucket + lock table (creates nothing)"
+dir = "iac/terraform/backend-bootstrap"
+run = """
+set -eu
+tofu init -input=false
+tofu plan
+"""
+
+[tasks.backend-bootstrap]
+description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write ../backend.hcl (prompts to approve)."
+dir = "iac/terraform/backend-bootstrap"
+run = """
+set -eu
+tofu init -input=false
+tofu apply
+# Only reached after a clean apply (set -eu). The bootstrap dir is
+# iac/terraform/backend-bootstrap, so ../backend.hcl is iac/terraform/backend.hcl
+# — exactly where the main config's `tofu init -backend-config=backend.hcl`
+# reads it. `-raw` emits the heredoc body without surrounding quotes.
+tofu output -raw backend_hcl > ../backend.hcl
+echo "wrote iac/terraform/backend.hcl"
+cat ../backend.hcl
+"""
+
+[tasks.backend-destroy]
+description = "Delete the S3 state bucket + lock table (needs force_destroy=true in tfvars; prompts to confirm)"
+dir = "iac/terraform/backend-bootstrap"
+run = "tofu destroy"
+
 # --- Provisioning entrypoints ------------------------------------------------
 # See iac/RUNBOOK.md. These drive only the AUTOMATABLE steps; the entrypoint
 # prints the console-only steps (MFA optional, enable Kiro, assign tier,

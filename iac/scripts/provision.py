@@ -5,11 +5,21 @@ READ THIS FIRST
 ---------------
 This orchestrates only the steps AWS actually exposes as APIs/IaC:
 
-  1. tofu init          (in ../terraform)
+  1. tofu init          (in ../terraform; REQUIRES the remote S3 backend)
   2. tofu plan          (always shown)
   3. tofu apply         (only with --apply)
   4. export the provisioning_manifest output -> ../output/manifest.json
   5. render ../output/credentials.md from the manifest (+ optional OTP CSV)
+
+Remote S3 state is MANDATORY for the main config. Step 1 inits with
+`-backend-config=backend.hcl`. `backend.tf` is tracked and always present (its
+`backend "s3" {}` block is value-free), so the only account-specific file is
+`backend.hcl` — it must exist in ../terraform first (written once by
+`mise run backend-bootstrap`, or copied from backend.hcl.example — see RUNBOOK
+step 1b). If `backend.hcl` is missing the script FAILS CLOSED (prints the fix
+and exits non-zero); it never silently falls back to local state, because local
+state is git-ignored and would make teardown from a fresh clone impossible.
+`--render-only` is exempt — it runs no tofu.
 
 It then PRINTS the console-only steps it cannot do (make MFA optional, enable
 Kiro, assign the tier, generate one-time passwords) as a checklist. It never
@@ -55,6 +65,12 @@ MANIFEST = OUTPUT_DIR / "manifest.json"
 CREDENTIALS = OUTPUT_DIR / "credentials.md"
 RENDER_SCRIPT = HERE / "provision_passwords_and_output.py"
 
+# Remote S3 state is mandatory for the main config (see module docstring).
+# backend.tf is tracked + value-free, so it is always present; backend.hcl
+# carries the account-specific values and is git-ignored. The guard therefore
+# only needs to check for backend.hcl before `tofu init`.
+BACKEND_HCL = TERRAFORM_DIR / "backend.hcl"
+
 CONSOLE_STEPS = """\
 ================================================================================
 CONSOLE-ONLY STEPS — AWS exposes no stable API for these. Do them by hand.
@@ -75,6 +91,31 @@ CONSOLE-ONLY STEPS — AWS exposes no stable API for these. Do them by hand.
              ../output/otps.csv (header: username,otp), then re-run:
              python provision.py --render-only --sign-in-url <URL> \\
                  --otp-csv ../output/otps.csv
+================================================================================
+"""
+
+BACKEND_SETUP_HELP = """\
+================================================================================
+REMOTE S3 STATE IS REQUIRED — set it up once, then re-run (fail closed).
+(Full detail in RUNBOOK.md step 1b.)
+================================================================================
+Why: `tofu destroy` can only delete what is in its STATE. Local state is
+git-ignored and does not travel with the repo, so teardown a month later from a
+fresh clone would orphan every user, group, and the account instance. State must
+live in S3.
+
+backend.tf is already tracked (value-free). The only missing piece is the
+account-specific backend.hcl. Fix (copy-paste):
+
+  # Create the state bucket + lock table AND write backend.hcl for you
+  # (bucket name derived from your account id — nothing to fill in):
+  mise run backend-bootstrap          # prompts to approve
+
+  # Prefer manual control? Instead of the above, copy the template and edit it:
+  #   cp iac/terraform/backend.hcl.example iac/terraform/backend.hcl
+
+  # Then re-run provisioning (mise handles `tofu init -backend-config=backend.hcl`):
+  mise run provision-plan             # or: mise run provision
 ================================================================================
 """
 
@@ -105,6 +146,21 @@ def _require_tofu() -> str:
     if not exe:
         sys.exit("ERROR: neither `tofu` nor `terraform` on PATH. `mise install` first.")
     return exe
+
+
+def _require_backend() -> None:
+    """Fail closed if the mandatory remote S3 backend is not set up.
+
+    The main config MUST init against S3 state. backend.tf is tracked and always
+    present, so the only account-specific file to check is backend.hcl. If it is
+    missing, print the exact fix and exit non-zero rather than silently running
+    `tofu init` with local state.
+    """
+    if not BACKEND_HCL.exists():
+        print(f"ERROR: remote S3 state not set up — missing in {TERRAFORM_DIR}: "
+              f"{BACKEND_HCL.name}")
+        print(BACKEND_SETUP_HELP)
+        sys.exit(2)
 
 
 def _run(cmd: list[str], cwd: pathlib.Path) -> int:
@@ -154,6 +210,7 @@ def main(argv: list[str]) -> int:
         return rc
 
     tofu = _require_tofu()
+    _require_backend()
 
     print("=" * 72)
     print("Kiro IdC provisioning entrypoint")
@@ -163,8 +220,12 @@ def main(argv: list[str]) -> int:
     print()
     print("Reminder: Step 0 (org management account: permit member-account IdC "
           "instances) must already be done, or `apply` will be denied.")
+    print("Reminder: remote S3 state is required and set up once via "
+          "`mise run backend-bootstrap` (writes backend.hcl; RUNBOOK step 1b); "
+          "init uses backend.hcl.")
 
-    if _run([tofu, "init", "-input=false"], TERRAFORM_DIR) != 0:
+    if _run([tofu, "init", "-input=false", "-backend-config=backend.hcl"],
+            TERRAFORM_DIR) != 0:
         return 1
 
     if _run([tofu, "plan"] + passthrough, TERRAFORM_DIR) != 0:

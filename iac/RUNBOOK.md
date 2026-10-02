@@ -52,15 +52,63 @@ exports `AWS_PROFILE` / `AWS_REGION`. Default region when `.env` is absent:
 
 ---
 
+## Step 1b — (IaC, one-time) Set up the remote S3 state backend (required)
+
+**This step is mandatory. Do it before Step 2.** `tofu destroy` can only delete
+what is in its state, and local state is git-ignored — it does not travel with
+the repo. If you tear down a month later from a fresh clone (or a different
+machine) without remote state, `tofu destroy` finds empty state and deletes
+nothing, orphaning every user, group, and the account instance. Putting state in
+S3 is what makes the "a month later, different computer" teardown work.
+
+`backend.tf` is tracked (value-free), so the S3 backend is already active in the
+config; `provision.py` / `mise run provision-plan` **fail closed (exit
+non-zero)** until the account-specific `backend.hcl` exists. The bootstrap
+writes `backend.hcl` for you — the bucket name is derived from your account id
+(`kiro-tofu-state-<ACCOUNT_ID>`), so there is nothing to fill in and no tfvars
+to edit (set `state_bucket_name` only to override the derived name).
+
+```bash
+# 1. Dry run — see what the bucket + lock table bootstrap would create.
+mise run backend-bootstrap-plan      # creates nothing
+
+# 2. Create the S3 bucket + DynamoDB lock table AND write backend.hcl.
+mise run backend-bootstrap           # prompts to approve; writes iac/terraform/backend.hcl
+
+# 3. Provision (mise runs `tofu init -backend-config=backend.hcl` for you).
+mise run provision-plan              # dry run; or `mise run provision` to apply
+```
+
+Prefer manual control? Instead of letting the bootstrap write it, copy the
+template and edit the two or three values by hand:
+
+```bash
+cp iac/terraform/backend.hcl.example iac/terraform/backend.hcl   # then edit
+```
+
+The bootstrap config keeps its **own local state** on purpose (chicken-and-egg:
+it is what creates the bucket). Only the main config uses the S3 backend.
+
+Verify:
+- `iac/terraform/backend.hcl` exists (git-ignored; `backend.tf` is tracked and
+  already present).
+- `tofu init -backend-config=backend.hcl` reports the S3 backend is initialized.
+
+---
+
 ## Step 2 — (IaC) Create the IdC account instance, users, groups, memberships
 
 ```bash
 cd iac/terraform
 cp terraform.tfvars.example terraform.tfvars   # then edit counts/prefixes/tier
-tofu init
+tofu init -backend-config=backend.hcl          # S3 backend from Step 1b
 tofu plan      # review: 1 instance + N users + M groups + memberships
 tofu apply     # creates them
 ```
+
+> `mise run provision-plan` / `mise run provision` run this init for you with
+> `-backend-config=backend.hcl` and now **require** it — they fail closed if
+> Step 1b was skipped.
 
 What this creates:
 - One IAM Identity Center **account instance** in this account.
@@ -198,9 +246,9 @@ region.
 Full teardown instructions — including how to do it **from a different machine
 a month later** — live in [`TEARDOWN.md`](./TEARDOWN.md). Two paths:
 
-- **Option B (primary):** remote S3 state + `tofu destroy`. Set up the remote
-  backend at provision time (bootstrap bucket + `backend.hcl`) so state survives
-  and `tofu destroy` works from any clone.
+- **Option B (standard):** remote S3 state + `tofu destroy`. The remote backend
+  is set up as a **required** step at provision time (Step 1b: bootstrap bucket
+  + `backend.hcl`), so state lives in S3 and `tofu destroy` works from any clone.
 
   ```bash
   cd iac/terraform
@@ -217,9 +265,10 @@ a month later** — live in [`TEARDOWN.md`](./TEARDOWN.md). Two paths:
   ```
 
 Caveats (detailed in `TEARDOWN.md`):
-- With the **default local backend, `tofu destroy` only works on the machine
-  that holds the state.** On a fresh clone it deletes nothing. Use Option B's
-  remote state, or Option A, for the "different computer" case.
+- Remote S3 state (Option B, set up in Step 1b) is what makes `tofu destroy`
+  work from any machine. If you ever ran without it, a local backend holds state
+  only on the machine that created it and deletes nothing on a fresh clone — use
+  Option A (the state-free script) to recover that case.
 - **Deactivate Kiro subscriptions first** in the Kiro console. Per Kiro docs,
   when you remove access "at end of month" the Kiro-created Identity Center
   application assignment is **not** auto-removed and needs a manual cleanup step
@@ -242,5 +291,5 @@ Caveats (detailed in `TEARDOWN.md`):
 | Assign tier to group | ⚠️ best-effort script, else console | `q:CreateAssignment` is internal/undocumented |
 | Set/share password | ❌ (console OTP) | IdC has no password API |
 | Render credentials.md | ✅ (script) | — |
-| Teardown users/groups/instance | ✅ (`tofu destroy`, or `teardown.py`) | Needs remote state, or state-free script |
+| Teardown users/groups/instance | ✅ (`tofu destroy`, or `teardown.py`) | Uses required remote state (Step 1b); state-free script is the fallback |
 | Deactivate Kiro subscription + app assignment | ❌ (console) | No stable API; not auto-removed |

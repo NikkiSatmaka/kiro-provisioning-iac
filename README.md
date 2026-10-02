@@ -61,7 +61,7 @@ instance rationale and the hard AWS platform limits, lives in
   project-local `.aws/`), with the org management account already permitting
   member-account IdC instances (see RUNBOOK step 0).
 
-mise installs the pinned tools — Python 3.12, OpenTofu 1.12, the AWS CLI, and
+mise installs the pinned tools — Python 3.12, OpenTofu 1.13, the AWS CLI, and
 uv — and creates the `.venv`.
 
 ## Quick start

@@ -18,6 +18,17 @@ output "kiro_tier" {
   value       = var.kiro_tier
 }
 
+# The default AWS access portal sign-in URL is derived directly from the
+# identity store id (format: d-xxxxxxxxxx.awsapps.com/start). Scripts read this
+# so users never have to paste the URL by hand. NOTE: if you later configure a
+# custom vanity subdomain in the IdC console (your_subdomain.awsapps.com/start),
+# this default URL still works but no longer matches the vanity one — pass the
+# custom URL explicitly to the renderer in that case.
+output "sign_in_url" {
+  description = "Default AWS access portal sign-in URL derived from the identity store id."
+  value       = "https://${local.identity_store_id}.awsapps.com/start"
+}
+
 output "users" {
   description = "Created users: padded-sequence => { username, email, user_id }. email is null for anonymous users."
   value = {
@@ -61,6 +72,7 @@ output "provisioning_manifest" {
     instance_arn      = local.instance_arn
     identity_store_id = local.identity_store_id
     kiro_tier         = var.kiro_tier
+    sign_in_url       = "https://${local.identity_store_id}.awsapps.com/start"
     users = {
       for k, u in aws_identitystore_user.this :
       k => {

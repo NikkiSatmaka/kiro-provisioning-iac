@@ -2,8 +2,10 @@
 
 > SENSITIVE — contains sign-in details. Do not commit. Distribute securely, then delete.
 > This template shows the shape produced by
-> `scripts/provision_passwords_and_output.py`. The generated file is
-> `output/credentials.md`, which is git-ignored.
+> `scripts/provision_passwords_and_output.py` (run it via `mise run credentials`).
+> The generated file is `output/credentials.md`, which is git-ignored. The
+> sign-in URL is derived automatically from the identity store id in the
+> manifest; you only pass one by hand for a custom vanity subdomain.
 
 - **Generated (UTC):** YYYY-MM-DD HH:MM:SSZ
 - **Sign-in URL:** https://d-xxxxxxxxxx.awsapps.com/start

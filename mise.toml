@@ -100,9 +100,17 @@ cat ../backend.hcl
 """
 
 [tasks.backend-destroy]
-description = "Delete the S3 state bucket + lock table (needs force_destroy=true in tfvars; prompts to confirm)"
+description = "Delete the S3 state bucket + lock table (empties versioned state automatically; prompts to confirm)"
 dir = "iac/terraform/backend-bootstrap"
-run = "tofu destroy"
+run = """
+set -eu
+# Apply force_destroy=true to the bucket FIRST so the provider is allowed to
+# empty a versioned bucket on destroy; then destroy. Passing -var inline means
+# no terraform.tfvars edit is needed — this stays a single, repeatable step for
+# every future project. Both steps prompt before mutating.
+tofu apply -var force_destroy=true
+tofu destroy -var force_destroy=true
+"""
 
 # --- Provisioning entrypoints ------------------------------------------------
 # See iac/RUNBOOK.md. These drive only the AUTOMATABLE steps; the entrypoint

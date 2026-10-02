@@ -179,7 +179,7 @@ def main(argv: list[str]) -> int:
     try:
         import boto3  # type: ignore
     except ImportError:
-        print("boto3 not installed. Install it (project venv has it: `uv sync`) or `pip install boto3`.")
+        print("boto3 not installed. Install it (project venv has it: `uv sync`) or `uv pip install boto3`.")
         return 2
 
     from botocore.exceptions import ClientError  # type: ignore

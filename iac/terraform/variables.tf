@@ -101,15 +101,31 @@ variable "group_count" {
 # User attributes
 # ---------------------------------------------------------------------------
 
-variable "email_domain" {
+variable "user_emails" {
   description = <<-EOT
-    Domain used to synthesize each user's email, e.g. "example.com" produces
-    kiro-user-01@example.com. IdC requires an email per user. If you intend to
-    use the console "send email" password flow these must be REAL, reachable
-    inboxes; for the one-time-password (OTP) flow they can be placeholders.
+    OPTIONAL map of padded-sequence key => email address, e.g.
+    { "01" = "alice@corp.com", "02" = "bob@corp.com" }.
+
+    Keys MUST match the generated sequence keys ("01", "02", ... per
+    sequence_padding / sequence_start). Any user without an entry is created
+    anonymously, with no email set. The default (empty map) leaves every user
+    anonymous — which is the normal flow for OTP sign-in.
+
+    Only populate this for users who genuinely need an email on their IdC
+    record (e.g. the console "send email" password flow).
   EOT
-  type        = string
-  default     = "example.invalid"
+  type        = map(string)
+  default     = {}
+
+  validation {
+    # Keys must be a subset of the generated sequence keys, so a typo'd or
+    # out-of-range key fails loudly instead of being silently ignored.
+    condition = alltrue([
+      for k in keys(var.user_emails) :
+      contains([for i in range(var.user_count) : format("%0${var.sequence_padding}d", i + var.sequence_start)], k)
+    ])
+    error_message = "Every user_emails key must match a generated sequence key (e.g. \"01\" ... up to user_count). Check sequence_padding, sequence_start, and user_count."
+  }
 }
 
 variable "display_name_template" {

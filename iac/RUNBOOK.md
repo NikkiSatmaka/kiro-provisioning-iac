@@ -172,8 +172,9 @@ one-time-password (OTP) flow, then render the Markdown.
        --out ../output/credentials.md
    ```
 
-`output/credentials.md` is git-ignored. It lists each user's username, email,
-group(s), OTP, and the sign-in URL + region.
+`output/credentials.md` is git-ignored. It lists each user's username, email
+(if set; anonymous users show a dash), group(s), OTP, and the sign-in URL +
+region.
 
 > On "same default password": AWS does not allow an admin-chosen shared
 > password. The closest supported option is a per-user OTP that the user must

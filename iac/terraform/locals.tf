@@ -15,11 +15,15 @@ locals {
 
   # Final names keyed by the padded sequence so for_each is stable.
   # { "01" => "kiro-user-01", "02" => "kiro-user-02", ... }
+  # Users are keyed on a zero-padded sequence and named by username. Email is
+  # OPTIONAL and supplemental: looked up from var.user_emails by the same key,
+  # null when the user has no entry. A null email renders no emails block on the
+  # IdC user (see identity_center.tf) — IAM Identity Center requires none.
   users = {
     for s in local.user_seq_str :
     s => {
       username     = "${var.user_prefix}${s}"
-      email        = "${var.user_prefix}${s}@${var.email_domain}"
+      email        = lookup(var.user_emails, s, null)
       display_name = replace(replace(var.display_name_template, "{seq}", s), "{name}", "${var.user_prefix}${s}")
       given_name   = "Kiro"
       family_name  = "User ${s}"

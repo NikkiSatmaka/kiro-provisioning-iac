@@ -23,8 +23,8 @@
 
 | # | Username | Email | Group(s) | Password / OTP | Status |
 |---|----------|-------|----------|----------------|--------|
-| 1 | `kiro-user-01` | kiro-user-01@example.invalid | kiro-team-01 | `TempPass-....` | OTP set |
-| 2 | `kiro-user-02` | kiro-user-02@example.invalid | kiro-team-01 | TODO — generate one-time password in console | pending password |
+| 1 | `kiro-user-01` | alice@corp.com | kiro-team-01 | `TempPass-....` | OTP set |
+| 2 | `kiro-user-02` | — | kiro-team-01 | TODO — generate one-time password in console | pending password |
 
 ## Reminder on passwords
 

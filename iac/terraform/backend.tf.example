@@ -1,6 +1,10 @@
 # ===========================================================================
-# Remote state backend (Option B — the PRIMARY teardown path)   OPT-IN
+# Remote state backend (Option B — the standard teardown path)   REQUIRED
 # ===========================================================================
+#
+# Remote S3 state is REQUIRED for real runs (RUNBOOK step 1b): provision.py
+# fails closed without it, because local state cannot travel to a fresh clone
+# for teardown later.
 #
 # This file is named `backend.tf.example` so it is INERT by default — OpenTofu
 # only reads files ending in `.tf`. The repo therefore runs out of the box with

@@ -143,7 +143,7 @@ iac/
 │   ├── locals.tf             ← name generation (prefix + zero-padded sequence)
 │   ├── identity_center.tf    ← account instance + users + groups + memberships
 │   ├── outputs.tf            ← instance ARN, identity store id, names/ids, URLs
-│   ├── backend.tf.example    ← rename to backend.tf to use remote S3 state (Option B)
+│   ├── backend.tf.example    ← rename to backend.tf to activate the required remote S3 state
 │   ├── backend.hcl.example   ← copy to backend.hcl with your bucket/table names
 │   ├── backend-bootstrap/    ← one-time: creates the S3 state bucket + lock table
 │   └── terraform.tfvars.example
@@ -207,18 +207,22 @@ defaults in `mise.toml` (`kiro-provisioning` / `ap-southeast-1`).
 ## Run order (summary — full detail in RUNBOOK.md)
 
 1. **(Management account, one-time)** Permit member-account IdC instances.
-2. **(This repo)** `tofu init && tofu plan && tofu apply` — creates the account
-   instance, users, groups, memberships.
-3. **(Console, one-time)** Set MFA prompt to **Never (disabled)** so users are
+2. **(This repo, one-time)** Bootstrap the S3 remote state backend
+   (`mise run backend-bootstrap`) and activate it (`backend.tf` + `backend.hcl`)
+   — **required** before apply; `provision.py` fails closed without it.
+3. **(This repo)** `tofu init -backend-config=backend.hcl && tofu plan && tofu
+   apply` — creates the account instance, users, groups, memberships.
+4. **(Console, one-time)** Set MFA prompt to **Never (disabled)** so users are
    not obligated to set up MFA.
-4. **(Console, one-time)** Enable Kiro with IAM Identity Center as the identity
+5. **(Console, one-time)** Enable Kiro with IAM Identity Center as the identity
    source; note the sign-in URL.
-5. **(Console)** Assign the Kiro tier to each group.
-6. **(Console + script)** Generate a one-time password per user; paste back and
+6. **(Console)** Assign the Kiro tier to each group.
+7. **(Console + script)** Generate a one-time password per user; paste back and
    run the output script to produce `output/credentials.md`.
-7. Distribute credentials. Users sign in to Kiro via the IdC sign-in URL.
+8. Distribute credentials. Users sign in to Kiro via the IdC sign-in URL.
 
 To remove everything later — including from a different machine a month on — see
-[`TEARDOWN.md`](./TEARDOWN.md). Set up the remote S3 state backend (Option B) at
-provision time so `tofu destroy` works from any clone; a state-free discovery
-script (Option A) is the fallback.
+[`TEARDOWN.md`](./TEARDOWN.md). The remote S3 state backend (Option B) is a
+**required** step at provision time (step 2 above) so `tofu destroy` works from
+any clone; a state-free discovery script (Option A) remains as an emergency
+fallback.

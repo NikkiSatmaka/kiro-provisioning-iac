@@ -48,7 +48,7 @@ Confirm the account is the intended **child** account and the region is one
 Kiro supports for IdC. Profile and region come from the git-ignored `.env` file
 at the repo root (`cp .env.example .env`, then edit); mise sources it and
 exports `AWS_PROFILE` / `AWS_REGION`. Default region when `.env` is absent:
-`ap-southeast-1`.
+`us-east-1`.
 
 ---
 

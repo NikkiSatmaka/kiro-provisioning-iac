@@ -9,7 +9,7 @@
 
 - **Generated (UTC):** YYYY-MM-DD HH:MM:SSZ
 - **Sign-in URL:** https://d-xxxxxxxxxx.awsapps.com/start
-- **Region code:** `ap-southeast-1`
+- **Region code:** `us-east-1`
 - **Identity store:** `d-xxxxxxxxxx`
 - **Kiro tier:** PRO
 - **Users:** N  |  **Groups:** M

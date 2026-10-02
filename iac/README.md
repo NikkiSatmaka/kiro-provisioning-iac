@@ -170,7 +170,7 @@ between projects is a variable:
 
 | Knob | Where | Example |
 | ---- | ----- | ------- |
-| AWS region | `.env` (git-ignored; `AWS_REGION`) | `ap-southeast-1` → `us-east-1` |
+| AWS region | `.env` (git-ignored; `AWS_REGION`) | `us-east-1` (default) → any Kiro-supported region |
 | AWS profile | `.env` (git-ignored; `AWS_PROFILE`) | `kiro-provisioning` |
 | User prefix + count | `variables.tf` | `kiro-user-` × 25 |
 | Group prefix + count | `variables.tf` | `kiro-team-` × 1 |
@@ -200,7 +200,7 @@ AWS_REGION=us-east-1          # change region here — nothing else to touch
 mise exports these (and derives `AWS_DEFAULT_REGION` from `AWS_REGION`). OpenTofu's
 `aws_region` variable defaults to empty and inherits `AWS_REGION`; the scripts
 read `AWS_REGION` (or `--region`). When `.env` is absent, mise falls back to the
-defaults in `mise.toml` (`kiro-provisioning` / `ap-southeast-1`).
+defaults in `mise.toml` (`kiro-provisioning` / `us-east-1`).
 
 ---
 

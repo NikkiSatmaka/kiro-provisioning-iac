@@ -12,7 +12,7 @@
 # Region/profile usually come from the environment (mise sources them from the
 # git-ignored .env). Leave aws_region empty to inherit AWS_REGION.
 # Uncomment to pin instead. Keep region the SAME as the main config.
-# aws_region  = "ap-southeast-1"
+# aws_region  = "us-east-1"
 # aws_profile = "kiro-provisioning"
 
 # OPTIONAL: the state bucket name. Leave this commented out and the bootstrap

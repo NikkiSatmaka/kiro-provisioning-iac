@@ -14,6 +14,6 @@
 
 bucket         = "kiro-tofu-state-<ACCOUNT_ID>"   # derived default; your 12-digit account id
 key            = "kiro-subscriptions/terraform.tfstate"
-region         = "<AWS_REGION>"                    # match AWS_REGION in .env (e.g. ap-southeast-1)
+region         = "<AWS_REGION>"                    # match AWS_REGION in .env (e.g. us-east-1)
 dynamodb_table = "kiro-tofu-locks"
 encrypt        = true

@@ -103,7 +103,9 @@ tear the backend down last (optional):
 
 ```bash
 cd iac/terraform/backend-bootstrap
-# edit terraform.tfvars: force_destroy = true   (only if you want the bucket gone)
+# force_destroy defaults to false. To delete a bucket that still holds state
+# versions, create the tfvars (the one case the bootstrap needs it) and set it:
+cp terraform.tfvars.example terraform.tfvars   # then set force_destroy = true
 tofu apply        # apply the force_destroy flag first
 tofu destroy      # deletes the state bucket + lock table
 ```

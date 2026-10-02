@@ -143,7 +143,7 @@ iac/
 │   ├── locals.tf             ← name generation (prefix + zero-padded sequence)
 │   ├── identity_center.tf    ← account instance + users + groups + memberships
 │   ├── outputs.tf            ← instance ARN, identity store id, names/ids, URLs
-│   ├── backend.tf.example    ← rename to backend.tf to activate the required remote S3 state
+│   ├── backend.tf.example    ← copy to backend.tf to activate the required remote S3 state
 │   ├── backend.hcl.example   ← copy to backend.hcl with your bucket/table names
 │   ├── backend-bootstrap/    ← one-time: creates the S3 state bucket + lock table
 │   └── terraform.tfvars.example

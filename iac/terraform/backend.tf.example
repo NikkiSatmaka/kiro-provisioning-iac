@@ -8,9 +8,11 @@
 #
 # This file is named `backend.tf.example` so it is INERT by default — OpenTofu
 # only reads files ending in `.tf`. The repo therefore runs out of the box with
-# LOCAL state. To switch to remote state, rename this file:
+# LOCAL state. To switch to remote state, COPY this file to `backend.tf`
+# (copy, not rename, so the tracked `.example` template stays in place and git
+# shows no deletion; the new `backend.tf` is git-ignored):
 #
-#   mv backend.tf.example backend.tf
+#   cp backend.tf.example backend.tf
 #
 # WHY REMOTE STATE MATTERS FOR TEARDOWN
 # -------------------------------------
@@ -32,7 +34,7 @@
 #        tofu init && tofu apply
 #        tofu output backend_hcl        # copy the printed block
 #   2. Back here:
-#        mv backend.tf.example backend.tf
+#        cp backend.tf.example backend.tf
 #        cp backend.hcl.example backend.hcl             # paste the block
 #        tofu init -backend-config=backend.hcl          # answer "yes" to migrate
 #

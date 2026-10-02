@@ -66,7 +66,7 @@ as a safety net even if you forget.
 
    ```bash
    cd iac/terraform
-   mv backend.tf.example backend.tf          # activates the S3 backend
+   cp backend.tf.example backend.tf           # activates the S3 backend (copy, keeps .example tracked)
    cp backend.hcl.example backend.hcl         # paste the block from step 1
    tofu init -backend-config=backend.hcl      # answer "yes" to migrate state
    ```
@@ -79,7 +79,7 @@ as a safety net even if you forget.
 ```bash
 git clone <repo> && cd <repo>/iac/terraform
 cp backend.hcl.example backend.hcl    # fill in the bucket/table names (see note)
-mv backend.tf.example backend.tf
+cp backend.tf.example backend.tf
 tofu init -backend-config=backend.hcl
 tofu destroy                           # removes users, groups, memberships, instance
 ```

@@ -89,7 +89,7 @@ cp iac/terraform/terraform.tfvars.example iac/terraform/terraform.tfvars
 
 # 7. Set up the remote state backend (REQUIRED, one-time)
 mise run backend-bootstrap   # create the S3 state bucket + lock table
-#   then activate it: mv backend.tf.example backend.tf, cp backend.hcl.example
+#   then activate it: cp backend.tf.example backend.tf, cp backend.hcl.example
 #   backend.hcl and paste the printed values — see RUNBOOK step 1b.
 #   provision-plan / provision fail closed until this is done.
 ```

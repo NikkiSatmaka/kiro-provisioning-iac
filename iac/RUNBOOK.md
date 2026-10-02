@@ -79,7 +79,7 @@ mise run backend-bootstrap           # also prints the backend_hcl block
 
 # 4. Activate the backend in the MAIN config.
 cd ..                                # back in iac/terraform
-mv backend.tf.example backend.tf     # activates the S3 backend (rename, not cp)
+cp backend.tf.example backend.tf     # activates the S3 backend (copy, keeps .example tracked)
 cp backend.hcl.example backend.hcl   # then paste the backend_hcl block
 tofu init -backend-config=backend.hcl   # answer "yes" to migrate state to S3
 ```

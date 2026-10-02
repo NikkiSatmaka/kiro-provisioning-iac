@@ -27,7 +27,7 @@ terraform {
   # provisioning (RUNBOOK step 1b); the backend lives in separate files:
   #
   #   backend-bootstrap/     creates the S3 bucket + DynamoDB lock table (run once)
-  #   backend.tf.example     rename to backend.tf to activate the S3 backend
+  #   backend.tf.example     copy to backend.tf to activate the S3 backend
   #   backend.hcl.example    copy to backend.hcl with your bucket/table names
   #
   # See RUNBOOK.md step 1b and TEARDOWN.md ("Option B") for the full walkthrough.

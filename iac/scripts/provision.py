@@ -110,9 +110,9 @@ Fix (copy-paste), from iac/terraform:
   cp terraform.tfvars.example terraform.tfvars   # set a globally-unique bucket
   mise run backend-bootstrap                      # prompts to approve
 
-  # 2) Activate the backend in the main config:
+  # 2) Activate the backend in the main config (copy, keeps .example tracked):
   cd ..                                           # back in iac/terraform
-  mv backend.tf.example backend.tf
+  cp backend.tf.example backend.tf
   cp backend.hcl.example backend.hcl              # paste values from:
   tofu -chdir=backend-bootstrap output backend_hcl
 

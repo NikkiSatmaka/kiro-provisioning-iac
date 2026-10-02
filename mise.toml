@@ -67,7 +67,7 @@ run = "aws sts get-caller-identity"
 # and local state is git-ignored, so teardown from a fresh clone a month later
 # would orphan everything. These tasks create the S3 bucket + DynamoDB lock
 # table (the bootstrap config keeps its OWN local state — chicken-and-egg).
-# Activating the backend afterwards (`mv backend.tf.example backend.tf` +
+# Activating the backend afterwards (`cp backend.tf.example backend.tf` +
 # `cp backend.hcl.example backend.hcl`) is a manual step, like the other `cp`s —
 # see iac/RUNBOOK.md step 1b. provision.py then fails closed until it is done.
 

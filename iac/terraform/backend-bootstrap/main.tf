@@ -17,15 +17,19 @@
 # be committed-by-value is NOT needed — if this state is ever lost you can
 # re-import or simply re-create (the resources are idempotent by name).
 #
-# ORDER OF OPERATIONS
-# -------------------
+# ORDER OF OPERATIONS (normally via `mise run backend-bootstrap`)
+# ---------------------------------------------------------------
 #   cd iac/terraform/backend-bootstrap
-#   cp terraform.tfvars.example terraform.tfvars   # pick globally-unique names
 #   tofu init
-#   tofu apply
-#   tofu output                                    # copy names into ../backend.hcl
+#   tofu apply                                     # bucket name auto-derived
+#   tofu output -raw backend_hcl > ../backend.hcl  # mise does this for you
 #
-# Then in ../ (the main config): see backend.tf + backend.hcl.example.
+# The bucket name needs NO human input: it is derived deterministically from the
+# account id as "kiro-tofu-state-<ACCOUNT_ID>" (globally unique). Set
+# var.state_bucket_name in terraform.tfvars only to OVERRIDE that default.
+#
+# Then in ../ (the main config): backend.tf is tracked + value-free; backend.hcl
+# (auto-written above, or copied from backend.hcl.example) carries the values.
 #
 # TEARDOWN
 # --------
@@ -61,12 +65,22 @@ provider "aws" {
 # Region the provider actually resolved to, surfaced in outputs for backend.hcl.
 data "aws_region" "current" {}
 
+# Account id, used to derive a deterministic, globally-unique bucket name.
+data "aws_caller_identity" "current" {}
+
+locals {
+  # Deterministic bucket name: no human has to invent a globally-unique string.
+  # Operator override (var.state_bucket_name) wins when set; otherwise derive
+  # "kiro-tofu-state-<ACCOUNT_ID>" — unique across AWS because the account id is.
+  state_bucket_name = var.state_bucket_name != "" ? var.state_bucket_name : "kiro-tofu-state-${data.aws_caller_identity.current.account_id}"
+}
+
 # ---------------------------------------------------------------------------
 # State bucket
 # ---------------------------------------------------------------------------
 
 resource "aws_s3_bucket" "state" {
-  bucket        = var.state_bucket_name
+  bucket        = local.state_bucket_name
   force_destroy = var.force_destroy
 }
 

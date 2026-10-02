@@ -16,15 +16,20 @@ variable "aws_profile" {
 
 variable "state_bucket_name" {
   description = <<-EOT
-    GLOBALLY-UNIQUE S3 bucket name for OpenTofu state. S3 bucket names are shared
-    across all AWS accounts, so include something unique (account id, org name).
-    Example: "acme-kiro-tofu-state-123456789012".
+    OPTIONAL override for the S3 state bucket name. Leave empty (default) to let
+    the bootstrap derive a deterministic, globally-unique name from the account
+    id: "kiro-tofu-state-<ACCOUNT_ID>". Set a value ONLY to override that — S3
+    bucket names are shared across all AWS accounts, so an override must stay
+    globally unique (3-63 chars). Example: "acme-kiro-tofu-state-123456789012".
   EOT
   type        = string
+  default     = ""
 
   validation {
-    condition     = length(var.state_bucket_name) >= 3 && length(var.state_bucket_name) <= 63
-    error_message = "state_bucket_name must be 3-63 characters (S3 bucket naming rules)."
+    # Only constrains the override path; the derived default (account id, 12
+    # digits + prefix) is always within S3's 3-63 char limit.
+    condition     = var.state_bucket_name == "" || (length(var.state_bucket_name) >= 3 && length(var.state_bucket_name) <= 63)
+    error_message = "state_bucket_name override must be 3-63 characters (S3 bucket naming rules)."
   }
 }
 

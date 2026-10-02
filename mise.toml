@@ -44,6 +44,20 @@ run = "uv sync"
 description = "Resolve and update uv.lock from pyproject.toml"
 run = "uv lock"
 
+# --- First-run bootstrap -----------------------------------------------------
+# Bridges the gap between the quick start and RUNBOOK.md. The `cp` of the
+# example config files is a manual step (see README quick start); only the
+# AWS profile generation is wrapped here, since it runs `aws configure`.
+
+[tasks.aws-configure]
+description = "Create/update the project-local AWS profile via `aws configure` (writes to .aws/, not ~/.aws)"
+run = """
+set -eu
+echo "Configuring AWS profile '$AWS_PROFILE' into project-local .aws/ (region: $AWS_REGION)."
+echo "Have your access key id + secret access key ready (from creds/)."
+aws configure --profile "$AWS_PROFILE"
+"""
+
 [tasks.verify]
 description = "Verify AWS auth with the project profile"
 run = "aws sts get-caller-identity"

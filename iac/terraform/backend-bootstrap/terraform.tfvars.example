@@ -1,6 +1,13 @@
-# Copy to terraform.tfvars and edit. terraform.tfvars is git-ignored.
+# OPTIONAL — you normally do NOT need this file.
 #
-#   cp terraform.tfvars.example terraform.tfvars
+# Every variable below has a working default, so `mise run backend-bootstrap`
+# runs with NO terraform.tfvars: the bucket name is derived from your account
+# id and region/profile come from the git-ignored .env (via mise). Only create
+# this file to OVERRIDE a default:
+#
+#   cp terraform.tfvars.example terraform.tfvars   # then uncomment what you override
+#
+# terraform.tfvars is git-ignored.
 
 # Region/profile usually come from the environment (mise sources them from the
 # git-ignored .env). Leave aws_region empty to inherit AWS_REGION.

@@ -9,7 +9,7 @@
 
 [tools]
 python = "3.12"
-opentofu = "1.12"
+opentofu = "1.13"
 aws-cli = "latest"
 uv = "latest"
 

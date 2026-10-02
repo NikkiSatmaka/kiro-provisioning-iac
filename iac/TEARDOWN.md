@@ -82,12 +82,14 @@ mise run backend-bootstrap
 cp terraform/backend.hcl.example terraform/backend.hcl   # edit region
 
 cd terraform
-tofu init -backend-config=backend.hcl
-tofu destroy                     # removes users, groups, memberships, instance
+tofu init -backend-config=backend.hcl   # one-time on a fresh clone (no task)
+cd ../..
+mise run teardown-tofu                  # tofu destroy: users, groups, memberships, instance
 ```
 
-`tofu destroy` reads the real state from S3 and deletes the IdC users, groups,
-memberships, and the account instance.
+`mise run teardown-tofu` runs `tofu destroy`, which reads the real state from S3
+and deletes the IdC users, groups, memberships, and the account instance. The
+`tofu init` above is only needed once per clone to wire up the S3 backend.
 
 > **You barely need to remember anything** to do this a month later: the bucket
 > name is the derived default `kiro-tofu-state-<account-id>` (so just your
@@ -102,12 +104,12 @@ Do the [manual Kiro-console cleanup](#manual-cleanup-both-options) below, then
 tear the backend down last (optional):
 
 ```bash
-cd iac/terraform/backend-bootstrap
 # force_destroy defaults to false. To delete a bucket that still holds state
 # versions, create the tfvars (the one case the bootstrap needs it) and set it:
-cp terraform.tfvars.example terraform.tfvars   # then set force_destroy = true
-tofu apply        # apply the force_destroy flag first
-tofu destroy      # deletes the state bucket + lock table
+cp iac/terraform/backend-bootstrap/terraform.tfvars.example \
+   iac/terraform/backend-bootstrap/terraform.tfvars   # then set force_destroy = true
+mise run backend-bootstrap   # apply the force_destroy flag first
+mise run backend-destroy     # deletes the state bucket + lock table
 ```
 
 ---
@@ -118,18 +120,23 @@ Use this when `tofu destroy` can't help: no remote backend was set up, and the
 local state is gone (fresh clone). It needs **no state** — it finds everything
 live from the account by naming convention.
 
+The common cases have mise tasks — `mise run teardown-plan` (dry run) and
+`mise run teardown-run` (delete everything incl. instance). Drop to the raw
+script only for the variants no task covers (keep-the-instance, custom
+prefixes):
+
 ```bash
 cd iac/scripts
-# (project venv has boto3; from repo root `uv sync` if needed)
+# (project venv has boto3; from repo root `mise run setup` if needed)
 
 # 1. DRY RUN (default, safe) — see exactly what it would delete:
-python teardown.py
+python teardown.py                           # or: mise run teardown-plan
 
-# 2. Delete users, groups, memberships (keep the account instance):
+# 2. Delete users, groups, memberships (keep the account instance) — no task:
 python teardown.py --delete
 
 # 3. Also delete the IdC account instance:
-python teardown.py --delete --delete-instance
+python teardown.py --delete --delete-instance   # or: mise run teardown-run
 ```
 
 Behavior:

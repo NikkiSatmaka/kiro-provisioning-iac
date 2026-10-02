@@ -212,15 +212,17 @@ defaults in `mise.toml` (`kiro-provisioning` / `ap-southeast-1`).
    writes `backend.hcl` for you (bucket name derived from your account id;
    `backend.tf` is already tracked) — **required** before apply; `provision.py`
    fails closed without it.
-3. **(This repo)** `tofu init -backend-config=backend.hcl && tofu plan && tofu
-   apply` — creates the account instance, users, groups, memberships.
+3. **(This repo)** `mise run provision-plan` then `mise run provision` — runs
+   `tofu init -backend-config=backend.hcl && plan && apply`, creating the account
+   instance, users, groups, and memberships.
 4. **(Console, one-time)** Set MFA prompt to **Never (disabled)** so users are
    not obligated to set up MFA.
 5. **(Console, one-time)** Enable Kiro with IAM Identity Center as the identity
    source; note the sign-in URL.
 6. **(Console)** Assign the Kiro tier to each group.
-7. **(Console + script)** Generate a one-time password per user; paste back and
-   run the output script to produce `output/credentials.md`.
+7. **(Console + task)** Generate a one-time password per user; paste them into
+   `output/otps.csv`, then `mise run credentials` to produce
+   `output/credentials.md`.
 8. Distribute credentials. Users sign in to Kiro via the IdC sign-in URL.
 
 To remove everything later — including from a different machine a month on — see

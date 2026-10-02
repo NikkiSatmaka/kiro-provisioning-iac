@@ -99,16 +99,27 @@ Verify:
 ## Step 2 — (IaC) Create the IdC account instance, users, groups, memberships
 
 ```bash
+# 1. Set your counts/prefixes/tier (no task — one-time copy + edit).
+cp iac/terraform/terraform.tfvars.example iac/terraform/terraform.tfvars
+
+# 2. Dry run — tofu init + plan (1 instance + N users + M groups + memberships).
+mise run provision-plan      # creates nothing
+
+# 3. Apply — creates them (prompts to approve).
+mise run provision
+```
+
+Both tasks run `tofu init -backend-config=backend.hcl` for you (S3 backend from
+Step 1b) and **require** it — they fail closed if Step 1b was skipped.
+
+Prefer raw tofu? The equivalent by hand:
+
+```bash
 cd iac/terraform
-cp terraform.tfvars.example terraform.tfvars   # then edit counts/prefixes/tier
 tofu init -backend-config=backend.hcl          # S3 backend from Step 1b
 tofu plan      # review: 1 instance + N users + M groups + memberships
 tofu apply     # creates them
 ```
-
-> `mise run provision-plan` / `mise run provision` run this init for you with
-> `-backend-config=backend.hcl` and now **require** it — they fail closed if
-> Step 1b was skipped.
 
 What this creates:
 - One IAM Identity Center **account instance** in this account.
@@ -118,8 +129,10 @@ What this creates:
 - **No** permission sets and **no** account assignments — these identities can
   log into Kiro and nothing else.
 
-Export the manifest the scripts consume:
+`mise run provision` already exports the manifest the scripts consume. To
+re-export it by hand:
 ```bash
+cd iac/terraform
 tofu output -json provisioning_manifest > ../output/manifest.json
 ```
 
@@ -161,10 +174,13 @@ This provisions the Kiro profile + service-linked role. Not scriptable.
 3. When asked for the identity source, choose **IAM Identity Center**. You may
    be prompted to verify the IdC configuration.
 4. Click **Enable**. A Kiro profile is created.
-5. **Copy the Sign-in URL** shown (looks like
-   `https://d-xxxxxxxxxx.awsapps.com/start`). You need it for Step 5.
+5. Note the **Sign-in URL** shown (looks like
+   `https://d-xxxxxxxxxx.awsapps.com/start`).
 
-Put the URL into `iac/config/settings.env` (`SIGN_IN_URL=...`).
+You normally don't need to record this: Step 5's `mise run credentials` derives
+the same default URL from the manifest automatically. Only copy it down if your
+org uses a **custom vanity subdomain** (`your-subdomain.awsapps.com/start`),
+which the derivation can't know about — pass that one to the render task.
 
 ---
 
@@ -210,14 +226,20 @@ one-time-password (OTP) flow, then render the Markdown.
    kiro-user-01,<otp>
    kiro-user-02,<otp>
    ```
-3. **(script)** Render the credentials file:
+3. **(task)** Render the credentials file:
    ```bash
-   cd iac/scripts
-   python provision_passwords_and_output.py \
-       --manifest ../output/manifest.json \
-       --sign-in-url "https://d-xxxxxxxxxx.awsapps.com/start" \
-       --otp-csv ../output/otps.csv \
-       --out ../output/credentials.md
+   mise run credentials
+   ```
+   This reads `output/otps.csv` and writes `output/credentials.md`. The
+   **sign-in URL is taken from the manifest automatically** — `tofu output`
+   derives it from the identity store id (`https://<identity-store-id>.awsapps.com/start`),
+   so there is nothing to paste by hand. The task fails fast with instructions
+   if `output/otps.csv` is missing.
+
+   Only if you configured a **custom vanity subdomain** in the IdC console does
+   the default URL differ; pass it explicitly:
+   ```bash
+   mise run credentials -- --sign-in-url "https://your-subdomain.awsapps.com/start"
    ```
 
 `output/credentials.md` is git-ignored. It lists each user's username, email
@@ -251,17 +273,15 @@ a month later** — live in [`TEARDOWN.md`](./TEARDOWN.md). Two paths:
   + `backend.hcl`), so state lives in S3 and `tofu destroy` works from any clone.
 
   ```bash
-  cd iac/terraform
-  tofu destroy    # removes users, groups, memberships, and the account instance
+  mise run teardown-tofu    # tofu destroy: removes users, groups, memberships, and the account instance (prompts to confirm)
   ```
 
 - **Option A (fallback):** a state-free discovery script for when no state is
   available (fresh clone, local state gone).
 
   ```bash
-  cd iac/scripts
-  python teardown.py                       # dry run
-  python teardown.py --delete --delete-instance
+  mise run teardown-plan    # dry run: discover what would be deleted
+  mise run teardown-run     # delete IdC users/groups/memberships + instance (prompts to confirm)
   ```
 
 Caveats (detailed in `TEARDOWN.md`):

@@ -129,7 +129,12 @@ def _render(manifest: dict, otps: dict[str, str], sign_in_url: str, note: str) -
     user_groups = _user_to_groups(manifest)
     generated = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
 
-    url_cell = sign_in_url or "TODO — get sign-in URL from the Kiro console (see RUNBOOK.md)"
+    # Precedence: an explicit --sign-in-url wins (lets you supply a custom vanity
+    # subdomain). Otherwise fall back to the default URL the manifest derives
+    # from the identity store id, so users never paste it by hand. Only if both
+    # are absent do we leave a TODO placeholder.
+    resolved_url = sign_in_url or manifest.get("sign_in_url", "")
+    url_cell = resolved_url or "TODO — get sign-in URL from the Kiro console (see RUNBOOK.md)"
 
     lines: list[str] = []
     lines.append("# Kiro Access Credentials")
@@ -198,7 +203,12 @@ def main(argv: list[str]) -> int:
     args.out.write_text(md)
     print(f"Wrote {args.out}  ({len(manifest['users'])} users).")
     if not args.sign_in_url:
-        print("NOTE: no --sign-in-url given; a TODO placeholder was written instead.")
+        if manifest.get("sign_in_url"):
+            print(f"NOTE: no --sign-in-url given; used the manifest's derived URL "
+                  f"({manifest['sign_in_url']}).")
+        else:
+            print("NOTE: no --sign-in-url given and none in the manifest; a TODO "
+                  "placeholder was written instead.")
     if not otps:
         print("NOTE: no --otp-csv given; password cells are TODO placeholders.")
     return 0

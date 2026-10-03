@@ -23,15 +23,14 @@ from __future__ import annotations
 import csv
 import uuid
 
-from hypothesis import HealthCheck, given, settings
-from hypothesis import strategies as st
-
 from export_audit import (
     CSV_HEADER,
     EMAIL_PREFIX,
     email_item_to_row,
     write_audit_csv,
 )
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 # An email as it appears after the EMAIL# prefix. We exclude the empty string
 # so each item models a genuinely claimed email, and exclude any value that

@@ -12,10 +12,9 @@ Any string that violates one of those three structural rules must be rejected
 
 from __future__ import annotations
 
+from claim_handler import is_valid_email
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
-from claim_handler import is_valid_email
 
 # Run >= 100 iterations per the design's property-test convention.
 PROPERTY_SETTINGS = settings(max_examples=200)

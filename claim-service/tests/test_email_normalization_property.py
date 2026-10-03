@@ -13,10 +13,9 @@ form must also already be lowercased and stripped (a fixed point of lower/strip)
 
 from __future__ import annotations
 
+import claim_handler
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
-import claim_handler
 
 # Run a healthy number of iterations per the design's property-test guidance
 # (minimum 100 iterations).

@@ -22,12 +22,11 @@ table with its own ``RATE#`` counter space.
 from __future__ import annotations
 
 import boto3
+import claim_handler
+from claim_handler import ClaimError
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from moto import mock_aws
-
-import claim_handler
-from claim_handler import ClaimError
 
 TABLE_NAME = "claim-service-per-ip-cap-test"
 

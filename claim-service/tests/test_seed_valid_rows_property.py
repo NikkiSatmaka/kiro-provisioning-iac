@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
 from seed_claim_pool import SeedRow, classify_rows, credential_item
 
 # A field value that is guaranteed non-empty after .strip() — i.e. it contains

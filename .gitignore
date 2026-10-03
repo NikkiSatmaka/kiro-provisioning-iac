@@ -32,3 +32,7 @@ __pycache__/
 # tracked backend.hcl.example stays tracked.
 claim-service/output/
 claim-service/terraform/backend.hcl
+
+# Generated Lambda deployment package (archive_file output in lambda.tf);
+# rebuilt from the handler + frontend on every plan/apply.
+claim-service/terraform/build/

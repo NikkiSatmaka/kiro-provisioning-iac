@@ -13,12 +13,20 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
 import os
 import time
 from datetime import UTC, datetime
 
 import boto3
 from boto3.dynamodb.conditions import Attr
+
+# Module logger for operational diagnostics. On Lambda, records emitted here go
+# to the function's CloudWatch log group. We log the traceback of an unexpected
+# (non-ClaimError) failure so a 500 is never silent again — but we log ONLY the
+# exception and its stack via ``exc_info``, never the request event, email, or
+# OTP, preserving the PII discipline in the module docstring (Requirement 7.4).
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Module-level configuration (read once from the environment)
@@ -696,5 +704,12 @@ def handler(event, context) -> dict:
         return json_response(405, {"error": "method not allowed"}, origin)  # R2.4
     except ClaimError as exc:
         return json_response(exc.status, {"error": exc.message}, origin)  # R7.1
-    except Exception:  # noqa: BLE001 — fixed 500 message, no detail/trace/PII (R7.2, R7.4)
+    except Exception:
+        # Fixed 500 message, no detail/trace/PII in the response (R7.2, R7.4).
+        # Log the traceback for operators (CloudWatch) so an unexpected failure
+        # is diagnosable instead of a silent 500. ``exc_info=True`` records only
+        # the exception type, its message, and the stack — NOT the request
+        # event, email, or OTP — so no PII leaks into the logs (R7.4). The
+        # participant still receives the fixed, detail-free envelope below.
+        logger.exception("unhandled error while serving claim request")
         return json_response(500, {"error": "internal error"}, origin)

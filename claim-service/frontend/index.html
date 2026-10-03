@@ -308,6 +308,67 @@
           .replace(/'/g, "&#39;");
       }
 
+      // Turn an HTTP status + server-supplied error string into a friendly,
+      // actionable message for a workshop participant. The backend's 4xx
+      // messages ("invalid workshop code", "all claimed", "email is not
+      // valid", "too many attempts; please try again later") are already
+      // human-readable, so we surface those. A 5xx — including the backend's
+      // deliberately detail-free "internal error" — is never shown verbatim:
+      // "internal error" means nothing to a participant, so we replace it with
+      // reassurance and a clear next step, and tell them it is not their fault.
+      function friendlyError(status, serverError) {
+        var text = String(serverError == null ? "" : serverError).trim();
+        var normalized = text.toLowerCase();
+
+        // Server trouble (5xx) or the generic internal-error envelope: never
+        // the participant's fault, and nothing they can fix by editing input.
+        if ((status && status >= 500) || normalized === "internal error" || normalized === "") {
+          return (
+            "Something went wrong on our end while issuing your credential — " +
+            "this isn't a problem with your email or code. Please wait a moment " +
+            "and try again. If it keeps happening, let your workshop facilitator know."
+          );
+        }
+
+        // Pool exhausted: all credentials have been claimed.
+        if (status === 409 || normalized === "all claimed") {
+          return (
+            "All credentials for this workshop have been claimed. " +
+            "Please check with your workshop facilitator."
+          );
+        }
+
+        // Rate limited: too many attempts from this network.
+        if (status === 429 || normalized.indexOf("too many attempts") !== -1) {
+          return (
+            "Too many attempts from your network. Please wait a minute, " +
+            "then try again."
+          );
+        }
+
+        // Wrong or empty workshop code.
+        if (normalized === "invalid workshop code") {
+          return (
+            "That workshop code wasn't accepted. Double-check the code with " +
+            "your facilitator and enter it again."
+          );
+        }
+
+        // Malformed email.
+        if (normalized.indexOf("email") !== -1) {
+          return "Please enter a valid email address, then try again.";
+        }
+
+        // Any other 4xx with a readable server message: surface it as-is; it
+        // is already a concise, user-appropriate explanation.
+        if (text) {
+          return text;
+        }
+
+        // Final fallback.
+        return "We couldn't complete your claim. Please try again.";
+      }
+
       function showError(message) {
         result.className = "result";
         result.innerHTML =
@@ -362,21 +423,20 @@
                 return {};
               })
               .then(function (data) {
-                return { ok: response.ok, data: data };
+                return { ok: response.ok, status: response.status, data: data };
               });
           })
           .then(function (res) {
             if (res.ok && res.data && res.data.username) {
               showCredential(res.data);
             } else {
-              var message =
-                (res.data && res.data.error) ||
-                "Something went wrong. Please try again.";
-              showError(message);
+              showError(friendlyError(res.status, res.data && res.data.error));
             }
           })
           .catch(function () {
-            showError("Network error. Please check your connection and try again.");
+            showError(
+              "We couldn't reach the claim service. Check your internet connection and try again."
+            );
           })
           .then(function () {
             submitBtn.disabled = false;

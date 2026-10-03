@@ -107,11 +107,13 @@ def _load_otps(path: pathlib.Path | None) -> dict[str, str]:
 
 
 def _user_to_groups(manifest: dict) -> dict[str, list[str]]:
-    """Best-effort username -> [group display names] from the manifest.
+    """Map username -> [group names] from the manifest's memberships.
 
-    The manifest's `groups` carry ids, not memberships. Memberships live in the
-    separate `memberships` tofu output. If you also export that, drop it in as
-    manifest['memberships'] = {k: {username, group}} and this will use it.
+    The `provisioning_manifest` tofu output includes a `memberships` block
+    ({key: {username, group}}) resolving which users belong to which groups.
+    Older manifests predating that block simply yield an empty mapping (every
+    user then renders a "—" in the Group(s) column), so this stays tolerant of
+    its absence.
     """
     mapping: dict[str, list[str]] = {}
     memberships = manifest.get("memberships") or {}

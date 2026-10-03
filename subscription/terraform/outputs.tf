@@ -88,5 +88,15 @@ output "provisioning_manifest" {
         group_id     = g.group_id
       }
     }
+    # Resolved user->group memberships, same shape as the standalone
+    # `memberships` output. The credentials renderer reads this to fill each
+    # user's Group(s) column; without it every user renders as "—".
+    memberships = {
+      for k, m in local.memberships :
+      k => {
+        username = local.users[m.user_key].username
+        group    = local.groups[m.group_key].name
+      }
+    }
   }
 }

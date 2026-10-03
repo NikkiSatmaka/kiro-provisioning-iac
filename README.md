@@ -51,14 +51,21 @@ state:
 ├── backend/                  ← shared remote-state backend (LOCAL state, run once)
 │   ├── README.md             ← why it exists + how to run
 │   └── terraform/            ← S3 state bucket + DynamoDB lock table
-└── subscription/             ← IdC account instance + users + groups + Kiro subscription
-    ├── README.md             ← concepts + reusability
-    ├── RUNBOOK.md            ← run order
-    ├── TEARDOWN.md           ← cleanup
-    ├── terraform/            ← OpenTofu config (account instance, users, groups, memberships)
-    ├── scripts/              ← provision.py, teardown.py, OTP + credentials renderer
-    ├── config/               ← non-secret run settings template
-    └── output/               ← generated manifest + credentials (git-ignored)
+├── subscription/             ← IdC account instance + users + groups + Kiro subscription
+│   ├── README.md             ← concepts + reusability
+│   ├── RUNBOOK.md            ← run order
+│   ├── TEARDOWN.md           ← cleanup
+│   ├── terraform/            ← OpenTofu config (account instance, users, groups, memberships)
+│   ├── scripts/              ← provision.py, teardown.py, OTP + credentials renderer
+│   ├── config/               ← non-secret run settings template
+│   └── output/               ← generated manifest + credentials (git-ignored)
+└── claim-service/            ← self-serve credential claim (opt-in; reuses the shared backend)
+    ├── README.md             ← run order + how participants reach the URL
+    ├── lambda/               ← the claim handler (Function URL: GET page, POST claim)
+    ├── frontend/             ← self-contained claim page served inline
+    ├── terraform/            ← DynamoDB + Lambda + Function URL + IAM
+    ├── scripts/              ← seed_claim_pool.py, export_audit.py
+    └── tests/                ← pytest + Hypothesis + moto suite
 ```
 
 **Shared backend relationship.** `backend/` runs first and creates the S3 bucket
@@ -66,7 +73,15 @@ state:
 create the bucket it stores state in — run it once per account). `subscription/`
 then consumes that bucket as its remote backend with the state key
 `subscription/terraform.tfstate`. Any future stack reuses the same bucket under
-its own distinct key.
+its own distinct key — e.g. `claim-service/` uses
+`claim-service/terraform.tfstate`, so its `tofu destroy` can never touch the
+identities in `subscription/`'s state.
+
+**Optional claim service.** `claim-service/` is an independent, opt-in stack for
+handing provisioned credentials to workshop participants via one public HTTPS
+Lambda Function URL. It is deployed, seeded, audited, and destroyed on its own
+(`mise run claim-*` tasks) without affecting `subscription/`. See
+`claim-service/README.md`.
 
 ## Prerequisites
 

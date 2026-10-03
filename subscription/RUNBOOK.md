@@ -39,60 +39,47 @@ Docs (rephrased for compliance):
 
 ## Step 1 — (this account) Confirm credentials & region
 
+Assumes the toolchain + AWS auth are already set up (root README, Phase 0).
+
 ```bash
 # From repo root; mise exports AWS_PROFILE / AWS_REGION automatically.
 mise run verify          # aws sts get-caller-identity
 ```
 
 Confirm the account is the intended **child** account and the region is one
-Kiro supports for IdC. Profile and region come from the git-ignored `.env` file
-at the repo root (`cp .env.example .env`, then edit); mise sources it and
-exports `AWS_PROFILE` / `AWS_REGION`. Default region when `.env` is absent:
-`us-east-1`.
+Kiro supports for IdC. Profile and region come from the git-ignored `.env`
+(default region `us-east-1`); see the root README's Phase 0 if `mise run verify`
+resolves the wrong account.
 
 ---
 
 ## Step 1b — (IaC, one-time) Set up the remote S3 state backend (required)
 
-**This step is mandatory. Do it before Step 2.** `tofu destroy` can only delete
-what is in its state, and local state is git-ignored — it does not travel with
-the repo. If you tear down a month later from a fresh clone (or a different
-machine) without remote state, `tofu destroy` finds empty state and deletes
-nothing, orphaning every user, group, and the account instance. Putting state in
-S3 is what makes the "a month later, different computer" teardown work.
-
-`backend.tf` is tracked (value-free), so the S3 backend is already active in the
-config; `provision.py` / `mise run provision-plan` **fail closed (exit
-non-zero)** until the account-specific `backend.hcl` exists. The bootstrap
-writes `backend.hcl` for you — the bucket name is derived from your account id
-(`kiro-tofu-state-<ACCOUNT_ID>`), so there is nothing to fill in and no tfvars
-to edit (set `state_bucket_name` only to override the derived name).
+**This step is mandatory. Do it before Step 2** — provisioning fails closed
+without it. It matters for *this* stack specifically: `tofu destroy` can only
+remove what is in its state, so if the subscription's state is not in S3, a
+teardown from a fresh clone later would orphan every user, group, and the
+account instance. The `../backend/` stack creates that S3 bucket + lock table
+and writes `subscription/terraform/backend.hcl` for you (the same bootstrap also
+writes `claim-service/terraform/backend.hcl`, used later if you distribute via
+the claim service).
 
 ```bash
-# 1. Dry run — see what the bucket + lock table bootstrap would create.
-mise run backend-bootstrap-plan      # creates nothing
-
-# 2. Create the S3 bucket + DynamoDB lock table AND write backend.hcl.
-mise run backend-bootstrap           # prompts to approve; writes subscription/terraform/backend.hcl
-
-# 3. Provision (mise runs `tofu init -backend-config=backend.hcl` for you).
-mise run provision-plan              # dry run; or `mise run provision` to apply
+mise run backend-bootstrap-plan      # DRY RUN: what the bucket + lock table bootstrap would create
+mise run backend-bootstrap           # create them AND write the stacks' backend.hcl (prompts)
 ```
 
-Prefer manual control? Instead of letting the bootstrap write it, copy the
-template and edit the two or three values by hand:
-
-```bash
-cp subscription/terraform/backend.hcl.example subscription/terraform/backend.hcl   # then edit
-```
-
-The backend/ stack keeps its **own local state** on purpose (chicken-and-egg:
-it is what creates the bucket). Only the subscription stack uses the S3 backend.
+That is all this stack needs from the backend. The mechanics — why the backend
+stack keeps its own local state, the derived bucket name, and the manual
+`backend.hcl` escape hatch — are documented in
+[`../backend/README.md`](../backend/README.md).
 
 Verify:
-- `subscription/terraform/backend.hcl` exists (git-ignored; `backend.tf` is tracked and
-  already present).
-- `tofu init -backend-config=backend.hcl` reports the S3 backend is initialized.
+- `subscription/terraform/backend.hcl` exists (git-ignored; `backend.tf` is
+  tracked and already present).
+- `mise run provision-plan` runs `tofu init -backend-config=backend.hcl` and
+  reports the S3 backend is initialized (it fails closed if `backend.hcl` is
+  missing).
 
 ---
 

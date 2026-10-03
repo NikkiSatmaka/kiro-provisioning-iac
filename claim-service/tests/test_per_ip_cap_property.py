@@ -77,7 +77,24 @@ def _reset_handler_state(monkeypatch):
     monkeypatch.setattr(claim_handler, "_table", None)
 
 
-@settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
+# The example count stays at 100 so the property is still exercised broadly.
+# ``deadline=None`` is a defensive measure (not the substantive fix): the first
+# example pays moto's cold table-create cost, which can exceed Hypothesis's
+# 200 ms default and otherwise risk a spurious ``DeadlineExceeded``; the sibling
+# property tests already disable the deadline for the same reason.
+# ``HealthCheck.too_slow`` is suppressed to match them. Neither changes handler
+# behavior. (The real cause of this test's prior failure was a test-ordering
+# bug elsewhere — a fixture ``importlib.reload``-ing ``claim_handler`` rebound
+# ``ClaimError`` to a new class so ``except ClaimError`` here stopped catching
+# it; that reload has been removed.)
+@settings(
+    max_examples=100,
+    deadline=None,
+    suppress_health_check=[
+        HealthCheck.function_scoped_fixture,
+        HealthCheck.too_slow,
+    ],
+)
 @given(cap=caps, extra=extra_attempts, ip=ips, other_ip=ips)
 def test_per_ip_cap_triggers_429(monkeypatch, cap, extra, ip, other_ip):
     """The first ``cap`` calls pass; every call beyond the cap raises 429.

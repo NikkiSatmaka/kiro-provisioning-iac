@@ -33,10 +33,18 @@ from export_audit import (
     write_audit_csv,
 )
 
-# An email as it appears after the EMAIL# prefix. Kept free of commas, quotes,
-# and newlines is unnecessary — csv handles quoting — but we exclude the empty
-# string so each item models a genuinely claimed email.
-email_value = st.text(min_size=1, max_size=40)
+# An email as it appears after the EMAIL# prefix. We exclude the empty string
+# so each item models a genuinely claimed email, and exclude any value that
+# itself begins with the EMAIL# prefix. The latter reflects a real production
+# invariant: the service derives the PK as ``EMAIL#<normalized_email>`` from a
+# normalized email (lowercase + strip of an address with a single ``@``), so a
+# stored email is never itself a literal ``EMAIL#...`` string and a *nested*
+# ``EMAIL#EMAIL#...`` PK cannot occur. Generating one would make
+# ``removeprefix(EMAIL_PREFIX)`` strip only the outer prefix and leave an
+# ``EMAIL#``-leading value — an input the live key space never produces.
+email_value = st.text(min_size=1, max_size=40).filter(
+    lambda e: not e.startswith(EMAIL_PREFIX)
+)
 
 # Free-form attribute values that ride along on the lock item.
 username_value = st.text(min_size=0, max_size=40)

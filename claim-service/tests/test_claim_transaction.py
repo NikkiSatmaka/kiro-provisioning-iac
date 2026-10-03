@@ -30,8 +30,6 @@ moto-backed table, and restores it afterwards so tests do not leak state.
 
 from __future__ import annotations
 
-import importlib
-
 import boto3
 import pytest
 from moto import mock_aws
@@ -66,22 +64,45 @@ def mocked_claim_handler():
 
         import claim_handler
 
-        importlib.reload(claim_handler)
+        # Point the handler's module state at this test's moto-backed table.
+        # We set every attribute the claim path reads explicitly rather than
+        # ``importlib.reload``-ing the module: a reload rebinds module-level
+        # classes (notably ``claim_handler.ClaimError``) to brand-new objects,
+        # which breaks ``except claim_handler.ClaimError`` / ``from claim_handler
+        # import ClaimError`` identity in *other* test modules that run later in
+        # the same session (they captured the pre-reload class). Pinning the
+        # fields we need keeps this fixture's effect local and harness-only.
+        #
+        # ``REGION`` is read from ``AWS_REGION`` at import; the ambient dev
+        # environment may set a different region (e.g. us-east-1), which would
+        # leave ``_get_table`` resolving a region where the moto table does not
+        # exist (ResourceNotFoundException on the first op). Pin it to the
+        # region ``_make_table`` created the table in.
+        claim_handler.REGION = REGION
         claim_handler.TABLE_NAME = TABLE_NAME
         claim_handler._table = None
         claim_handler._dynamodb = None
 
-        # Materialize the memoized table, then hand its ``meta.client`` a fresh
-        # standalone low-level client. The handler reaches the transaction via
-        # ``table.meta.client.transact_write_items`` exactly as in production;
-        # we only swap *which* client object backs that attribute. moto 5
-        # mis-serializes ``TransactWriteItems`` issued through a *resource's*
-        # auto-attached client (it cancels with a spurious "unhashable type:
-        # 'dict'"), while a plain ``boto3.client`` executes the identical call
-        # correctly. This is a mock-harness workaround only — it changes no
-        # handler behavior.
+        # Materialize the memoized table, then route ONLY
+        # ``transact_write_items`` through a fresh standalone low-level client.
+        # The handler reaches the transaction via
+        # ``table.meta.client.transact_write_items`` exactly as in production.
+        #
+        # Mock-harness workaround (changes no handler behavior): under moto 5
+        # the resource's *auto-attached* client mis-serializes
+        # ``TransactWriteItems`` fed raw AttributeValue dicts — it cancels with
+        # a spurious "unhashable type: 'dict'" — while a plain ``boto3.client``
+        # executes the identical call correctly. We cannot swap the *whole*
+        # resource client (the resource-level seed/scan/get ops need the
+        # resource's marshalling client, which rejects their high-level items
+        # with ParamValidationError), so we rebind only the one bound method
+        # that the handler issues at the client level. moto shares a single
+        # ``TransactionCanceledException`` class across clients, so the
+        # handler's ``client.exceptions.TransactionCanceledException`` lookup
+        # still resolves and cancellation handling is unaffected.
         table = claim_handler._get_table()
-        table.meta.client = boto3.client("dynamodb", region_name=REGION)
+        standalone = boto3.client("dynamodb", region_name=REGION)
+        table.meta.client.transact_write_items = standalone.transact_write_items
 
         yield claim_handler
 

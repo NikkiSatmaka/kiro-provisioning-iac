@@ -113,6 +113,18 @@ def test_successful_claim_returns_assigned_credentials_fields(pool, email):
         claim_handler._dynamodb = resource
         claim_handler._table = table
 
+        # Mock-harness workaround (changes no handler behavior): route only
+        # ``transact_write_items`` through a standalone low-level client. Under
+        # moto 5 the resource's auto-attached client mis-serializes
+        # ``TransactWriteItems`` fed raw AttributeValue dicts (spurious
+        # "unhashable type: 'dict'" cancellation), while a plain
+        # ``boto3.client`` runs the identical call correctly. The resource
+        # client is left intact for the handler's resource-level scan/get, and
+        # moto shares one ``TransactionCanceledException`` class across clients
+        # so cancellation handling is unaffected.
+        standalone = boto3.client("dynamodb", region_name=REGION)
+        table.meta.client.transact_write_items = standalone.transact_write_items
+
         normalized = claim_handler.normalize_email(email)
         result = claim_handler.claim(normalized)
 

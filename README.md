@@ -95,12 +95,13 @@ bucket it stores state in).
 
 ```bash
 mise run backend-bootstrap-plan   # DRY RUN: plan the bucket + lock table (creates nothing)
-mise run backend-bootstrap        # create them AND write subscription/terraform/backend.hcl (prompts)
+mise run backend-bootstrap        # create them AND write both stacks' backend.hcl (prompts)
 ```
 
-The bootstrap derives the bucket name from your account id and writes
-`subscription/terraform/backend.hcl` for you — nothing to fill in. `provision-*`
-tasks fail closed until it exists.
+The bootstrap derives the bucket name from your account id and writes the
+backend config for **both** stacks — `subscription/terraform/backend.hcl` and
+`claim-service/terraform/backend.hcl` — so neither needs an account id filled in
+by hand. `provision-*` tasks fail closed until the subscription one exists.
 
 → **Details:** [`backend/README.md`](./backend/README.md) and
 [RUNBOOK Step 1b](./subscription/RUNBOOK.md#step-1b--iac-one-time-set-up-the-remote-s3-state-backend-required).

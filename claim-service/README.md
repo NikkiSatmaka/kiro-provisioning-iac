@@ -70,8 +70,12 @@ In `.env` set at least:
 
 The remote state bucket must already exist (created by the `backend/` stack —
 see the root `README.md`). This service **reuses** that shared bucket under a
-distinct state key, so there is no separate bootstrap. Create the backend config
-once:
+distinct state key (`claim-service/terraform.tfstate`), so there is no separate
+bootstrap. `mise run backend-bootstrap` already writes
+`claim-service/terraform/backend.hcl` for you alongside the subscription one —
+if you have run it, there is nothing to do here.
+
+Only if you need to create it by hand (e.g. the bucket predates this output):
 
 ```bash
 cp claim-service/terraform/backend.hcl.example claim-service/terraform/backend.hcl

@@ -34,6 +34,7 @@ instance rationale and the hard AWS platform limits, lives in
 | [`subscription/README.md`](./subscription/README.md) | Concepts: what is provisioned, why an account instance, what AWS won't automate, reusability knobs |
 | [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) | End-to-end run order, including the console-only steps |
 | [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) | Cleanup: remote-state `tofu destroy` (primary) + state-free script (fallback) |
+| [`claim-service/README.md`](./claim-service/README.md) | Optional self-serve distribution: deploy a Lambda Function URL, seed the pool from `subscription/output/`, let participants claim with a workshop code |
 
 ## Repo layout
 
@@ -158,6 +159,22 @@ mise run provision-render # Re-render output/credentials.md from an existing man
 mise run teardown-plan    # DRY RUN: discover what teardown would delete (no changes)
 mise run teardown-tofu    # tofu destroy (standard path; uses the required remote state)
 mise run teardown-run     # state-free fallback: delete users/groups/instance (confirms)
+```
+
+Optionally, distribute the provisioned credentials through the **claim service**
+(instead of handing out `output/credentials.md` directly). It deploys its own
+Lambda + Function URL and seeds its pool from the same `subscription/output/`
+files, so run it **after** provisioning + Step 5 (OTPs). Set `WORKSHOP_CODE` in
+`.env` first; see [`claim-service/README.md`](./claim-service/README.md).
+
+```bash
+mise run claim-deploy-plan # DRY RUN: plan the table + Lambda + Function URL
+mise run claim-deploy      # apply (prompts), then print the public HTTPS claim URL
+mise run claim-url         # print the claim URL for the QR code / short link
+mise run claim-seed-plan   # DRY RUN: what would seed from subscription/output/
+mise run claim-seed        # write the pool from otps.csv + manifest.json
+mise run claim-audit       # export who claimed what (git-ignored CSV)
+mise run claim-destroy     # tear down the claim stack (never touches subscription/)
 ```
 
 Follow [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) for the full step-by-step order,

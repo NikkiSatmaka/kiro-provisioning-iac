@@ -255,11 +255,24 @@ region.
 
 ## Step 6 — Distribute & verify sign-in
 
-1. Share `output/credentials.md` securely; delete it after distribution.
-2. A user signs in: Kiro → sign in with organization → **Sign in via IAM
+You have two ways to get credentials to users — pick one:
+
+- **Direct (default):** share `output/credentials.md` securely; delete it after
+  distribution.
+- **Self-serve claim service (optional):** instead of handing out the file,
+  deploy the `claim-service/` stack and let participants claim their own
+  credential from a QR code / short link using a workshop code. It seeds its
+  pool from the `output/otps.csv` + `output/manifest.json` you just produced, so
+  run it only **after** this step. See
+  [`../claim-service/README.md`](../claim-service/README.md) for the
+  `mise run claim-*` lifecycle (deploy → seed → audit → destroy).
+
+Then, however it was distributed:
+
+1. A user signs in: Kiro → sign in with organization → **Sign in via IAM
    Identity Center** → enter the **Sign-in URL** + **region code** → username +
    OTP → set a new password → **Allow access**.
-3. Confirm the Kiro subscription is visible/active inside Kiro.
+2. Confirm the Kiro subscription is visible/active inside Kiro.
 
 ---
 

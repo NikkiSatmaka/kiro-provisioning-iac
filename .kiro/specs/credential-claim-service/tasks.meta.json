@@ -1,0 +1,465 @@
+{
+  "pbtResults": {
+    "4.3 Write property test for email normalization": {
+      "status": "passed",
+      "lastRunTimestamp": 1790943056352
+    }
+  },
+  "executionHistory": {
+    "1.1 Create directory structure and placeholder files": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942210751
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942220571
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942556446
+      }
+    ],
+    "1.2 Add `.gitignore` entries for local-only artifacts": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942210800
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942221969
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942557412
+      }
+    ],
+    "2.1 Author `terraform/dynamodb.tf`": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942210858
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942223466
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942560086
+      }
+    ],
+    "3.1 Author partial backend config": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942210902
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942224055
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942560605
+      }
+    ],
+    "4.1 Implement email + request helpers in `lambda/claim_handler.py`": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942210940
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942565070
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942897746
+      }
+    ],
+    "4.2 Write property test for malformed-email rejection": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942210977
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942908372
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943150441
+      }
+    ],
+    "4.3 Write property test for email normalization": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211010
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942909302
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943151404
+      }
+    ],
+    "4.4 Implement `pick_available` and the claim transaction": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211083
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942906942
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943152785
+      }
+    ],
+    "4.5 Write unit tests for the single-transaction shape (mocked DynamoDB)": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211122
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943450921
+      }
+    ],
+    "4.6 Write property test for successful-claim contents": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211155
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943452825
+      }
+    ],
+    "4.7 Implement `TransactionCanceledException` reason mapping, reclaim, retry": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211192
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943307574
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943446573
+      }
+    ],
+    "4.8 Write property test for bounded retry on credential conflict": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211236
+      }
+    ],
+    "4.9 Write property test for idempotent re-claim": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211273
+      }
+    ],
+    "4.10 Write property test for exhaustion": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211319
+      }
+    ],
+    "4.11 Write property test for PII placement": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211356
+      }
+    ],
+    "5. Checkpoint - claim core": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211402
+      }
+    ],
+    "6.1 Implement `check_and_increment_ip` in `claim_handler.py`": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211440
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943159390
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943300832
+      }
+    ],
+    "6.2 Write property test for the per-IP cap": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211486
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943452974
+      }
+    ],
+    "7.1 Implement `check_workshop_code` and the top-level `handler` routing": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211524
+      }
+    ],
+    "7.2 Write unit tests for each gate branch and response shape": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211576
+      }
+    ],
+    "7.3 Write property test for the workshop-code gate": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211622
+      }
+    ],
+    "8.1 Create `frontend/index.html`": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211701
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942566238
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942896795
+      }
+    ],
+    "8.2 Wire `render_page` to serve the inlined HTML on GET": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211753
+      }
+    ],
+    "8.3 Write unit test for the GET branch": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211793
+      }
+    ],
+    "9.1 Author `terraform/variables.tf` and `terraform/lambda.tf`": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211838
+      }
+    ],
+    "9.2 Author `terraform/outputs.tf`": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211888
+      }
+    ],
+    "9.3 Write infrastructure smoke assertions (plan/snapshot inspection)": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211927
+      }
+    ],
+    "10.1 Implement `scripts/seed_claim_pool.py`": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942211971
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942567189
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942900094
+      }
+    ],
+    "10.2 Write property test for seeding valid rows": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942212018
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942910728
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943153754
+      }
+    ],
+    "10.3 Write property test for invalid-row handling": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942212067
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942911445
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943154759
+      }
+    ],
+    "10.4 Implement `scripts/export_audit.py`": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942212105
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942568317
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942899151
+      }
+    ],
+    "10.5 Write property test for the audit export": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942212151
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943160478
+      },
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943301656
+      }
+    ],
+    "11. Checkpoint - scripts and infrastructure": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942212188
+      }
+    ],
+    "12.1 Add mise tasks to the root `mise.toml` and finish the README": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942212235
+      }
+    ],
+    "12.2 Write the race / concurrency test for the claim path": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942212272
+      }
+    ],
+    "13. Final checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942212318
+      }
+    ],
+    "1. Scaffold the `claim-service/` subtree": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942557458
+      }
+    ],
+    "2. DynamoDB single-table infrastructure": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942560125
+      }
+    ],
+    "3. Backend wiring (shared bucket, distinct key)": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790942560669
+      }
+    ],
+    "10. Operator scripts": [
+      {
+        "executionId": "3729b262-e13b-4e3f-bb30-89b913fe2332",
+        "chatSessionId": "sess_cf629d9b-0b1c-4ce2-87b9-0a1231614d9b",
+        "timestamp": 1790943301706
+      }
+    ]
+  }
+}

@@ -92,19 +92,23 @@ tofu plan
 """
 
 [tasks.backend-bootstrap]
-description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write subscription/terraform/backend.hcl (prompts to approve)."
+description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write the subscription/ and claim-service/ backend.hcl files (prompts to approve)."
 dir = "backend/terraform"
 run = """
 set -eu
 tofu init -input=false
 tofu apply
 # Only reached after a clean apply (set -eu). The bootstrap dir is
-# backend/terraform, so ../../subscription/terraform/backend.hcl is where the
-# subscription stack's `tofu init -backend-config=backend.hcl` reads it.
-# `-raw` emits the heredoc body without surrounding quotes.
+# backend/terraform, so ../../<stack>/terraform/backend.hcl is where each
+# stack's `tofu init -backend-config=backend.hcl` reads it. Both stacks share
+# the one bucket + lock table and differ only by state key, so write both from
+# the matching outputs. `-raw` emits the heredoc body without surrounding quotes.
 tofu output -raw backend_hcl > ../../subscription/terraform/backend.hcl
 echo "wrote subscription/terraform/backend.hcl"
 cat ../../subscription/terraform/backend.hcl
+tofu output -raw backend_hcl_claim_service > ../../claim-service/terraform/backend.hcl
+echo "wrote claim-service/terraform/backend.hcl"
+cat ../../claim-service/terraform/backend.hcl
 """
 
 [tasks.backend-destroy]
@@ -142,15 +146,14 @@ dir = "subscription/scripts"
 run = "python provision.py --apply"
 
 [tasks.provision-render]
-description = "Re-render output/credentials.md from an existing manifest (pass --sign-in-url / --otp-csv as needed)"
+description = "Re-render output/credentials.md from an existing manifest (pass --otp-csv as needed)"
 dir = "subscription/scripts"
 run = "python provision.py --render-only"
 
 # Render output/credentials.md after you have filled in output/otps.csv with the
 # one-time passwords collected from the console (header: username,otp). The
-# sign-in URL is taken from the manifest (derived from the identity store id by
-# `tofu output`), so there is nothing to paste by hand. Override it only for a
-# custom vanity subdomain by appending: -- --sign-in-url https://your.awsapps.com/start
+# sign-in URL always comes from the manifest (derived from the identity store id
+# by `tofu output`), so there is nothing to paste by hand.
 [tasks.credentials]
 description = "Render output/credentials.md from output/otps.csv (sign-in URL comes from the manifest)"
 dir = "subscription/scripts"
@@ -167,7 +170,7 @@ if [ ! -f ../output/otps.csv ]; then
   echo "then re-run: mise run credentials" >&2
   exit 1
 fi
-python provision.py --render-only --otp-csv ../output/otps.csv "$@"
+python provision.py --render-only --otp-csv ../output/otps.csv
 """
 
 # Teardown entrypoints — see subscription/TEARDOWN.md. Nothing here mutates the
@@ -190,3 +193,136 @@ run = "python teardown.py --delete --delete-instance"
 description = "Option B primary: tofu destroy (needs remote state or local state; prompts to confirm)"
 dir = "subscription/terraform"
 run = "tofu destroy"
+
+# =============================================================================
+# === claim-service/ stack ===
+# =============================================================================
+# Self-serve credential claim service — see claim-service/README.md. Tasks are
+# ordered to match the operator lifecycle:
+#
+#   test  ->  deploy-plan  ->  deploy  ->  seed-plan  ->  seed
+#         ->  (workshop runs)  ->  audit  ->  destroy
+#
+# Conventions mirror the subscription/ stack: every mutating step has a safe
+# *-plan / dry-run sibling that reports without changing anything, and the
+# apply/seed/destroy steps prompt before they mutate. Nothing here runs
+# automatically.
+#
+# Secrets: the Function URL is public (authorization NONE); access is gated in
+# the handler by WORKSHOP_CODE + the per-IP cap. Set WORKSHOP_CODE in the
+# git-ignored .env (see .env.example). OpenTofu reads it via TF_VAR_workshop_code,
+# which these tasks export from WORKSHOP_CODE so the sensitive var is never
+# written to a tracked file or passed on the command line.
+
+# --- 1. Test (local, no AWS) -------------------------------------------------
+[tasks.claim-test]
+description = "Run the claim-service test suite (pytest + Hypothesis + moto; no AWS needed)"
+dir = "claim-service"
+run = "uv run --group dev pytest -q"
+
+# --- 2. Deploy ---------------------------------------------------------------
+# backend.hcl must exist first (reuses the shared state bucket from backend/):
+#   cp claim-service/terraform/backend.hcl.example claim-service/terraform/backend.hcl
+#   # then set your 12-digit <account_id> in the bucket name
+# See claim-service/README.md "Deploy". WORKSHOP_CODE must be set in .env.
+
+[tasks.claim-deploy-plan]
+description = "DRY RUN: tofu init + plan for the claim service (creates nothing)"
+dir = "claim-service/terraform"
+run = """
+set -eu
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: claim-service/terraform/backend.hcl not found." >&2
+  echo "Create it from the template (reuses the shared state bucket):" >&2
+  echo "  cp claim-service/terraform/backend.hcl.example claim-service/terraform/backend.hcl" >&2
+  echo "then set your 12-digit <account_id> in the bucket name and re-run." >&2
+  exit 1
+fi
+if [ -z "${WORKSHOP_CODE:-}" ]; then
+  echo "ERROR: WORKSHOP_CODE is not set." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_CODE=my-workshop-2026" >&2
+  exit 1
+fi
+export TF_VAR_workshop_code="$WORKSHOP_CODE"
+tofu init -input=false -backend-config=backend.hcl
+tofu plan
+"""
+
+[tasks.claim-deploy]
+description = "Apply: create the DynamoDB table, Lambda, and Function URL, then print the claim URL (prompts to approve)"
+dir = "claim-service/terraform"
+run = """
+set -eu
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: claim-service/terraform/backend.hcl not found (see claim-deploy-plan)." >&2
+  exit 1
+fi
+if [ -z "${WORKSHOP_CODE:-}" ]; then
+  echo "ERROR: WORKSHOP_CODE is not set (see .env.example)." >&2
+  exit 1
+fi
+export TF_VAR_workshop_code="$WORKSHOP_CODE"
+tofu init -input=false -backend-config=backend.hcl
+tofu apply
+# Only reached after a clean apply (set -eu). Print the public HTTPS URL
+# participants hit — put it behind the workshop QR code / short link.
+echo ""
+echo "Claim service deployed. Participant URL (HTTPS):"
+tofu output -raw claim_url
+echo ""
+"""
+
+[tasks.claim-url]
+description = "Print the deployed claim URL (the HTTPS Function URL for the QR code / short link)"
+dir = "claim-service/terraform"
+run = "tofu output -raw claim_url"
+
+# --- 3. Seed the pool --------------------------------------------------------
+# Reads the subscription/ outputs (otps.csv + manifest.json) and writes one
+# CRED# item per credential. --apply is required to write; without it the
+# script is a dry run. The table name defaults to the stack's var.table_name.
+
+[tasks.claim-seed-plan]
+description = "DRY RUN: classify otps.csv rows and report what would be seeded (writes nothing)"
+dir = "claim-service/scripts"
+run = """
+set -eu
+python seed_claim_pool.py \
+  --otp-csv ../../subscription/output/otps.csv \
+  --manifest ../../subscription/output/manifest.json \
+  --table credential-claim-service
+"""
+
+[tasks.claim-seed]
+description = "Seed the claim pool from the subscription/ outputs (writes CRED# items; conditional, safe to re-run)"
+dir = "claim-service/scripts"
+run = """
+set -eu
+python seed_claim_pool.py \
+  --otp-csv ../../subscription/output/otps.csv \
+  --manifest ../../subscription/output/manifest.json \
+  --table credential-claim-service \
+  --apply
+"""
+
+# --- 4. Audit (after the workshop, before teardown) --------------------------
+[tasks.claim-audit]
+description = "Export who claimed what to a git-ignored CSV under claim-service/output/ (PII — not committed)"
+dir = "claim-service/scripts"
+run = """
+set -eu
+TABLE_NAME=credential-claim-service python export_audit.py
+"""
+
+# --- 5. Destroy --------------------------------------------------------------
+[tasks.claim-destroy]
+description = "Tear down the claim service (table, Lambda, Function URL); never touches subscription/ identities (prompts to confirm)"
+dir = "claim-service/terraform"
+run = """
+set -eu
+# workshop_code is required by the stack even to destroy (it is a required var);
+# export it from the env so destroy does not prompt for a value.
+export TF_VAR_workshop_code="${WORKSHOP_CODE:-unused-at-destroy}"
+tofu destroy
+"""

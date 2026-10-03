@@ -35,12 +35,13 @@ USAGE
   # 3. Render:
   python provision_passwords_and_output.py \
       --manifest ../output/manifest.json \
-      --sign-in-url https://d-xxxx.awsapps.com/start \
       --otp-csv ../output/otps.csv \
       --out ../output/credentials.md
 
-If --sign-in-url is omitted, the script leaves a clear TODO placeholder (you get
-the real URL from the Kiro console after enabling Kiro — see RUNBOOK.md).
+The sign-in URL is ALWAYS taken from the manifest (Terraform derives it from the
+identity store id as https://<identity-store-id>.awsapps.com/start). It is never
+passed in by hand — if a manifest somehow lacks it, the script fails fast rather
+than letting a human paste a URL.
 """
 
 from __future__ import annotations
@@ -59,8 +60,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                    help="Path to manifest.json (tofu output -json provisioning_manifest).")
     p.add_argument("--out", required=True, type=pathlib.Path,
                    help="Path to write the credentials Markdown file.")
-    p.add_argument("--sign-in-url", default="",
-                   help="Kiro / IdC access portal sign-in URL. Get it from the Kiro console after enabling Kiro.")
     p.add_argument("--otp-csv", type=pathlib.Path, default=None,
                    help="Optional CSV with header 'username,otp' mapping users to one-time passwords.")
     p.add_argument("--note", default="",
@@ -81,11 +80,15 @@ def _load_manifest(path: pathlib.Path) -> dict:
     # outputs) wraps each in {"value": ...}. Accept both shapes.
     if "value" in data and "identity_store_id" not in data:
         data = data["value"]
-    required = {"region", "identity_store_id", "users"}
+    required = {"region", "identity_store_id", "users", "sign_in_url"}
     missing = required - set(data)
     if missing:
         sys.exit(f"ERROR: manifest missing keys: {sorted(missing)}. "
                  f"Did you export the 'provisioning_manifest' output?")
+    if not str(data.get("sign_in_url") or "").strip():
+        sys.exit("ERROR: manifest 'sign_in_url' is empty. It is derived by "
+                 "Terraform from the identity store id; re-export the manifest "
+                 "(tofu output -json provisioning_manifest > manifest.json).")
     return data
 
 
@@ -107,11 +110,13 @@ def _load_otps(path: pathlib.Path | None) -> dict[str, str]:
 
 
 def _user_to_groups(manifest: dict) -> dict[str, list[str]]:
-    """Best-effort username -> [group display names] from the manifest.
+    """Map username -> [group names] from the manifest's memberships.
 
-    The manifest's `groups` carry ids, not memberships. Memberships live in the
-    separate `memberships` tofu output. If you also export that, drop it in as
-    manifest['memberships'] = {k: {username, group}} and this will use it.
+    The `provisioning_manifest` tofu output includes a `memberships` block
+    ({key: {username, group}}) resolving which users belong to which groups.
+    Older manifests predating that block simply yield an empty mapping (every
+    user then renders a "—" in the Group(s) column), so this stays tolerant of
+    its absence.
     """
     mapping: dict[str, list[str]] = {}
     memberships = manifest.get("memberships") or {}
@@ -120,7 +125,7 @@ def _user_to_groups(manifest: dict) -> dict[str, list[str]]:
     return mapping
 
 
-def _render(manifest: dict, otps: dict[str, str], sign_in_url: str, note: str) -> str:
+def _render(manifest: dict, otps: dict[str, str], note: str) -> str:
     region = manifest["region"]
     identity_store_id = manifest["identity_store_id"]
     tier = manifest.get("kiro_tier", "(set in tfvars)")
@@ -129,12 +134,11 @@ def _render(manifest: dict, otps: dict[str, str], sign_in_url: str, note: str) -
     user_groups = _user_to_groups(manifest)
     generated = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
 
-    # Precedence: an explicit --sign-in-url wins (lets you supply a custom vanity
-    # subdomain). Otherwise fall back to the default URL the manifest derives
-    # from the identity store id, so users never paste it by hand. Only if both
-    # are absent do we leave a TODO placeholder.
-    resolved_url = sign_in_url or manifest.get("sign_in_url", "")
-    url_cell = resolved_url or "TODO — get sign-in URL from the Kiro console (see RUNBOOK.md)"
+    # The sign-in URL is ALWAYS taken from the manifest — Terraform derives it
+    # from the identity store id (https://<identity-store-id>.awsapps.com/start),
+    # so it is never pasted in by hand. _load_manifest guarantees it is present
+    # and non-empty, so this is a direct read.
+    url_cell = manifest["sign_in_url"]
 
     lines: list[str] = []
     lines.append("# Kiro Access Credentials")
@@ -198,17 +202,11 @@ def main(argv: list[str]) -> int:
     args = _parse_args(argv)
     manifest = _load_manifest(args.manifest)
     otps = _load_otps(args.otp_csv)
-    md = _render(manifest, otps, args.sign_in_url, args.note)
+    md = _render(manifest, otps, args.note)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(md)
     print(f"Wrote {args.out}  ({len(manifest['users'])} users).")
-    if not args.sign_in_url:
-        if manifest.get("sign_in_url"):
-            print(f"NOTE: no --sign-in-url given; used the manifest's derived URL "
-                  f"({manifest['sign_in_url']}).")
-        else:
-            print("NOTE: no --sign-in-url given and none in the manifest; a TODO "
-                  "placeholder was written instead.")
+    print(f"NOTE: sign-in URL taken from the manifest ({manifest['sign_in_url']}).")
     if not otps:
         print("NOTE: no --otp-csv given; password cells are TODO placeholders.")
     return 0

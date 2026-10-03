@@ -39,60 +39,47 @@ Docs (rephrased for compliance):
 
 ## Step 1 — (this account) Confirm credentials & region
 
+Assumes the toolchain + AWS auth are already set up (root README, Phase 0).
+
 ```bash
 # From repo root; mise exports AWS_PROFILE / AWS_REGION automatically.
 mise run verify          # aws sts get-caller-identity
 ```
 
 Confirm the account is the intended **child** account and the region is one
-Kiro supports for IdC. Profile and region come from the git-ignored `.env` file
-at the repo root (`cp .env.example .env`, then edit); mise sources it and
-exports `AWS_PROFILE` / `AWS_REGION`. Default region when `.env` is absent:
-`us-east-1`.
+Kiro supports for IdC. Profile and region come from the git-ignored `.env`
+(default region `us-east-1`); see the root README's Phase 0 if `mise run verify`
+resolves the wrong account.
 
 ---
 
 ## Step 1b — (IaC, one-time) Set up the remote S3 state backend (required)
 
-**This step is mandatory. Do it before Step 2.** `tofu destroy` can only delete
-what is in its state, and local state is git-ignored — it does not travel with
-the repo. If you tear down a month later from a fresh clone (or a different
-machine) without remote state, `tofu destroy` finds empty state and deletes
-nothing, orphaning every user, group, and the account instance. Putting state in
-S3 is what makes the "a month later, different computer" teardown work.
-
-`backend.tf` is tracked (value-free), so the S3 backend is already active in the
-config; `provision.py` / `mise run provision-plan` **fail closed (exit
-non-zero)** until the account-specific `backend.hcl` exists. The bootstrap
-writes `backend.hcl` for you — the bucket name is derived from your account id
-(`kiro-tofu-state-<ACCOUNT_ID>`), so there is nothing to fill in and no tfvars
-to edit (set `state_bucket_name` only to override the derived name).
+**This step is mandatory. Do it before Step 2** — provisioning fails closed
+without it. It matters for *this* stack specifically: `tofu destroy` can only
+remove what is in its state, so if the subscription's state is not in S3, a
+teardown from a fresh clone later would orphan every user, group, and the
+account instance. The `../backend/` stack creates that S3 bucket + lock table
+and writes `subscription/terraform/backend.hcl` for you (the same bootstrap also
+writes `claim-service/terraform/backend.hcl`, used later if you distribute via
+the claim service).
 
 ```bash
-# 1. Dry run — see what the bucket + lock table bootstrap would create.
-mise run backend-bootstrap-plan      # creates nothing
-
-# 2. Create the S3 bucket + DynamoDB lock table AND write backend.hcl.
-mise run backend-bootstrap           # prompts to approve; writes subscription/terraform/backend.hcl
-
-# 3. Provision (mise runs `tofu init -backend-config=backend.hcl` for you).
-mise run provision-plan              # dry run; or `mise run provision` to apply
+mise run backend-bootstrap-plan      # DRY RUN: what the bucket + lock table bootstrap would create
+mise run backend-bootstrap           # create them AND write the stacks' backend.hcl (prompts)
 ```
 
-Prefer manual control? Instead of letting the bootstrap write it, copy the
-template and edit the two or three values by hand:
-
-```bash
-cp subscription/terraform/backend.hcl.example subscription/terraform/backend.hcl   # then edit
-```
-
-The backend/ stack keeps its **own local state** on purpose (chicken-and-egg:
-it is what creates the bucket). Only the subscription stack uses the S3 backend.
+That is all this stack needs from the backend. The mechanics — why the backend
+stack keeps its own local state, the derived bucket name, and the manual
+`backend.hcl` escape hatch — are documented in
+[`../backend/README.md`](../backend/README.md).
 
 Verify:
-- `subscription/terraform/backend.hcl` exists (git-ignored; `backend.tf` is tracked and
-  already present).
-- `tofu init -backend-config=backend.hcl` reports the S3 backend is initialized.
+- `subscription/terraform/backend.hcl` exists (git-ignored; `backend.tf` is
+  tracked and already present).
+- `mise run provision-plan` runs `tofu init -backend-config=backend.hcl` and
+  reports the S3 backend is initialized (it fails closed if `backend.hcl` is
+  missing).
 
 ---
 
@@ -174,13 +161,10 @@ This provisions the Kiro profile + service-linked role. Not scriptable.
 3. When asked for the identity source, choose **IAM Identity Center**. You may
    be prompted to verify the IdC configuration.
 4. Click **Enable**. A Kiro profile is created.
-5. Note the **Sign-in URL** shown (looks like
-   `https://d-xxxxxxxxxx.awsapps.com/start`).
 
-You normally don't need to record this: Step 5's `mise run credentials` derives
-the same default URL from the manifest automatically. Only copy it down if your
-org uses a **custom vanity subdomain** (`your-subdomain.awsapps.com/start`),
-which the derivation can't know about — pass that one to the render task.
+You do **not** need to copy the sign-in URL from this screen. Step 5's
+`mise run credentials` always takes it from the manifest, which Terraform
+derives from the identity store id (`https://<identity-store-id>.awsapps.com/start`).
 
 ---
 
@@ -231,16 +215,10 @@ one-time-password (OTP) flow, then render the Markdown.
    mise run credentials
    ```
    This reads `output/otps.csv` and writes `output/credentials.md`. The
-   **sign-in URL is taken from the manifest automatically** — `tofu output`
-   derives it from the identity store id (`https://<identity-store-id>.awsapps.com/start`),
-   so there is nothing to paste by hand. The task fails fast with instructions
-   if `output/otps.csv` is missing.
-
-   Only if you configured a **custom vanity subdomain** in the IdC console does
-   the default URL differ; pass it explicitly:
-   ```bash
-   mise run credentials -- --sign-in-url "https://your-subdomain.awsapps.com/start"
-   ```
+   **sign-in URL is always taken from the manifest** — `tofu output` derives it
+   from the identity store id (`https://<identity-store-id>.awsapps.com/start`),
+   so it is never passed in by hand. The task fails fast with instructions if
+   `output/otps.csv` is missing.
 
 `output/credentials.md` is git-ignored. It lists each user's username, email
 (if set; anonymous users show a dash), group(s), OTP, and the sign-in URL +
@@ -255,11 +233,24 @@ region.
 
 ## Step 6 — Distribute & verify sign-in
 
-1. Share `output/credentials.md` securely; delete it after distribution.
-2. A user signs in: Kiro → sign in with organization → **Sign in via IAM
+You have two ways to get credentials to users — pick one:
+
+- **Direct (default):** share `output/credentials.md` securely; delete it after
+  distribution.
+- **Self-serve claim service (optional):** instead of handing out the file,
+  deploy the `claim-service/` stack and let participants claim their own
+  credential from a QR code / short link using a workshop code. It seeds its
+  pool from the `output/otps.csv` + `output/manifest.json` you just produced, so
+  run it only **after** this step. See
+  [`../claim-service/README.md`](../claim-service/README.md) for the
+  `mise run claim-*` lifecycle (deploy → seed → audit → destroy).
+
+Then, however it was distributed:
+
+1. A user signs in: Kiro → sign in with organization → **Sign in via IAM
    Identity Center** → enter the **Sign-in URL** + **region code** → username +
    OTP → set a new password → **Allow access**.
-3. Confirm the Kiro subscription is visible/active inside Kiro.
+2. Confirm the Kiro subscription is visible/active inside Kiro.
 
 ---
 

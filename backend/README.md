@@ -20,8 +20,13 @@ state. It only tracks the state bucket and the lock table.
 
 ```bash
 mise run backend-bootstrap-plan   # DRY RUN: tofu init + plan, creates nothing
-mise run backend-bootstrap        # apply AND auto-write subscription/terraform/backend.hcl
+mise run backend-bootstrap        # apply AND auto-write both stacks' backend.hcl
 ```
+
+A single bootstrap writes the backend config for **every** consuming stack —
+`subscription/terraform/backend.hcl` and `claim-service/terraform/backend.hcl`.
+Both point at this one bucket + lock table and differ only by their state
+`key`, so you never fill in an account id by hand.
 
 Raw equivalent:
 
@@ -29,15 +34,19 @@ Raw equivalent:
 cd backend/terraform
 tofu init
 tofu apply
-tofu output -raw backend_hcl > ../../subscription/terraform/backend.hcl
+tofu output -raw backend_hcl              > ../../subscription/terraform/backend.hcl
+tofu output -raw backend_hcl_claim_service > ../../claim-service/terraform/backend.hcl
 ```
 
 ## Who consumes it
 
 - `subscription/` — remote state with key `subscription/terraform.tfstate`.
+- `claim-service/` — remote state with key `claim-service/terraform.tfstate`.
 
-Future stacks reuse the **same bucket** under their own distinct state key, so
-each stack's state stays isolated.
+Both reuse the **same bucket** under their own distinct state key, so each
+stack's state stays isolated (a `tofu destroy` on one can never touch the
+other's state). Any future stack follows the same pattern: add a
+`backend_hcl_<stack>` output here and have the bootstrap write it.
 
 ## Teardown
 

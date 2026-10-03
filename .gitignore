@@ -17,7 +17,22 @@ mise.local.toml
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.hypothesis/
+
+# OpenTofu/Terraform local working dir (provider plugin cache; recreated by init)
+.terraform/
 
 # Git worktrees for AI-assisted / parallel development live here. The worktree
 # directories are backed by the shared .git store and must never be committed.
 .worktrees/
+
+# Credential Claim Service local-only artifacts. The audit CSVs contain claimed
+# emails (PII) and the backend.hcl holds the per-account state config; the
+# tracked backend.hcl.example stays tracked.
+claim-service/output/
+claim-service/terraform/backend.hcl
+
+# Generated Lambda deployment package (archive_file output in lambda.tf);
+# rebuilt from the handler + frontend on every plan/apply.
+claim-service/terraform/build/

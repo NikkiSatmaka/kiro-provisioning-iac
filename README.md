@@ -13,6 +13,24 @@ account access (no permission sets, no account assignments).
 
 ---
 
+## The journey, start to finish
+
+This README is the **starting point**. Follow the phases below in order; each
+one links to the detailed doc for that step. New here? Just go top to bottom.
+
+| Phase | What you do | Detailed doc |
+| ----- | ----------- | ------------ |
+| **0. Set up** | Install the toolchain, point it at your AWS account, authenticate | this README ↓ |
+| **1. Backend** | Create the shared S3 remote-state bucket (one-time, required) | [`backend/README.md`](./backend/README.md) · [RUNBOOK Step 1b](./subscription/RUNBOOK.md#step-1b--iac-one-time-set-up-the-remote-s3-state-backend-required) |
+| **2. Provision** | Create the IdC instance, users, groups; the console-only Kiro steps; render credentials | [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) |
+| **3. Distribute** | Hand out credentials directly, **or** deploy the self-serve claim service | [`claim-service/README.md`](./claim-service/README.md) |
+| **Teardown** | Remove everything when the workshop/engagement ends | [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) |
+
+The phases chain: **2 produces `subscription/output/otps.csv` + `manifest.json`,
+which 3 consumes.** So always provision before you distribute.
+
+---
+
 ## What it does
 
 For a given account, region, and requested count `N`, the tooling creates an IdC
@@ -20,65 +38,25 @@ account instance, `N` users, `M` groups, and their memberships via OpenTofu,
 then walks you through the console-only steps AWS does not expose as a stable
 API (making MFA optional, enabling Kiro, assigning a subscription tier, and
 generating per-user passwords). It finishes by rendering a credentials Markdown
-file for distribution.
+file — which you distribute directly or via the optional claim service.
 
 A full explanation of **what gets provisioned and why**, including the account
 instance rationale and the hard AWS platform limits, lives in
 **[`subscription/README.md`](./subscription/README.md)**.
 
-## Documentation
+---
 
-| Doc | Purpose |
-| --- | ------- |
-| [`backend/README.md`](./backend/README.md) | The shared remote-state backend: the S3 bucket + lock table the other stacks store state in |
-| [`subscription/README.md`](./subscription/README.md) | Concepts: what is provisioned, why an account instance, what AWS won't automate, reusability knobs |
-| [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) | End-to-end run order, including the console-only steps |
-| [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) | Cleanup: remote-state `tofu destroy` (primary) + state-free script (fallback) |
+## Phase 0 — Set up (toolchain + AWS auth)
 
-## Repo layout
+Prerequisites:
 
-The repo is split into independent top-level stacks, each with its own OpenTofu
-state:
-
-```
-.
-├── README.md                 ← you are here (repo overview)
-├── mise.toml                 ← toolchain (python, opentofu, aws-cli, uv) + task runner
-├── pyproject.toml / uv.lock  ← Python deps (boto3) managed by uv
-├── .env.example              ← per-run settings template (AWS_PROFILE / AWS_REGION)
-├── .aws/                     ← project-local AWS config/credentials (git-ignored secrets)
-├── creds/                    ← raw setup credentials (git-ignored)
-├── backend/                  ← shared remote-state backend (LOCAL state, run once)
-│   ├── README.md             ← why it exists + how to run
-│   └── terraform/            ← S3 state bucket + DynamoDB lock table
-└── subscription/             ← IdC account instance + users + groups + Kiro subscription
-    ├── README.md             ← concepts + reusability
-    ├── RUNBOOK.md            ← run order
-    ├── TEARDOWN.md           ← cleanup
-    ├── terraform/            ← OpenTofu config (account instance, users, groups, memberships)
-    ├── scripts/              ← provision.py, teardown.py, OTP + credentials renderer
-    ├── config/               ← non-secret run settings template
-    └── output/               ← generated manifest + credentials (git-ignored)
-```
-
-**Shared backend relationship.** `backend/` runs first and creates the S3 bucket
-+ DynamoDB lock table, keeping its own **local** state (a remote backend can't
-create the bucket it stores state in — run it once per account). `subscription/`
-then consumes that bucket as its remote backend with the state key
-`subscription/terraform.tfstate`. Any future stack reuses the same bucket under
-its own distinct key.
-
-## Prerequisites
-
-- [mise](https://mise.jdx.dev/) to manage the toolchain and run tasks.
-- AWS credentials for the target **child/member** account (placed in the
-  project-local `.aws/`), with the org management account already permitting
-  member-account IdC instances (see RUNBOOK step 0).
-
-mise installs the pinned tools — Python 3.12, OpenTofu 1.13, the AWS CLI, and
-uv — and creates the `.venv`.
-
-## Quick start
+- [mise](https://mise.jdx.dev/) to manage the toolchain and run tasks. It
+  installs the pinned tools — Python 3.12, OpenTofu 1.13, the AWS CLI, uv — and
+  creates the `.venv`.
+- AWS credentials for the target **child/member** account (the CSVs land in
+  `creds/`), and the org management account must already permit member-account
+  IdC instances (that is **RUNBOOK Step 0** — a one-time, irreversible toggle in
+  the Organizations management account; do it before Phase 2's apply).
 
 ```bash
 # 1. Install the toolchain + create the Python venv
@@ -89,6 +67,7 @@ mise run setup
 
 # 3. Point the repo at your account/region (git-ignored)
 cp .env.example .env    # then edit AWS_PROFILE / AWS_REGION
+#   (set WORKSHOP_CODE too if you will use the claim service in Phase 3)
 
 # 4. Create the project-local AWS profile (writes to .aws/, not ~/.aws)
 mise run aws-configure   # runs `aws configure --profile <AWS_PROFILE>`
@@ -96,17 +75,6 @@ mise run aws-configure   # runs `aws configure --profile <AWS_PROFILE>`
 
 # 5. Confirm AWS auth resolves to the intended account
 mise run verify          # aws sts get-caller-identity
-
-# 6. Choose what to provision (git-ignored)
-cp subscription/terraform/terraform.tfvars.example subscription/terraform/terraform.tfvars
-#   then edit prefixes, counts, membership strategy, Kiro tier
-
-# 7. Set up the remote state backend (REQUIRED, one-time)
-mise run backend-bootstrap   # create the S3 state bucket + lock table AND
-#   write subscription/terraform/backend.hcl (bucket name derived from your
-#   account id — nothing to fill in). backend.tf is already tracked, so there is
-#   no copy to do; see RUNBOOK step 1b. provision-plan / provision fail closed until
-#   backend.hcl exists. (Manual escape hatch: cp backend.hcl.example backend.hcl.)
 ```
 
 Credentials are **generated by the AWS CLI**, not copied from a template:
@@ -114,43 +82,179 @@ Credentials are **generated by the AWS CLI**, not copied from a template:
 the keys land in the git-ignored project-local `.aws/credentials` under the
 `AWS_PROFILE` from your `.env`. Read the key values from the CSVs in `creds/`.
 
-Everything that changes between projects — region, profile, user/group
-prefixes, counts, membership strategy, Kiro tier — is a variable. Region and
-profile live in the git-ignored `.env`; the user/group prefixes, counts,
-membership strategy, and tier live in `subscription/terraform/terraform.tfvars`
-(created in step 6 above). See
-[`subscription/README.md`](./subscription/README.md#reusability) for the
-full list.
+→ **Next:** Phase 1.
 
-With the backend set up, follow [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) from
-**Step 0** (the one-time org management-account toggle) through the required
-remote-state backend (Step 1b), provisioning, the console-only steps, and
-credential rendering.
+---
 
-## Common tasks
+## Phase 1 — Backend (shared remote state, one-time)
 
-The mise tasks wrap the entrypoints. None mutate the account without a prompt;
-the `*-plan` tasks are safe dry runs.
+Remote state is **required** — it is what makes a `tofu destroy` work from a
+fresh clone a month later. `backend/` creates the S3 state bucket + DynamoDB lock
+table and keeps its **own local** state (a remote backend can't create the
+bucket it stores state in).
 
 ```bash
-mise run backend-bootstrap-plan # DRY RUN: plan the S3 state bucket + lock table (creates nothing)
-mise run backend-bootstrap      # One-time (REQUIRED): create the S3 state bucket + lock table (prompts)
+mise run backend-bootstrap-plan   # DRY RUN: plan the bucket + lock table (creates nothing)
+mise run backend-bootstrap        # create them AND write both stacks' backend.hcl (prompts)
+```
 
-mise run provision-plan   # DRY RUN: tofu init + plan, no changes
-mise run provision        # Apply: create IdC instance + users + groups, then render credentials (prompts)
-mise run provision-render # Re-render output/credentials.md from an existing manifest
+The bootstrap derives the bucket name from your account id and writes the
+backend config for **both** stacks — `subscription/terraform/backend.hcl` and
+`claim-service/terraform/backend.hcl` — so neither needs an account id filled in
+by hand. `provision-*` tasks fail closed until the subscription one exists.
 
+→ **Details:** [`backend/README.md`](./backend/README.md) and
+[RUNBOOK Step 1b](./subscription/RUNBOOK.md#step-1b--iac-one-time-set-up-the-remote-s3-state-backend-required).
+**Next:** Phase 2.
+
+---
+
+## Phase 2 — Provision the subscription
+
+```bash
+# 1. Choose what to provision (git-ignored)
+cp subscription/terraform/terraform.tfvars.example subscription/terraform/terraform.tfvars
+#   then edit prefixes, counts, membership strategy, Kiro tier
+
+# 2. Dry run, then apply (prompts)
+mise run provision-plan   # tofu init + plan, no changes
+mise run provision        # create IdC instance + users + groups + memberships
+```
+
+`tofu apply` only covers what AWS exposes as an API. Provisioning then needs
+**console-only steps** — make MFA optional, enable Kiro, assign the subscription
+tier, and generate per-user one-time passwords — after which `mise run
+credentials` renders `output/credentials.md`. These are all laid out, in order,
+in the RUNBOOK.
+
+→ **Follow the full run order:** [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md)
+from **Step 0** (the management-account toggle) through credential rendering
+(Step 5). **Next:** Phase 3.
+
+---
+
+## Phase 3 — Distribute the credentials
+
+Two ways to get credentials to users — pick one:
+
+- **Direct (default):** share the rendered `subscription/output/credentials.md`
+  securely, then delete it. This is RUNBOOK Step 6; no extra infrastructure.
+- **Self-serve claim service (optional):** deploy a single public HTTPS Lambda
+  Function URL and let participants claim their own credential from a QR code /
+  short link using a workshop code. It seeds its pool from the **same**
+  `subscription/output/otps.csv` + `manifest.json` you produced in Phase 2, so
+  run it only after provisioning. Set `WORKSHOP_CODE` in `.env` first.
+
+```bash
+# Claim-service lifecycle (only if you chose the self-serve path):
+mise run claim-deploy-plan # DRY RUN: plan the table + Lambda + Function URL
+mise run claim-deploy      # apply (prompts), then print the public HTTPS claim URL
+mise run claim-url         # print the claim URL for the QR code / short link
+mise run claim-seed-plan   # DRY RUN: what would seed from subscription/output/
+mise run claim-seed        # write the pool from otps.csv + manifest.json
+mise run claim-audit       # after the workshop: export who claimed what (git-ignored CSV)
+mise run claim-destroy     # tear down the claim stack (never touches subscription/)
+```
+
+However it was distributed, a user signs in via Kiro → IAM Identity Center with
+the sign-in URL + region + username + OTP, then sets a new password.
+
+→ **Details:** [`claim-service/README.md`](./claim-service/README.md) for the
+self-serve path; [RUNBOOK Step 6](./subscription/RUNBOOK.md#step-6--distribute--verify-sign-in)
+for direct distribution and sign-in verification.
+
+---
+
+## Teardown
+
+When the engagement ends, remove everything. The remote state from Phase 1 is
+what lets `tofu destroy` work from any machine.
+
+```bash
+# Claim service first, if you deployed it:
+mise run claim-destroy    # remove the table, Lambda, Function URL (prompts)
+
+# Then the subscription:
 mise run teardown-plan    # DRY RUN: discover what teardown would delete (no changes)
 mise run teardown-tofu    # tofu destroy (standard path; uses the required remote state)
 mise run teardown-run     # state-free fallback: delete users/groups/instance (confirms)
 ```
 
-Follow [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) for the full step-by-step order,
-including the console-only steps the tooling cannot perform.
+→ **Details (including teardown from a different machine a month later, and the
+Kiro-subscription deactivation that must happen first):**
+[`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md).
 
-## Security notes
+---
+
+## Reference
+
+### Documentation index
+
+| Doc | Purpose |
+| --- | ------- |
+| [`backend/README.md`](./backend/README.md) | The shared remote-state backend: the S3 bucket + lock table the other stacks store state in |
+| [`subscription/README.md`](./subscription/README.md) | Concepts: what is provisioned, why an account instance, what AWS won't automate, reusability knobs |
+| [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) | End-to-end run order, including the console-only steps |
+| [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) | Cleanup: remote-state `tofu destroy` (primary) + state-free script (fallback) |
+| [`claim-service/README.md`](./claim-service/README.md) | Optional self-serve distribution: deploy a Lambda Function URL, seed the pool from `subscription/output/`, let participants claim with a workshop code |
+
+### Repo layout
+
+The repo is split into independent top-level stacks, each with its own OpenTofu
+state:
+
+```
+.
+├── README.md                 ← you are here (the newcomer journey)
+├── mise.toml                 ← toolchain (python, opentofu, aws-cli, uv) + task runner
+├── pyproject.toml / uv.lock  ← Python deps (boto3) managed by uv
+├── .env.example              ← per-run settings template (AWS_PROFILE / AWS_REGION / WORKSHOP_CODE)
+├── .aws/                     ← project-local AWS config/credentials (git-ignored secrets)
+├── creds/                    ← raw setup credentials (git-ignored)
+├── backend/                  ← shared remote-state backend (LOCAL state, run once)
+│   ├── README.md             ← why it exists + how to run
+│   └── terraform/            ← S3 state bucket + DynamoDB lock table
+├── subscription/             ← IdC account instance + users + groups + Kiro subscription
+│   ├── README.md             ← concepts + reusability
+│   ├── RUNBOOK.md            ← run order
+│   ├── TEARDOWN.md           ← cleanup
+│   ├── terraform/            ← OpenTofu config (account instance, users, groups, memberships)
+│   ├── scripts/              ← provision.py, teardown.py, OTP + credentials renderer
+│   ├── config/               ← non-secret run settings template
+│   └── output/               ← generated manifest + credentials (git-ignored)
+└── claim-service/            ← self-serve credential claim (opt-in; reuses the shared backend)
+    ├── README.md             ← run order + how participants reach the URL
+    ├── lambda/               ← the claim handler (Function URL: GET page, POST claim)
+    ├── frontend/             ← self-contained claim page served inline
+    ├── terraform/            ← DynamoDB + Lambda + Function URL + IAM
+    ├── scripts/              ← seed_claim_pool.py, export_audit.py
+    └── tests/                ← pytest + Hypothesis + moto suite
+```
+
+**Shared backend relationship.** `backend/` runs first and creates the S3 bucket
++ DynamoDB lock table, keeping its own **local** state (a remote backend can't
+create the bucket it stores state in — run it once per account). `subscription/`
+then consumes that bucket as its remote backend with the state key
+`subscription/terraform.tfstate`. Any future stack reuses the same bucket under
+its own distinct key — e.g. `claim-service/` uses
+`claim-service/terraform.tfstate`, so its `tofu destroy` can never touch the
+identities in `subscription/`'s state.
+
+### Configuration knobs
+
+Everything that changes between projects — region, profile, user/group
+prefixes, counts, membership strategy, Kiro tier — is a variable. Region and
+profile live in the git-ignored `.env`; the user/group prefixes, counts,
+membership strategy, and tier live in `subscription/terraform/terraform.tfvars`.
+See [`subscription/README.md`](./subscription/README.md#reusability) for the
+full list.
+
+### Security notes
 
 - `.env`, `.aws/credentials`, `creds/`, and anything under `subscription/output/`
   (generated manifests and credentials) are **git-ignored**. Keep them that way.
 - Generated `output/credentials.md` and `output/otps.csv` contain sign-in
   secrets — distribute securely and delete them after use.
+- The claim service's Function URL is **public**; access is gated by the
+  `WORKSHOP_CODE` and a per-IP cap. Pick a fresh code per workshop and don't
+  share it before the event.

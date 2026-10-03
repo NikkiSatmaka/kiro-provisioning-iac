@@ -1,15 +1,22 @@
 # Kiro Subscription Provisioning (IAM Identity Center — account instance)
 
-Reusable Infrastructure-as-Code (**OpenTofu**) + Python tooling to provision
-**Kiro enterprise subscriptions** for a team in a single AWS account, using an
-**IAM Identity Center _account instance_** as the identity source.
+Infrastructure-as-Code (**OpenTofu**) + Python tooling to provision **Kiro
+enterprise subscriptions** for a team in a single AWS account, using an **IAM
+Identity Center _account instance_** as the identity source.
 
 The identity users this creates are intended for **Kiro login only** — they are
 not granted any AWS account access (no permission sets, no account assignments).
 
 > ⚠️ **Nothing here runs automatically.** Every step is manual or driven by an
-> explicit entrypoint you invoke. Read [`RUNBOOK.md`](./RUNBOOK.md) for the
-> end-to-end run order and the steps that AWS only exposes through the console.
+> explicit entrypoint you invoke. [`RUNBOOK.md`](./RUNBOOK.md) is the
+> end-to-end run order, including the steps AWS only exposes through the console.
+
+**Scope of this doc.** This README explains the subscription stack itself — what
+it provisions, why an account instance, the AWS platform limits, and the
+reusability knobs. For the overall repo journey (toolchain setup, the shared
+state backend, and distributing the result), start at the
+[root `README.md`](../README.md). To run the subscription steps in order, use
+[`RUNBOOK.md`](./RUNBOOK.md); to tear it down, [`TEARDOWN.md`](./TEARDOWN.md).
 
 ---
 
@@ -27,7 +34,11 @@ For a given account, region, and a requested count `N`:
 6. **Passwords** — a one-time-password (OTP) workflow per user; IdC does **not**
    support an admin-set shared password via API (see caveat).
 7. **A credentials Markdown file** capturing each user's sign-in URL, username,
-   and password/OTP for distribution.
+   and password/OTP.
+
+What happens to that credentials file afterwards — handing it out directly or
+feeding it to the claim service — is **out of scope here**; that is the
+distribution phase, owned by the root README and `../claim-service/`.
 
 ---
 
@@ -71,6 +82,7 @@ Sources (rephrased for compliance with licensing restrictions):
 
 These are hard platform limits, not gaps in this repo. The tooling automates
 everything up to these lines and then hands you a precise, guided manual step.
+Each maps to a step in [`RUNBOOK.md`](./RUNBOOK.md).
 
 ### 0. Making MFA optional (not required) for sign-in
 
@@ -158,11 +170,11 @@ subscription/
     └── credentials.template.md            ← shape of the generated MD
 ```
 
-The shared OpenTofu state backend (the S3 bucket + DynamoDB lock table that hold
-this stack's `subscription/terraform.tfstate`) is the sibling top-level
-`../backend/` stack — run it once before provisioning (see `../backend/README.md`).
-
-Generated credential files land in `subscription/output/` and are **git-ignored**.
+This stack stores its OpenTofu state (`subscription/terraform.tfstate`) in the
+shared S3 bucket created by the sibling `../backend/` stack. That bucket is a
+**prerequisite**, set up once — see [`../backend/README.md`](../backend/README.md)
+and [`RUNBOOK.md`](./RUNBOOK.md) step 1b. Generated credential files land in
+`subscription/output/` and are **git-ignored**.
 
 ---
 
@@ -181,55 +193,16 @@ between projects is a variable:
 | Membership strategy | `variables.tf` | `all_in_first` / `round_robin` |
 | Kiro tier | `variables.tf` + script | `PRO`, `PRO_PLUS`, `PRO_MAX`, `POWER` |
 
-Point it at a different account/region by editing one git-ignored file, `.env`
-(see below). No code edits required.
-
-### The `.env` file — one place for per-run settings
-
-All per-run / per-account values live in a single git-ignored `.env` at the repo
-root. mise sources it and exports the variables to the AWS CLI, the SDKs,
-OpenTofu, and the scripts.
-
-```bash
-cp .env.example .env    # then edit .env
-```
-
-```dotenv
-# .env
-AWS_PROFILE=kiro-provisioning
-AWS_REGION=us-east-1          # change region here — nothing else to touch
-```
-
-mise exports these (and derives `AWS_DEFAULT_REGION` from `AWS_REGION`). OpenTofu's
-`aws_region` variable defaults to empty and inherits `AWS_REGION`; the scripts
-read `AWS_REGION` (or `--region`). When `.env` is absent, mise falls back to the
-defaults in `mise.toml` (`kiro-provisioning` / `us-east-1`).
+Region and profile come from the git-ignored `.env` at the repo root (set up in
+the root README's Phase 0); the user/group prefixes, counts, membership
+strategy, sequence padding, and Kiro tier live in
+`terraform/terraform.tfvars` (copy `terraform.tfvars.example`). Point the stack
+at a different account/region by editing `.env` alone — no code edits required.
 
 ---
 
-## Run order (summary — full detail in RUNBOOK.md)
+## Running it
 
-1. **(Management account, one-time)** Permit member-account IdC instances.
-2. **(This repo, one-time)** Bootstrap the S3 remote state backend
-   (`mise run backend-bootstrap`), which creates the bucket + lock table and
-   writes `backend.hcl` for you (bucket name derived from your account id;
-   `backend.tf` is already tracked) — **required** before apply; `provision.py`
-   fails closed without it.
-3. **(This repo)** `mise run provision-plan` then `mise run provision` — runs
-   `tofu init -backend-config=backend.hcl && plan && apply`, creating the account
-   instance, users, groups, and memberships.
-4. **(Console, one-time)** Set MFA prompt to **Never (disabled)** so users are
-   not obligated to set up MFA.
-5. **(Console, one-time)** Enable Kiro with IAM Identity Center as the identity
-   source; note the sign-in URL.
-6. **(Console)** Assign the Kiro tier to each group.
-7. **(Console + task)** Generate a one-time password per user; paste them into
-   `output/otps.csv`, then `mise run credentials` to produce
-   `output/credentials.md`.
-8. Distribute credentials. Users sign in to Kiro via the IdC sign-in URL.
-
-To remove everything later — including from a different machine a month on — see
-[`TEARDOWN.md`](./TEARDOWN.md). The remote S3 state backend (Option B) is a
-**required** step at provision time (step 2 above) so `tofu destroy` works from
-any clone; a state-free discovery script (Option A) remains as an emergency
-fallback.
+The step-by-step order — the management-account prerequisite, provisioning, the
+console-only Kiro steps, and rendering the credentials file — lives in
+[`RUNBOOK.md`](./RUNBOOK.md). Teardown lives in [`TEARDOWN.md`](./TEARDOWN.md).

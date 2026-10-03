@@ -196,12 +196,11 @@ def test_pipeline_reports_first_failing_step(
             }
         )
 
-        # moto-5 transact_write_items workaround (changes no handler behavior):
-        # route the transaction through a standalone low-level client, matching
-        # the sibling success property test. Only exercised when every earlier
-        # stage passes and the pipeline reaches claim().
-        standalone = boto3.client("dynamodb", region_name=REGION)
-        table.meta.client.transact_write_items = standalone.transact_write_items
+        # The handler sends NATIVE values to the resource-attached
+        # ``transact_write_items``, which auto-serializes them; the real client
+        # runs the transaction correctly under moto, so no client reroute is
+        # needed. (The earlier standalone-client workaround tested a different
+        # serialization path than production and hid the typed-descriptor bug.)
 
         body = _body_for(fail_body, fail_email, fail_code)
         event = make_event(method="POST", body=body, source_ip=ip)

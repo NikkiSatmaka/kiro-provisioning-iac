@@ -26,11 +26,12 @@ in practice, so ASCII is the realistic input space and keeps the property on the
 gate's accept/reject logic rather than a compare-digest stdlib limitation.
 
 The POST path needs a table, so each example reuses the moto fixture + memoized
-state reset + ``transact_write_items`` standalone-client workaround that the
-sibling property tests document (``test_claim_success_contents_property.py`` /
-``test_per_ip_cap_property.py``). ``CONFIGURED_WORKSHOP_CODE`` is set per example
-via monkeypatch, and one available ``CRED#`` is seeded so the accept case can
-reach claim.
+state reset that the sibling property tests document
+(``test_claim_success_contents_property.py`` / ``test_per_ip_cap_property.py``).
+The claim transaction runs through the handler's real resource-attached client,
+which auto-serializes the native values the handler sends.
+``CONFIGURED_WORKSHOP_CODE`` is set per example via monkeypatch, and one
+available ``CRED#`` is seeded so the accept case can reach claim.
 """
 
 from __future__ import annotations
@@ -184,10 +185,11 @@ def test_wrong_or_empty_code_never_writes_padded_correct_accepted(
         monkeypatch.setattr(claim_handler, "_table", table)
         monkeypatch.setattr(claim_handler, "CONFIGURED_WORKSHOP_CODE", code)
 
-        # moto-5 transact_write_items standalone-client workaround (changes no
-        # handler behavior) so the accept case can execute the claim transaction.
-        standalone = boto3.client("dynamodb", region_name=REGION)
-        table.meta.client.transact_write_items = standalone.transact_write_items
+        # The handler sends NATIVE values to the resource-attached
+        # ``transact_write_items``, which auto-serializes them; the real client
+        # runs the transaction correctly under moto, so no client reroute is
+        # needed. (The earlier standalone-client workaround tested a different
+        # serialization path than production and hid the typed-descriptor bug.)
 
         # Spy on claim so we can assert it is never invoked (reject half) and
         # invoked exactly once with the normalized email (accept half).

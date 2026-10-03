@@ -526,23 +526,29 @@ def claim(email: str) -> dict:
                 TransactItems=[
                     {
                         # One claim per email: fails if this email already
-                        # holds a lock.
+                        # holds a lock. Values are native Python, not typed
+                        # {"S": ...} descriptors: this transaction runs on the
+                        # resource's auto-serializing client (table.meta.client),
+                        # which marshals native values itself. Passing pre-typed
+                        # descriptors here makes it double-serialize them into a
+                        # Map, so DynamoDB rejects PK with "expected: S actual: M"
+                        # and cancels the transaction with a ValidationError.
                         "Put": {
                             "TableName": TABLE_NAME,
                             "Item": {
-                                "PK": {"S": f"EMAIL#{email}"},
-                                "username": {"S": username},
-                                "claimed_at": {"S": claimed_at},
+                                "PK": f"EMAIL#{email}",
+                                "username": username,
+                                "claimed_at": claimed_at,
                             },
                             "ConditionExpression": "attribute_not_exists(PK)",
                         },
                     },
                     {
                         # One claim per credential: fails if it was taken since
-                        # the pick.
+                        # the pick. Native values for the same reason as above.
                         "Update": {
                             "TableName": TABLE_NAME,
-                            "Key": {"PK": {"S": f"CRED#{username}"}},
+                            "Key": {"PK": f"CRED#{username}"},
                             "UpdateExpression": (
                                 "SET #status = :claimed, "
                                 "claimed_by_email = :email, "
@@ -551,10 +557,10 @@ def claim(email: str) -> dict:
                             "ConditionExpression": "#status = :available",
                             "ExpressionAttributeNames": {"#status": "status"},
                             "ExpressionAttributeValues": {
-                                ":claimed": {"S": "claimed"},
-                                ":available": {"S": "available"},
-                                ":email": {"S": email},
-                                ":claimed_at": {"S": claimed_at},
+                                ":claimed": "claimed",
+                                ":available": "available",
+                                ":email": email,
+                                ":claimed_at": claimed_at,
                             },
                         },
                     },

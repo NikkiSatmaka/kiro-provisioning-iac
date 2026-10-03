@@ -87,26 +87,18 @@ def mocked_claim_handler():
         claim_handler._table = None
         claim_handler._dynamodb = None
 
-        # Materialize the memoized table, then route ONLY
-        # ``transact_write_items`` through a fresh standalone low-level client.
-        # The handler reaches the transaction via
-        # ``table.meta.client.transact_write_items`` exactly as in production.
-        #
-        # Mock-harness workaround (changes no handler behavior): under moto 5
-        # the resource's *auto-attached* client mis-serializes
-        # ``TransactWriteItems`` fed raw AttributeValue dicts — it cancels with
-        # a spurious "unhashable type: 'dict'" — while a plain ``boto3.client``
-        # executes the identical call correctly. We cannot swap the *whole*
-        # resource client (the resource-level seed/scan/get ops need the
-        # resource's marshalling client, which rejects their high-level items
-        # with ParamValidationError), so we rebind only the one bound method
-        # that the handler issues at the client level. moto shares a single
-        # ``TransactionCanceledException`` class across clients, so the
-        # handler's ``client.exceptions.TransactionCanceledException`` lookup
-        # still resolves and cancellation handling is unaffected.
-        table = claim_handler._get_table()
-        standalone = boto3.client("dynamodb", region_name=REGION)
-        table.meta.client.transact_write_items = standalone.transact_write_items
+        # Materialize the memoized table. The handler reaches the transaction
+        # via ``table.meta.client.transact_write_items`` exactly as in
+        # production — and sends NATIVE Python values (not typed AttributeValue
+        # descriptors), because that resource-attached client auto-serializes
+        # the request. We deliberately do NOT swap or rebind the client here:
+        # routing the transaction through a plain low-level client (as an
+        # earlier harness did) tested a different serialization path than
+        # production used, which is precisely what hid the production bug where
+        # typed descriptors got double-serialized into a Map and DynamoDB
+        # cancelled the transaction with a ValidationError. Letting the real
+        # resource client serialize the native values keeps the test honest.
+        claim_handler._get_table()
 
         yield claim_handler
 

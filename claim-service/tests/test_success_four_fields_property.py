@@ -35,9 +35,9 @@ new table every example, mirroring the sibling moto-backed property tests
 * The seeded ``CRED#`` ``region`` is the env-derived ``REGION`` — the region
   ``conftest.py`` pins ``AWS_REGION`` to (default us-east-1) — so the returned
   ``region`` matches the seeded value under the test environment.
-* The moto-5 ``transact_write_items`` standalone-client workaround (identical to
-  the sibling tests) routes only that one call through a plain low-level client;
-  it changes no handler behavior.
+* The claim transaction runs through the handler's real resource-attached
+  client, which auto-serializes the native values the handler sends — the same
+  serialization path as production.
 
 To prove non-leakage positively, every seeded credential also carries the
 internal attributes a claimed credential would gain (``claimed_by_email``,
@@ -166,11 +166,11 @@ def test_success_returns_exactly_four_fields(monkeypatch, pool, email):
             table.put_item(Item=item)
             seeded[username] = item
 
-        # moto-5 transact_write_items workaround (changes no handler behavior):
-        # route the transaction through a standalone low-level client, matching
-        # the sibling success property test.
-        standalone = boto3.client("dynamodb", region_name=REGION)
-        table.meta.client.transact_write_items = standalone.transact_write_items
+        # The handler sends NATIVE values to the resource-attached
+        # ``transact_write_items``, which auto-serializes them; the real client
+        # runs the transaction correctly under moto, so no client reroute is
+        # needed. (The earlier standalone-client workaround tested a different
+        # serialization path than production and hid the typed-descriptor bug.)
 
         # Drive the whole handler as a browser would: a POST with a valid email
         # and the correct workshop code, from a fresh source IP.

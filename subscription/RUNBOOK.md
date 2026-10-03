@@ -161,13 +161,10 @@ This provisions the Kiro profile + service-linked role. Not scriptable.
 3. When asked for the identity source, choose **IAM Identity Center**. You may
    be prompted to verify the IdC configuration.
 4. Click **Enable**. A Kiro profile is created.
-5. Note the **Sign-in URL** shown (looks like
-   `https://d-xxxxxxxxxx.awsapps.com/start`).
 
-You normally don't need to record this: Step 5's `mise run credentials` derives
-the same default URL from the manifest automatically. Only copy it down if your
-org uses a **custom vanity subdomain** (`your-subdomain.awsapps.com/start`),
-which the derivation can't know about — pass that one to the render task.
+You do **not** need to copy the sign-in URL from this screen. Step 5's
+`mise run credentials` always takes it from the manifest, which Terraform
+derives from the identity store id (`https://<identity-store-id>.awsapps.com/start`).
 
 ---
 
@@ -218,16 +215,10 @@ one-time-password (OTP) flow, then render the Markdown.
    mise run credentials
    ```
    This reads `output/otps.csv` and writes `output/credentials.md`. The
-   **sign-in URL is taken from the manifest automatically** — `tofu output`
-   derives it from the identity store id (`https://<identity-store-id>.awsapps.com/start`),
-   so there is nothing to paste by hand. The task fails fast with instructions
-   if `output/otps.csv` is missing.
-
-   Only if you configured a **custom vanity subdomain** in the IdC console does
-   the default URL differ; pass it explicitly:
-   ```bash
-   mise run credentials -- --sign-in-url "https://your-subdomain.awsapps.com/start"
-   ```
+   **sign-in URL is always taken from the manifest** — `tofu output` derives it
+   from the identity store id (`https://<identity-store-id>.awsapps.com/start`),
+   so it is never passed in by hand. The task fails fast with instructions if
+   `output/otps.csv` is missing.
 
 `output/credentials.md` is git-ignored. It lists each user's username, email
 (if set; anonymous users show a dash), group(s), OTP, and the sign-in URL +

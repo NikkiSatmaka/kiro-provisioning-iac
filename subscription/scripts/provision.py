@@ -40,11 +40,9 @@ USAGE
   # Apply and auto-approve (non-interactive / CI):
   python provision.py --apply --yes
 
-  # After you have collected OTPs from the console, re-render with them and the
-  # real sign-in URL (no tofu needed):
-  python provision.py --render-only \
-      --sign-in-url https://d-xxxx.awsapps.com/start \
-      --otp-csv ../output/otps.csv
+  # After you have collected OTPs from the console, re-render with them (no tofu
+  # needed). The sign-in URL comes from the manifest automatically:
+  python provision.py --render-only --otp-csv ../output/otps.csv
 
   # Pass extra args straight through to tofu (after a --):
   python provision.py --apply -- -var 'user_count=25'
@@ -82,15 +80,15 @@ CONSOLE-ONLY STEPS — AWS exposes no stable API for these. Do them by hand.
              Prompt users for MFA -> "Never (disabled)" -> Save.
 [ ] Step 3   Enable Kiro:
              Kiro console -> "Onboard your team to Kiro" -> identity source
-             = IAM Identity Center -> Enable. COPY the Sign-in URL.
+             = IAM Identity Center -> Enable.
 [ ] Step 4   Assign the tier to each group:
              Kiro console -> Users & Groups -> Groups -> Add group ->
              pick the tier (or try: python attempt_kiro_subscription.py --attempt).
 [ ] Step 5   Generate a one-time password per user (IdC -> Users -> Reset
              password -> Generate one-time password), save them to
-             ../output/otps.csv (header: username,otp), then re-run:
-             python provision.py --render-only --sign-in-url <URL> \\
-                 --otp-csv ../output/otps.csv
+             ../output/otps.csv (header: username,otp), then re-run (the sign-in
+             URL comes from the manifest automatically):
+             python provision.py --render-only --otp-csv ../output/otps.csv
 ================================================================================
 """
 
@@ -130,8 +128,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                    help="Auto-approve the apply (passes -auto-approve to tofu). Requires --apply.")
     p.add_argument("--render-only", action="store_true",
                    help="Skip tofu entirely; just (re)render credentials.md from an existing manifest.")
-    p.add_argument("--sign-in-url", default="",
-                   help="Kiro/IdC sign-in URL for credentials.md (get it from the Kiro console, step 3).")
     p.add_argument("--otp-csv", type=pathlib.Path, default=None,
                    help="Optional username,otp CSV to embed in credentials.md.")
     p.add_argument("--no-render", action="store_true",
@@ -184,7 +180,7 @@ def _export_manifest(tofu: str) -> bool:
     return True
 
 
-def _render(sign_in_url: str, otp_csv: pathlib.Path | None) -> int:
+def _render(otp_csv: pathlib.Path | None) -> int:
     if not MANIFEST.exists():
         print(f"NOTE: {MANIFEST} not found; skipping credentials render. "
               f"Run with --apply first (or export the manifest).")
@@ -192,8 +188,6 @@ def _render(sign_in_url: str, otp_csv: pathlib.Path | None) -> int:
     cmd = [sys.executable, str(RENDER_SCRIPT),
            "--manifest", str(MANIFEST),
            "--out", str(CREDENTIALS)]
-    if sign_in_url:
-        cmd += ["--sign-in-url", sign_in_url]
     if otp_csv:
         cmd += ["--otp-csv", str(otp_csv)]
     return _run(cmd, cwd=HERE)
@@ -205,7 +199,7 @@ def main(argv: list[str]) -> int:
 
     # Render-only short-circuit (no tofu).
     if args.render_only:
-        rc = _render(args.sign_in_url, args.otp_csv)
+        rc = _render(args.otp_csv)
         print(CONSOLE_STEPS)
         return rc
 
@@ -246,7 +240,7 @@ def main(argv: list[str]) -> int:
         return 1
 
     if not args.no_render:
-        _render(args.sign_in_url, args.otp_csv)
+        _render(args.otp_csv)
 
     print("\nIaC steps done: IdC instance + users + groups + memberships created.")
     print(CONSOLE_STEPS)

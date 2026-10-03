@@ -146,15 +146,14 @@ dir = "subscription/scripts"
 run = "python provision.py --apply"
 
 [tasks.provision-render]
-description = "Re-render output/credentials.md from an existing manifest (pass --sign-in-url / --otp-csv as needed)"
+description = "Re-render output/credentials.md from an existing manifest (pass --otp-csv as needed)"
 dir = "subscription/scripts"
 run = "python provision.py --render-only"
 
 # Render output/credentials.md after you have filled in output/otps.csv with the
 # one-time passwords collected from the console (header: username,otp). The
-# sign-in URL is taken from the manifest (derived from the identity store id by
-# `tofu output`), so there is nothing to paste by hand. Override it only for a
-# custom vanity subdomain by appending: -- --sign-in-url https://your.awsapps.com/start
+# sign-in URL always comes from the manifest (derived from the identity store id
+# by `tofu output`), so there is nothing to paste by hand.
 [tasks.credentials]
 description = "Render output/credentials.md from output/otps.csv (sign-in URL comes from the manifest)"
 dir = "subscription/scripts"
@@ -171,7 +170,7 @@ if [ ! -f ../output/otps.csv ]; then
   echo "then re-run: mise run credentials" >&2
   exit 1
 fi
-python provision.py --render-only --otp-csv ../output/otps.csv "$@"
+python provision.py --render-only --otp-csv ../output/otps.csv
 """
 
 # Teardown entrypoints — see subscription/TEARDOWN.md. Nothing here mutates the

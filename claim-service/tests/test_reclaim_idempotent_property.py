@@ -27,9 +27,10 @@ Isolation note mirrors the sibling moto-backed property tests
 (``test_claim_success_contents_property.py``, ``test_pipeline_ordering_property.py``):
 each example runs inside its own ``mock_aws()`` context against a fresh moto
 table, resets the handler's memoized module state (``TABLE_NAME`` / ``_dynamodb``
-/ ``_table``), overrides ``CONFIGURED_WORKSHOP_CODE`` via monkeypatch, and routes
-``transact_write_items`` through a standalone low-level client (the moto-5
-workaround). ``PER_IP_CAP`` is pinned high and every submission uses a *fresh*
+/ ``_table``), and overrides ``CONFIGURED_WORKSHOP_CODE`` via monkeypatch. The
+claim transaction runs through the handler's real resource-attached client
+(which auto-serializes the native values the handler sends), exactly as in
+production. ``PER_IP_CAP`` is pinned high and every submission uses a *fresh*
 source IP so repeated submissions reach the claim/re-claim path instead of
 tripping the per-IP 429.
 """
@@ -169,18 +170,17 @@ def _count_claimed(table) -> int:
 
 
 # Spare available credentials kept in the pool on top of the one the first
-# claim consumes. This keeps the pool non-empty across every re-submission, so
-# the re-claim path is actually exercised.
+# claim consumes. This keeps the pool non-empty across every re-submission so
+# this property exercises the re-claim path under normal (non-exhausted)
+# conditions.
 #
-# Scope note (edge documented, not asserted here): the fixed ``claim`` core
-# calls ``pick_available()`` *before* it attempts the ``EMAIL#`` lock, so when
-# the pool is *fully exhausted* a re-submission raises ``ClaimError(409)`` at
-# the pick step and never reaches the idempotent re-claim path. That
-# empty-pool interaction is a property of the frozen correctness core
-# (owned by the ``credential-claim-service`` spec), not of this wiring
-# feature, and is intentionally outside Property 9's scope here — Property 9
-# exercises the re-claim path, which requires the pool to still hold an
-# available credential. A buffer of spare credentials guarantees that.
+# Note: ``claim`` now reads the ``EMAIL#`` lock as a fast path *before*
+# ``pick_available()``, so a returning email re-claims correctly even when the
+# pool is fully exhausted. That exhausted-pool case — the original "all
+# claimed" bug for a returning participant — is covered by its own regression
+# test, ``test_reclaim_when_pool_exhausted`` below. Here a buffer still keeps
+# the pool non-empty so the property's "claims exactly once" invariant is
+# checked against a live pool rather than an exhausted one.
 POOL_BUFFER = 2
 
 
@@ -216,11 +216,11 @@ def test_reclaim_is_idempotent(monkeypatch, resubmissions):
         # exhaustion.
         _seed_pool(table, len(resubmissions) + POOL_BUFFER)
 
-        # moto-5 transact_write_items workaround (changes no handler behavior):
-        # route the transaction through a standalone low-level client, matching
-        # the sibling success/ordering property tests.
-        standalone = boto3.client("dynamodb", region_name=REGION)
-        table.meta.client.transact_write_items = standalone.transact_write_items
+        # The handler sends NATIVE values to the resource-attached
+        # ``transact_write_items``, which auto-serializes them; the real client
+        # runs the transaction correctly under moto, so no client reroute is
+        # needed. (The earlier standalone-client workaround tested a different
+        # serialization path than production and hid the typed-descriptor bug.)
 
         # First claim — a fresh IP so the per-IP counter starts clean.
         first = _post(BASE_EMAIL, source_ip="203.0.113.1")
@@ -259,3 +259,54 @@ def test_reclaim_is_idempotent(monkeypatch, resubmissions):
         assert _count_claimed(table) == 1, (
             "expected exactly one CRED# credential flipped to claimed"
         )
+
+
+def test_reclaim_when_pool_exhausted(monkeypatch):
+    """A returning email re-claims its credential even when the pool is empty.
+
+    Regression for the "all claimed" bug: when every credential has been
+    claimed, ``pick_available()`` returns ``None``. The old ``claim`` picked
+    *before* checking the email lock, so it raised ``ClaimError(409)`` ("all
+    claimed") and a returning participant — who already holds a credential —
+    was wrongly turned away. ``claim`` now reads the ``EMAIL#`` lock first, so
+    the returning email gets its SAME credential back with 200, while a *new*
+    email with no lock still correctly sees the exhausted-pool 409.
+    """
+    with mock_aws():
+        resource = boto3.resource("dynamodb", region_name=REGION)
+        _create_table(resource)
+        table = resource.Table(TABLE_NAME)
+        _reset_handler_state(monkeypatch, table)
+
+        # Pool of exactly ONE credential, so a single claim exhausts it.
+        _seed_pool(table, 1)
+
+        # First claim takes the only credential; the pool is now exhausted.
+        first = _post(BASE_EMAIL, source_ip="203.0.113.1")
+        assert first["statusCode"] == 200, first["body"]
+        assert _count_claimed(table) == 1
+
+        # Sanity: the pool really is empty now.
+        assert claim_handler.pick_available() is None
+
+        # The SAME email returns — pool is exhausted, but it must still get its
+        # credential back (200, byte-identical body), not "all claimed".
+        again = _post(BASE_EMAIL, source_ip="198.51.100.1")
+        assert again["statusCode"] == 200, (
+            f"returning email on an exhausted pool must re-claim, got "
+            f"{again['statusCode']}: {again['body']}"
+        )
+        assert again["body"] == first["body"], "re-claim returned a different credential"
+
+        # No second lock, no second credential consumed.
+        assert _count_prefix(table, "EMAIL#") == 1
+        assert _count_claimed(table) == 1
+
+        # A DIFFERENT email with no prior lock still sees the exhausted pool:
+        # the fast path does not invent credentials, it only returns an
+        # existing claim.
+        other = _post("someone-else@example.com", source_ip="198.51.100.2")
+        assert other["statusCode"] == 409, (
+            f"a new email on an exhausted pool must get 409, got {other['statusCode']}"
+        )
+        assert json.loads(other["body"]) == {"error": "all claimed"}

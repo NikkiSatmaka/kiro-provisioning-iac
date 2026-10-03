@@ -476,6 +476,13 @@ def claim(email: str) -> dict:
     runs an optimistic claim with bounded retry (design: "Selecting which
     credential to hand out"):
 
+    0. **Re-claim fast path.** First reads the ``EMAIL#<email>`` lock; if it
+       already exists, this email has claimed before, so :func:`reclaim`
+       returns the **same** credential (Requirements 2.5, 3.1, 3.2). This check
+       runs *before* the pool is consulted so a returning participant always
+       gets their credential back — even once every credential has been claimed
+       and the pool is exhausted. (Previously the pool-exhaustion check ran
+       first, so a returning participant wrongly saw "all claimed".)
     1. Picks an available credential via :func:`pick_available`; raises
        ``ClaimError(409)`` when the pool is exhausted (Requirement 5.1).
     2. Commits a single ``TransactWriteItems`` holding **both** uniqueness
@@ -485,10 +492,14 @@ def claim(email: str) -> dict:
          * a conditional ``Update`` of ``CRED#<username>`` guarded by
            ``status = "available"`` — one claim per credential (Req 2.1 / 8.1).
 
-    There is **no read-then-write** on either uniqueness constraint: correctness
-    lives entirely in the transaction's conditions, so concurrent claims can
-    neither double-assign a credential nor let an email claim twice
-    (Requirement 8.3).
+    The step-0 read is only a fast path, **not** the uniqueness boundary: the
+    authoritative one-per-email guarantee still lives in the transaction's
+    conditional ``Put``. Two concurrent first-time claims for the same email can
+    both pass the step-0 read (neither lock exists yet), but only one can commit
+    the ``Put`` guarded by ``attribute_not_exists(PK)``; the loser's transaction
+    is cancelled and routed to :func:`reclaim`, so an email still never
+    double-claims (Requirement 8.3). Likewise a credential is never
+    double-assigned, since its ``Update`` is guarded by ``status = available``.
 
     When the transaction is cancelled, ``CancellationReasons`` tells us which
     condition failed (design: "Claim decision flow"):
@@ -511,6 +522,18 @@ def claim(email: str) -> dict:
     table = _get_table()
     client = table.meta.client
     cancelled = client.exceptions.TransactionCanceledException
+
+    # Idempotent re-claim FIRST: if this email already holds a lock, hand back
+    # the same credential before touching the pool. This must run before
+    # pick_available(), otherwise a returning participant hits a "all claimed"
+    # 409 the moment the pool is exhausted — even though they already have a
+    # credential waiting for them. The authoritative one-per-email guarantee
+    # still lives in the transaction's conditional Put below (an email that
+    # races to claim twice is caught there); this read is a fast path for the
+    # common "closed the tab and came back" case, not the correctness boundary.
+    existing = table.get_item(Key={"PK": f"EMAIL#{email}"}).get("Item")
+    if existing:
+        return reclaim(email)
 
     # One pick + transaction per iteration; a credential conflict re-picks and
     # retries, so the loop runs at most RETRY_BOUND times (Requirement 2.4).

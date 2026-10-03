@@ -191,48 +191,64 @@ def test_claim_issues_exactly_one_transaction_with_both_conditional_writes(
     assert update is not None, "transaction must contain an Update (the CRED#)"
 
     # EMAIL# lock: conditional on the lock not already existing (Req 2.2 / 8.2).
-    assert put["Item"]["PK"]["S"].startswith("EMAIL#")
+    # Values are NATIVE Python (plain strings), not typed AttributeValue dicts —
+    # the resource-attached client serializes them. Asserting on the native form
+    # is what pins the fix: a regression back to typed ``{"S": ...}`` descriptors
+    # (the production bug) would show up here as a dict instead of a str.
+    assert put["Item"]["PK"].startswith("EMAIL#")
     assert put["ConditionExpression"] == "attribute_not_exists(PK)"
 
     # CRED# update: conditional on the credential still being available
     # (Req 2.1 / 8.1). The condition is written with a name placeholder for the
     # reserved word ``status``; resolve it before asserting.
-    assert update["Key"]["PK"]["S"].startswith("CRED#")
+    assert update["Key"]["PK"].startswith("CRED#")
     names = update.get("ExpressionAttributeNames", {})
     values = update.get("ExpressionAttributeValues", {})
     resolved = update["ConditionExpression"]
     for placeholder, actual in names.items():
         resolved = resolved.replace(placeholder, actual)
     assert "status" in resolved
-    assert values[":available"] == {"S": "available"}
+    assert values[":available"] == "available"
 
 
-def test_claim_does_not_read_the_email_lock_before_writing(
+def test_claim_email_read_is_a_fast_path_not_the_uniqueness_check(
     mocked_claim_handler, spied_client
 ):
-    """No read-then-write uniqueness check on the claim path (Req 8.3).
+    """The EMAIL# read is a re-claim fast path; uniqueness stays in the txn.
 
-    Correctness is in the transaction conditions alone, so a successful claim
-    must not point-read the ``EMAIL#`` lock before committing — the only
-    ``GetItem`` allowed is the post-commit readback of the ``CRED#`` item.
+    ``claim`` reads the ``EMAIL#`` lock first as a fast path for a returning
+    participant (so an exhausted pool never masks an existing claim). For a
+    *first-time* claimant that read finds nothing, and the claim still proceeds
+    through the transaction whose conditional ``Put`` (``attribute_not_exists``)
+    remains the authoritative one-per-email guarantee — the read is NOT a
+    read-then-write uniqueness check (Req 8.3).
     """
     _seed_available(mocked_claim_handler)
 
     mocked_claim_handler.claim("participant@example.com")
 
-    # No EMAIL# lock was point-read at any time on the success path.
+    # The uniqueness guarantee is still carried by the transaction's
+    # conditional Put, not by the fast-path read: exactly one transaction
+    # committed, and its EMAIL# Put is guarded by attribute_not_exists(PK).
+    assert len(spied_client.transact_calls) == 1
+    transact_items = spied_client.transact_calls[0]["TransactItems"]
+    put = next((i["Put"] for i in transact_items if "Put" in i), None)
+    assert put is not None
+    assert put["Item"]["PK"].startswith("EMAIL#")
+    assert put["ConditionExpression"] == "attribute_not_exists(PK)"
+
+    # The only EMAIL# reads are the step-0 fast-path checks (a first-time
+    # claimant finds no lock, so the claim proceeds to the transaction). We do
+    # not forbid the read — we forbid it being the uniqueness mechanism, which
+    # the assertion above pins to the transaction condition.
     email_reads = [
         key for key in spied_client.get_item_keys
         if key and str(key.get("PK", "")).startswith("EMAIL#")
     ]
-    assert email_reads == [], (
-        "claim must not read the EMAIL# lock before writing; the uniqueness "
-        "check belongs to the transaction condition, not a read-then-write"
+    assert all(
+        str(key.get("PK", "")) == "EMAIL#participant@example.com"
+        for key in email_reads
     )
-
-    # Any GetItem that did happen is the post-commit CRED# readback.
-    for key in spied_client.get_item_keys:
-        assert str(key.get("PK", "")).startswith("CRED#")
 
 
 # --- Success body -----------------------------------------------------------

@@ -21,7 +21,8 @@ Operator actions are wrapped as mise tasks in the root `mise.toml`, mirroring
 the `subscription/` dry-run-first conventions.
 
 Provisioning IdC users and generating OTPs are out of scope; they remain in
-`subscription/`. The deployment region is `ap-southeast-1`.
+`subscription/`. The deployment region is read from the `AWS_REGION`
+environment variable, defaulting to `us-east-1` when `AWS_REGION` is unset.
 
 ## Glossary
 
@@ -103,7 +104,7 @@ username, OTP, sign-in URL, and region, so that I can sign in to Kiro.
 #### Acceptance Criteria
 
 1. WHEN a claim succeeds, THE Claim_Handler SHALL return HTTP 200 with a body containing the `username`, `otp`, `sign_in_url`, and `region` of the assigned Credential_Item.
-2. THE Claim_Handler SHALL set the `region` returned in a successful claim to `ap-southeast-1`.
+2. THE Claim_Handler SHALL set the `region` returned in a successful claim to the value of the `AWS_REGION` environment variable, defaulting to `us-east-1` when `AWS_REGION` is unset.
 
 ### Requirement 5: Pool exhaustion
 

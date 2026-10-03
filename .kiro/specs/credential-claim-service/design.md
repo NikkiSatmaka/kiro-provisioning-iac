@@ -30,7 +30,8 @@ primary source `claim-service/DESIGN.md`:
    `claim-destroy`), mirroring `subscription/`'s dry-run-first + approval conventions
    (Requirement 14).
 
-The deployment region is `ap-southeast-1` (Requirement 4.2).
+The deployment region is read from the `AWS_REGION` environment variable,
+defaulting to `us-east-1` when `AWS_REGION` is unset (Requirement 4.2).
 
 ### Design goals and the requirements they serve
 
@@ -60,7 +61,7 @@ flowchart TD
         manifest["manifest.json<br/>(sign_in_url, region)"]
     end
 
-    subgraph aws["AWS (ap-southeast-1)"]
+    subgraph aws["AWS (AWS_REGION, default us-east-1)"]
         furl["Lambda Function URL<br/>(single public URL)"]
         lambda["Claim_Handler<br/>Python 3.12 + boto3"]
         ddb[("DynamoDB table<br/>single-table, on-demand")]
@@ -241,7 +242,7 @@ PK               = "CRED#<username>"
 username         = <string>
 otp              = <string>
 sign_in_url      = <string>
-region           = "ap-southeast-1"
+region           = <AWS_REGION, default "us-east-1">
 status           = "available" | "claimed"
 claimed_by_email = <normalized_email>   (absent until claimed)
 claimed_at       = <iso8601>            (absent until claimed)
@@ -471,7 +472,7 @@ sign_in_url, region) and assigns no second Credential_Item.
 
 *For any* successful claim of a Credential_Item, the HTTP 200 body contains that
 item's `username`, `otp`, `sign_in_url`, and `region`, with `region` equal to
-`ap-southeast-1`.
+the `AWS_REGION` environment variable (defaulting to `us-east-1` when unset).
 
 **Validates: Requirements 4.1, 4.2**
 

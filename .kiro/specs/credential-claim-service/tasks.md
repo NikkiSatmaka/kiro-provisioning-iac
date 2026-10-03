@@ -48,9 +48,11 @@ handler, the scripts, or the Terraform graph so there is no orphaned code.
     - Create `terraform/backend.tf` with a value-free `backend "s3" {}` block
     - Create `terraform/backend.hcl.example` setting
       `bucket = "kiro-tofu-state-<account_id>"`,
-      `key = "claim-service/terraform.tfstate"`, `region = "ap-southeast-1"`
+      `key = "claim-service/terraform.tfstate"`, and `region` set from
+      `AWS_REGION` (default `us-east-1` when unset)
     - Add a `terraform/providers.tf` / `versions.tf` pinning the AWS provider
-      and region `ap-southeast-1`; confirm NO `backend-bootstrap/` directory
+      and setting its region from `AWS_REGION` (default `us-east-1` when
+      unset); confirm NO `backend-bootstrap/` directory
       here — the shared bucket is created by the `backend/` stack
     - _Requirements: 10.1, 10.2, 4.2_
 
@@ -82,7 +84,7 @@ handler, the scripts, or the Terraform graph so there is no orphaned code.
   - [ ] 4.5 Write unit tests for the single-transaction shape (mocked DynamoDB)
     - Assert exactly one `transact_write_items` call with the two conditional
       writes; assert claim success returns `username`, `otp`, `sign_in_url`,
-      `region = ap-southeast-1`
+      `region` equal to `AWS_REGION` (default `us-east-1` when unset)
     - _Requirements: 2.3, 4.1, 4.2, 8.3_
 
   - [ ] 4.6 Write property test for successful-claim contents

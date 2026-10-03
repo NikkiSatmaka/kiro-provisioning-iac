@@ -120,17 +120,18 @@ resource "aws_lambda_function" "claim_handler" {
 
 # ---------------------------------------------------------------------------
 # The single public Function URL (authorization NONE; gated in the handler by
-# the workshop code + per-IP cap, Requirement 12). CORS allow_origins is the
-# configured origin, falling back to "*" when allowed_origin is empty because
-# the Function URL's own origin is only known post-apply (see variables.tf).
+# the workshop code + per-IP cap, Requirement 12).
+#
+# CORS is owned ENTIRELY by the handler, not by a Function URL `cors` block. The
+# handler emits exactly one Access-Control-Allow-Origin on every response via
+# resolve_origin() (R9.3), plus the allowed methods (GET, POST) and allowed
+# headers (content-type) through preflight_response. We deliberately omit the
+# `cors` block here so the Lambda Function URL service does not inject its own
+# Access-Control-Allow-Origin and produce a second, conflicting header at the
+# edge (R9.5). See design: "Infrastructure consideration: duplicate
+# Access-Control-Allow-Origin" (option a).
 # ---------------------------------------------------------------------------
 resource "aws_lambda_function_url" "claim_handler" {
   function_name      = aws_lambda_function.claim_handler.function_name
   authorization_type = "NONE"
-
-  cors {
-    allow_origins = [var.allowed_origin != "" ? var.allowed_origin : "*"]
-    allow_methods = ["GET", "POST"]
-    allow_headers = ["content-type"]
-  }
 }

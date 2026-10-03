@@ -11,6 +11,7 @@ attribute. Raw emails and OTPs are never logged.
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import time
@@ -31,6 +32,22 @@ from boto3.dynamodb.conditions import Attr
 # packaging and configuration").
 REGION = os.environ.get("AWS_REGION", "")
 TABLE_NAME = os.environ.get("TABLE_NAME", "")
+
+# The workshop code every claim must present, and the single CORS origin the
+# handler echoes back. Both are injected by OpenTofu as env vars; when unset we
+# default to the empty string. An empty ALLOWED_ORIGIN later resolves to the
+# "*" wildcard, while an empty CONFIGURED_WORKSHOP_CODE makes every submitted
+# code mismatch under the constant-time compare (design: "Module
+# configuration"; Requirements 4.1, 4.2).
+CONFIGURED_WORKSHOP_CODE = os.environ.get("WORKSHOP_CODE", "")
+ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "")
+
+# Read-once cache for the claim page. The HTML ships next to this module as
+# index.html; _load_page populates _PAGE_HTML on first GET and reuses it across
+# warm invocations, mirroring the lazy _table memoization (design: "Module-level
+# additions").
+_PAGE_PATH = os.path.join(os.path.dirname(__file__), "index.html")
+_PAGE_HTML: str | None = None
 
 # Max POST attempts allowed from a single source IP before the per-IP cap
 # trips (Requirement 12.2). Injected by OpenTofu as PER_IP_CAP; defaults to a
@@ -72,6 +89,26 @@ def _get_table():
         _dynamodb = boto3.resource("dynamodb", **kwargs)
         _table = _dynamodb.Table(TABLE_NAME)
     return _table
+
+
+def _load_page() -> str:
+    """Return the claim page HTML, reading ``index.html`` once and caching it.
+
+    On the first call the packaged ``index.html`` (a sibling of this module at
+    the deployment-package root) is read from ``_PAGE_PATH`` and cached in the
+    module-level ``_PAGE_HTML``; warm invocations reuse the cache, mirroring the
+    lazy ``_table`` memoization above (design: "_load_page"; Requirements 3.1,
+    3.2).
+
+    A read failure raises ``OSError`` rather than being swallowed, so the
+    handler layer (``html_response``) can map it to a 500 ``Error_Envelope``
+    (Requirement 3.3).
+    """
+    global _PAGE_HTML
+    if _PAGE_HTML is None:
+        with open(_PAGE_PATH, encoding="utf-8") as fh:
+            _PAGE_HTML = fh.read()
+    return _PAGE_HTML
 
 
 class ClaimError(Exception):
@@ -169,6 +206,27 @@ def source_ip(event: dict) -> str:
     )
 
 
+def request_method(event: dict) -> str:
+    """Return the request's HTTP method, upper-cased, or ``""`` when unreadable.
+
+    Reads the method from ``event["requestContext"]["http"]["method"]`` and
+    upper-cases it so the handler's routing compares case-insensitively — ``get``,
+    ``Post`` and ``options`` all match (Requirements 2.1–2.4).
+
+    When the method is absent, empty, or not a string, returns the empty-string
+    sentinel ``""``; the handler maps that to a ``GET`` so an unreadable method
+    is treated as a page request (Requirement 2.5; design: "request_method").
+    """
+    raw = (
+        event.get("requestContext", {})
+        .get("http", {})
+        .get("method")
+    )
+    if not isinstance(raw, str) or raw == "":
+        return ""
+    return raw.upper()
+
+
 def check_and_increment_ip(ip: str, cap: int) -> None:
     """Count one POST attempt from ``ip`` and enforce the per-IP cap.
 
@@ -200,6 +258,113 @@ def check_and_increment_ip(ip: str, cap: int) -> None:
 
     if count > cap:
         raise ClaimError(429, "too many attempts; please try again later")
+
+
+# ---------------------------------------------------------------------------
+# Workshop-code gate (Requirement 5)
+# ---------------------------------------------------------------------------
+
+def verify_workshop_code(submitted: str) -> None:
+    """Gate a claim on the configured workshop code (Requirement 5).
+
+    Trims the submitted code and compares it against the module-level
+    ``CONFIGURED_WORKSHOP_CODE`` with :func:`hmac.compare_digest`, the stdlib
+    constant-time comparison (R5.2) — so a wrong code reveals nothing through
+    timing. Returns ``None`` on a match so the pipeline proceeds; raises
+    ``ClaimError(403, "invalid workshop code")`` when the trimmed code is empty
+    (R5.3) or does not match (R5.3).
+
+    This gate runs *before* ``normalize_email`` and ``claim`` in the pipeline
+    (design: "run_claim_pipeline"), so a wrong or empty code touches no
+    credential, locks no email, and never normalizes-for-claim (R5.3, R5.4) —
+    this function itself only trims, compares, and raises.
+
+    ``submitted`` is always a present value: ``parse_post`` already raises 400
+    for a missing ``workshop_code`` field (R6.3), so a "missing" field is a 400
+    while a "present-but-wrong/empty" code is this 403.
+
+    Fail-closed: when ``WORKSHOP_CODE`` is unset ``CONFIGURED_WORKSHOP_CODE`` is
+    ``""``, and every submission is rejected — a non-empty trimmed candidate
+    never equals ``""`` under ``compare_digest``, and an empty candidate is
+    caught by the explicit empty check.
+    """
+    candidate = submitted.strip()  # R5.1 (trim submitted)
+    if candidate == "":
+        raise ClaimError(403, "invalid workshop code")  # R5.3 (empty after trim)
+    if not hmac.compare_digest(candidate, CONFIGURED_WORKSHOP_CODE):  # R5.2
+        raise ClaimError(403, "invalid workshop code")  # R5.3 (wrong code)
+
+
+# ---------------------------------------------------------------------------
+# Response builders and CORS (the wiring layer; Requirements 3, 7, 9)
+# ---------------------------------------------------------------------------
+
+def resolve_origin() -> str:
+    """Return the CORS origin to echo on every response (R9.1, R9.2).
+
+    Resolves to the configured ``ALLOWED_ORIGIN`` when it is a non-empty string
+    (R9.1), otherwise the ``"*"`` wildcard (R9.2), mirroring the Function URL
+    CORS fallback in ``lambda.tf``. Reads only a module string, so it cannot
+    raise — the handler calls it *before* its ``try`` so even a 500 still
+    carries CORS headers (R9.3).
+    """
+    return ALLOWED_ORIGIN if ALLOWED_ORIGIN else "*"
+
+
+def cors_headers(origin: str) -> dict:
+    """Return the base header map carrying the single CORS origin (R9.3, R9.5).
+
+    This is the *one* place ``Access-Control-Allow-Origin`` is set, so every
+    response funnels its ACAO through here and carries exactly one such header
+    equal to ``resolve_origin()`` — no second, conflicting value from the
+    handler side (R9.5).
+    """
+    return {"Access-Control-Allow-Origin": origin}
+
+
+def json_response(status: int, obj: dict, origin: str) -> dict:
+    """Build a JSON Function URL response (R7.3, R8.2).
+
+    JSON-encodes ``obj`` to a string ``body`` (so the Function URL serializes it
+    verbatim, R1.3), sets ``Content-Type: application/json`` (R7.3), and includes
+    the single CORS origin via :func:`cors_headers` (R9.3). Used for POST
+    success bodies, every ``Error_Envelope``, and the 405 response.
+    """
+    headers = cors_headers(origin)
+    headers["Content-Type"] = "application/json"  # R7.3, R8.2
+    return {"statusCode": status, "headers": headers, "body": json.dumps(obj)}
+
+
+def html_response(origin: str) -> dict:
+    """Serve the cached claim page, or a 500 envelope if it is unreadable (R3).
+
+    Reads the page via :func:`_load_page` (R3.1, R3.2) and returns it with HTTP
+    200 and ``Content-Type: text/html; charset=utf-8``. If ``_load_page`` raises
+    ``OSError`` (``index.html`` unreadable), returns a 500 ``Error_Envelope``
+    with the uniform CORS + JSON headers (R3.3) rather than letting the failure
+    escape.
+    """
+    try:
+        page = _load_page()  # R3.1, R3.2
+    except OSError:
+        return json_response(500, {"error": "internal error"}, origin)  # R3.3
+    headers = cors_headers(origin)
+    headers["Content-Type"] = "text/html; charset=utf-8"  # R2.1
+    return {"statusCode": 200, "headers": headers, "body": page}
+
+
+def preflight_response(origin: str) -> dict:
+    """Build the CORS preflight response for an OPTIONS request (R2.3, R9.4).
+
+    Returns HTTP 204 with an empty-string ``body`` (R2.3), the single CORS
+    origin via :func:`cors_headers`, and the preflight headers:
+    ``Access-Control-Allow-Methods: GET, POST`` and
+    ``Access-Control-Allow-Headers: content-type`` (R9.4).
+    """
+    headers = cors_headers(origin)
+    headers["Access-Control-Allow-Methods"] = "GET, POST"  # R9.4
+    headers["Access-Control-Allow-Headers"] = "content-type"  # R9.4
+    return {"statusCode": 204, "headers": headers, "body": ""}
 
 
 # ---------------------------------------------------------------------------
@@ -421,3 +586,86 @@ def claim(email: str) -> dict:
     # Exhausted the retry budget while still losing credential races: treat as
     # no credential available to this claimant (Requirements 5.1, 5.2).
     raise ClaimError(409, "all claimed")
+
+
+# ---------------------------------------------------------------------------
+# POST pipeline composition (Requirement 6)
+# ---------------------------------------------------------------------------
+
+def run_claim_pipeline(event: dict) -> dict:
+    """Run the POST claim pipeline and return the credential dict (R6).
+
+    Composes the existing functions in the one fixed order the design mandates
+    (design: "run_claim_pipeline"), raising ``ClaimError`` at the first failing
+    step and letting it propagate to the handler layer, which maps it to an
+    HTTP ``Error_Envelope`` — this layer never maps to HTTP itself:
+
+    1. **Per-IP cap** — :func:`source_ip` then :func:`check_and_increment_ip`
+       with ``PER_IP_CAP``. An IP already over the cap is rejected with
+       ``ClaimError(429)`` *before* the body is parsed, so a flooding caller
+       never reaches body parse, code verification, or any credential
+       (R6.1, R6.2).
+    2. **Body parse** — :func:`parse_post` yields ``email`` and
+       ``workshop_code`` or raises ``ClaimError(400)`` (R6.3).
+    3. **Email format** — :func:`is_valid_email`; a malformed address raises
+       ``ClaimError(400)`` here, before the workshop-code gate (R6.4).
+    4. **Workshop-code gate** — :func:`verify_workshop_code` raises
+       ``ClaimError(403)`` on a wrong/empty code. Running it *before*
+       normalize-for-claim guarantees a bad code touches no credential, locks
+       no email, and never normalizes-for-claim or accesses a credential
+       (R5.3, R5.4).
+    5. **Normalize** — :func:`normalize_email` derives the canonical key only
+       after the gate has passed (R6.5).
+    6. **Claim** — :func:`claim` returns the four-field success body on success
+       or raises ``ClaimError(409)`` when the pool is exhausted (R6.6).
+    """
+    ip = source_ip(event)
+    check_and_increment_ip(ip, PER_IP_CAP)  # 1. per-IP cap → 429 (R6.1, R6.2)
+    fields = parse_post(event)  # 2. body parse → 400 (R6.3)
+    if not is_valid_email(fields["email"]):  # 3. email format
+        raise ClaimError(400, "email is not valid")  # (R6.4)
+    verify_workshop_code(fields["workshop_code"])  # 4. gate → 403 (R5, R5.3, R5.4)
+    email = normalize_email(fields["email"])  # 5. normalize (R6.5)
+    return claim(email)  # 6. claim → 200 / 409 (R6.6)
+
+
+# ---------------------------------------------------------------------------
+# Lambda entrypoint (the wiring layer; Requirements 1, 2, 7, 9)
+# ---------------------------------------------------------------------------
+
+def handler(event, context) -> dict:
+    """Single Lambda Function URL entrypoint composing the wiring layer (R1, R2, R7).
+
+    Resolves the CORS origin, routes on the HTTP method, and wraps the dispatch
+    in one ``try/except`` so no failure escapes unmapped (design:
+    "handler(event, context) -> dict").
+
+    ``resolve_origin()`` runs *before* the ``try`` so even a 500 still carries
+    the CORS origin header (R9.3); it only reads a module string and cannot
+    raise. Routing is case-insensitive via :func:`request_method`:
+
+    * ``OPTIONS`` → :func:`preflight_response` (R2.3).
+    * ``POST`` → ``json_response(200, run_claim_pipeline(event), origin)``
+      (R2.2, R6.6, R8).
+    * ``GET`` or ``""`` (an unreadable method, treated as GET) →
+      :func:`html_response` (R2.1, R2.5, R3).
+    * anything else → a 405 ``Error_Envelope`` (R2.4).
+
+    A ``ClaimError`` maps to its carried status and message (R7.1). Any other
+    exception maps to a fixed 500 ``{"error": "internal error"}`` — no exception
+    type, detail, stack trace, email, or OTP (R7.2, R7.4).
+    """
+    origin = resolve_origin()  # R9.1, R9.2 (before try so a 500 still has CORS, R9.3)
+    try:
+        method = request_method(event)  # R2 (case-insensitive)
+        if method == "OPTIONS":
+            return preflight_response(origin)  # R2.3, R9.4
+        if method == "POST":
+            return json_response(200, run_claim_pipeline(event), origin)  # R2.2, R6.6, R8
+        if method in ("GET", ""):  # "" == unreadable → GET (R2.5)
+            return html_response(origin)  # R2.1, R3
+        return json_response(405, {"error": "method not allowed"}, origin)  # R2.4
+    except ClaimError as exc:
+        return json_response(exc.status, {"error": exc.message}, origin)  # R7.1
+    except Exception:  # noqa: BLE001 — fixed 500 message, no detail/trace/PII (R7.2, R7.4)
+        return json_response(500, {"error": "internal error"}, origin)

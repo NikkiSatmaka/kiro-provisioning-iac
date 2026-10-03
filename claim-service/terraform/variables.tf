@@ -12,6 +12,17 @@
 # `workshop_code` is strictly required at apply time.
 # =============================================================================
 
+variable "aws_region" {
+  description = <<-EOT
+    Deployment region for the table, Lambda, and Function URL. Leave empty
+    (default) to inherit AWS_REGION from the environment (mise sources it from
+    the git-ignored .env; it defaults to us-east-1 there). Set a value only to
+    pin. The region is never hardcoded in the provider — it comes from the env.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "table_name" {
   description = "Name of the single DynamoDB table backing the service (CRED#/EMAIL#/RATE# items share it)."
   type        = string

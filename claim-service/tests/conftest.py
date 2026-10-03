@@ -26,6 +26,8 @@ for _subdir in ("scripts", "lambda"):
 # The handler reads its region from AWS_REGION (never hardcoded). On Lambda the
 # runtime always sets it; under test it is not set, so pin it here before the
 # handler module is imported. This mirrors the Lambda environment and gives the
-# moto-backed DynamoDB client a concrete region to resolve to.
-os.environ.setdefault("AWS_REGION", "ap-southeast-1")
-os.environ.setdefault("AWS_DEFAULT_REGION", "ap-southeast-1")
+# moto-backed DynamoDB client a concrete region to resolve to. The default
+# matches the repo-wide default (AWS_REGION=us-east-1 in .env.example /
+# mise.toml); an ambient AWS_REGION from the shell still wins via setdefault.
+os.environ.setdefault("AWS_REGION", "us-east-1")
+os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")

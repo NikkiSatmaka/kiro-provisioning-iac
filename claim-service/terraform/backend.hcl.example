@@ -14,4 +14,4 @@
 
 bucket = "kiro-tofu-state-<account_id>"          # shared bucket; your 12-digit account id
 key    = "claim-service/terraform.tfstate"       # distinct key => isolated from subscription/
-region = "ap-southeast-1"
+region = "us-east-1"                             # match AWS_REGION from .env (defaults to us-east-1)

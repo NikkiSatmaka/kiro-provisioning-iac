@@ -57,6 +57,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import pathlib
 import sys
 from dataclasses import dataclass, field
@@ -276,8 +277,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
     p.add_argument(
         "--region",
-        default="ap-southeast-1",
-        help="AWS region the table lives in (default: ap-southeast-1).",
+        default=os.environ.get("AWS_REGION", "us-east-1"),
+        help=(
+            "AWS region the table lives in. Defaults to AWS_REGION from the "
+            "environment, or us-east-1 when unset."
+        ),
     )
     p.add_argument(
         "--apply",

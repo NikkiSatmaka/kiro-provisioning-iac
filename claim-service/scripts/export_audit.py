@@ -30,8 +30,10 @@ from typing import Any
 
 import boto3
 
-# Deployment region for the Claim Service (Requirement 4.2 / 10.1).
-REGION = "ap-southeast-1"
+# Deployment region for the Claim Service, derived only from the environment
+# (AWS_REGION), defaulting to us-east-1 when unset (Requirement 4.2 / 10.1).
+# Never hardcoded to a specific region.
+REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 # Key prefix identifying an Email_Lock_Item (``EMAIL#<normalized_email>``).
 EMAIL_PREFIX = "EMAIL#"

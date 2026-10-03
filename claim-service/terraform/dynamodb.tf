@@ -21,7 +21,7 @@
 #   username         = <string>
 #   otp              = <string>
 #   sign_in_url      = <string>
-#   region           = "ap-southeast-1"
+#   region           = <AWS_REGION, default "us-east-1">
 #   status           = "available" | "claimed"
 #   claimed_by_email = <normalized_email>   (absent until claimed)
 #   claimed_at       = <iso8601>            (absent until claimed)

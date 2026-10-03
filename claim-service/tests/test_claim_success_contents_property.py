@@ -5,10 +5,11 @@ Property 7: Successful claims return the assigned credential's fields
 Validates: Requirements 4.1, 4.2
 
 For any randomly seeded pool of ``CRED#`` items — each carrying a username,
-otp, sign_in_url, ``region == "ap-southeast-1"`` and ``status == "available"``
+otp, sign_in_url, ``region`` equal to the env-derived ``REGION`` and
+``status == "available"``
 — a successful ``claim(email)`` returns the HTTP-200-equivalent credential dict
 whose ``username``/``otp``/``sign_in_url`` match the *assigned* credential's
-seeded values and whose ``region`` is ``"ap-southeast-1"`` (Requirements 4.1,
+seeded values and whose ``region`` is the env-derived ``REGION`` (Requirements 4.1,
 4.2). The handler itself selects *which* credential to hand out (pick_available
 + the claim transaction), so the test does not assume a particular pick; it
 looks the assigned username back up in the seeded pool and asserts the returned
@@ -27,14 +28,17 @@ health check entirely.
 
 from __future__ import annotations
 
+import os
+
 import boto3
+import claim_handler
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from moto import mock_aws
 
-import claim_handler
-
-REGION = "ap-southeast-1"
+# Region is derived only from the environment (AWS_REGION), defaulting to
+# us-east-1; conftest.py pins it before import so moto resolves a region.
+REGION = os.environ.get("AWS_REGION", "us-east-1")
 TABLE_NAME = "claim-service-prop7"
 
 # A field value guaranteed non-empty after stripping surrounding whitespace —

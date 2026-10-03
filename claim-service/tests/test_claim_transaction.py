@@ -16,7 +16,7 @@ They assert three things on a successful claim:
   ``attribute_not_exists(PK)`` and the ``CRED#`` ``Update`` guarded by the
   ``status = available`` condition (Requirements 2.3, 8.3).
 * The returned dict is exactly ``{username, otp, sign_in_url, region}`` with
-  ``region == "ap-southeast-1"`` (Requirements 4.1, 4.2).
+  ``region`` equal to the env-derived ``REGION`` (Requirements 4.1, 4.2).
 * **No read-then-write uniqueness check** happens on the claim path: there is no
   point read (``GetItem``) or ``Query`` of the ``EMAIL#`` lock before the
   transaction — correctness lives only in the transaction's conditions
@@ -30,12 +30,16 @@ moto-backed table, and restores it afterwards so tests do not leak state.
 
 from __future__ import annotations
 
+import os
+
 import boto3
 import pytest
 from moto import mock_aws
 
 TABLE_NAME = "claim-service-test"
-REGION = "ap-southeast-1"
+# Region is derived only from the environment (AWS_REGION), defaulting to
+# us-east-1; conftest.py pins it before import so moto resolves a region.
+REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 
 def _make_table():
@@ -247,7 +251,7 @@ def test_claim_success_returns_the_four_contract_fields(
     """A successful claim returns exactly the 200 contract fields.
 
     Validates: Requirements 4.1, 4.2 — ``username``, ``otp``, ``sign_in_url``
-    and ``region == "ap-southeast-1"``, and nothing else.
+    and ``region`` equal to the env-derived ``REGION``, and nothing else.
     """
     expected = _seed_available(mocked_claim_handler)
 
@@ -255,7 +259,7 @@ def test_claim_success_returns_the_four_contract_fields(
 
     assert result == expected
     assert set(result) == {"username", "otp", "sign_in_url", "region"}
-    assert result["region"] == "ap-southeast-1"
+    assert result["region"] == REGION
     assert result["username"] == "alice"
     assert result["otp"] == "OTP-123"
     assert result["sign_in_url"].startswith("https://")

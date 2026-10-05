@@ -26,14 +26,6 @@ provider "aws" {
   }
 }
 
-# Cloud Control provider — only used to create the IdC account instance.
-# NOTE: AWSCC does not support provider-level default_tags; tags are set
-# per-resource (see identity_center.tf).
-provider "awscc" {
-  region  = var.aws_region != "" ? var.aws_region : null
-  profile = var.aws_profile != "" ? var.aws_profile : null
-}
-
 # Resolve the region the AWS provider actually used (whether it came from
 # var.aws_region or the AWS_REGION env fallback), so outputs / the manifest
 # always report a concrete region for the scripts and credentials file.

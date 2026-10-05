@@ -13,10 +13,12 @@ output "region" {
   value       = data.aws_region.current.region
 }
 
-# The shared backend values every stack uses. Each stack gets its OWN
-# backend.hcl that differs ONLY in the `key` (its isolated state path), so a
-# `tofu destroy` on one stack can never touch another's state. The bucket,
-# region, lock table, and encryption are identical across stacks.
+# The shared backend values every stack uses. The backend.hcl is keyless: the
+# per-workshop state path (`key`) is supplied at init time via
+# `tofu init -backend-config="key=workshops/<id>/<stack>/terraform.tfstate"`,
+# so one bootstrapped backend.hcl serves every workshop and nothing in the file
+# pins a single state path. The bucket, region, lock table, and encryption are
+# identical across stacks.
 locals {
   _backend_hcl_shared = {
     bucket         = local.state_bucket_name
@@ -24,19 +26,19 @@ locals {
     dynamodb_table = aws_dynamodb_table.locks.name
   }
 
-  # Render a full backend.hcl body for a given state key.
+  # A keyless backend.hcl body carrying only bucket, region, dynamodb_table, and
+  # encrypt. `key` is intentionally omitted and supplied at init time.
+  _backend_hcl_body = <<-EOT
+    bucket         = "${local._backend_hcl_shared.bucket}"
+    region         = "${local._backend_hcl_shared.region}"
+    dynamodb_table = "${local._backend_hcl_shared.dynamodb_table}"
+    encrypt        = true
+  EOT
+
+  # Both stacks share the identical keyless body.
   _backend_hcl_for = {
-    for stack, key in {
-      subscription  = "subscription/terraform.tfstate"
-      claim_service = "claim-service/terraform.tfstate"
-    } :
-    stack => <<-EOT
-      bucket         = "${local._backend_hcl_shared.bucket}"
-      key            = "${key}"
-      region         = "${local._backend_hcl_shared.region}"
-      dynamodb_table = "${local._backend_hcl_shared.dynamodb_table}"
-      encrypt        = true
-    EOT
+    subscription  = local._backend_hcl_body
+    claim_service = local._backend_hcl_body
   }
 }
 

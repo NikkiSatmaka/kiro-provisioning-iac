@@ -40,16 +40,20 @@ USAGE
   python seed_claim_pool.py \
       --otp-csv ../../subscription/output/otps.csv \
       --manifest ../../subscription/output/manifest.json \
-      --table claim-service
+      --workshop-id kiro-2025-10-10
 
   # Actually write the pool:
   python seed_claim_pool.py \
       --otp-csv ../../subscription/output/otps.csv \
       --manifest ../../subscription/output/manifest.json \
-      --table claim-service \
+      --workshop-id kiro-2025-10-10 \
       --apply
 
-The table name must match the deployed table (OpenTofu ``var.table_name``).
+The table name is derived from the workshop id as
+``credential-claim-<workshop_id>`` — the same ``local.name`` OpenTofu uses — so
+the seed targets exactly the table that workshop's claim service created
+(Requirements 6.5, 7.6). ``--workshop-id`` defaults to the ``WORKSHOP_ID``
+environment variable; pass ``--table`` only to override the derived name.
 """
 
 from __future__ import annotations
@@ -63,6 +67,59 @@ import sys
 from dataclasses import dataclass, field
 
 import boto3
+from botocore.exceptions import ClientError
+
+# ---------------------------------------------------------------------------
+# Workshop-scoped table-name resolution
+# ---------------------------------------------------------------------------
+# Each workshop deploys its own claim table whose name OpenTofu derives as
+# ``credential-claim-<workshop_id>`` (design: "One claim service per workshop";
+# claim-service/terraform local.name). The seed/audit scripts resolve the same
+# name from the workshop id so they target exactly the table that workshop's
+# Claim_Service_Terraform created, and no other workshop's table (Requirements
+# 6.5, 7.6).
+
+TABLE_NAME_PREFIX = "credential-claim-"
+
+
+def resolve_table_name(workshop_id: str | None, table_override: str | None) -> str:
+    """Resolve the claim table name for a workshop.
+
+    Precedence (design: "seed/audit derive the table name from workshop_id"):
+
+    1. An explicit ``--table`` override wins when given — an operator escape
+       hatch for a non-standard table name.
+    2. Otherwise the name is derived from ``workshop_id`` as
+       ``credential-claim-<workshop_id>`` (the same ``local.name`` OpenTofu
+       uses), so the seed targets exactly the workshop's own table and no
+       other's (Requirements 6.5, 7.6).
+
+    Exits non-zero when neither a ``--table`` override nor a (non-empty,
+    whitespace-trimmed) ``workshop_id`` is supplied, so the script never falls
+    back to a guessed or shared table name.
+    """
+    if table_override and table_override.strip():
+        return table_override.strip()
+    wid = (workshop_id or "").strip()
+    if not wid:
+        sys.exit(
+            "ERROR: no table to seed. Supply --workshop-id (or set WORKSHOP_ID), "
+            "or pass an explicit --table name."
+        )
+    return f"{TABLE_NAME_PREFIX}{wid}"
+
+
+def _is_resource_not_found(exc: ClientError) -> bool:
+    """True when a botocore ClientError is DynamoDB's ResourceNotFoundException.
+
+    The claim table is addressed by name, so a missing table surfaces on the
+    first request as ``ResourceNotFoundException``. We match on the error code
+    rather than an exception class so the check holds whether the error is
+    raised by a live client or a stubbed one in tests.
+    """
+    return (
+        exc.response.get("Error", {}).get("Code") == "ResourceNotFoundException"
+    )
 
 # ---------------------------------------------------------------------------
 # Pure, AWS-free row processing (unit/property testable)
@@ -321,9 +378,22 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Path to manifest.json (source of sign_in_url and region).",
     )
     p.add_argument(
+        "--workshop-id",
+        default=os.environ.get("WORKSHOP_ID"),
+        help=(
+            "Workshop slug used to derive the claim table name "
+            "credential-claim-<workshop_id>. Defaults to the WORKSHOP_ID "
+            "environment variable. Required unless --table is given."
+        ),
+    )
+    p.add_argument(
         "--table",
-        required=True,
-        help="DynamoDB table name (OpenTofu var.table_name).",
+        default=None,
+        help=(
+            "Explicit DynamoDB table name, overriding the name derived from "
+            "--workshop-id. Normally omitted so the name is derived from the "
+            "workshop id."
+        ),
     )
     p.add_argument(
         "--region",
@@ -351,16 +421,33 @@ def main(argv: list[str]) -> int:
     )
     rows = classify_rows(load_rows(args.otp_csv))
 
-    table = boto3.resource("dynamodb", region_name=args.region).Table(args.table)
-    written, skipped_existing = seed(
-        table,
-        rows,
-        sign_in_url,
-        region,
-        account_id,
-        user_account_map,
-        apply=args.apply,
-    )
+    # Resolve the workshop's own table name (credential-claim-<workshop_id>)
+    # before touching AWS, so a missing/invalid id fails before any request and
+    # the seed can only ever address this workshop's table (Requirements 6.5,
+    # 7.6).
+    table_name = resolve_table_name(args.workshop_id, args.table)
+    table = boto3.resource("dynamodb", region_name=args.region).Table(table_name)
+    try:
+        written, skipped_existing = seed(
+            table,
+            rows,
+            sign_in_url,
+            region,
+            account_id,
+            user_account_map,
+            apply=args.apply,
+        )
+    except ClientError as exc:
+        # The workshop's table does not exist: name the workshop_id and stop
+        # without touching any other workshop's table (Requirement 7.7).
+        if _is_resource_not_found(exc):
+            wid = (args.workshop_id or "").strip()
+            sys.exit(
+                f"ERROR: claim table {table_name!r} for workshop "
+                f"{wid or '(unknown)'!r} does not exist. Deploy the claim "
+                "service for this workshop before seeding."
+            )
+        raise
 
     if args.apply:
         print(

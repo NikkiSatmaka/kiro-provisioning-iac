@@ -157,15 +157,68 @@ python provision.py
 """
 
 [tasks.provision]
-description = "Apply: create IdC instance + users + groups + memberships, then render credentials (prompts to approve)"
-dir = "subscription/scripts"
+description = "Apply: create a workshop's IdC users + groups + memberships + assignments, then render credentials (requires WORKSHOP_ID; prompts to approve)"
+dir = "subscription/terraform"
 run = """
 set -eu
-# Pass the Kiro sign-in region to Terraform via TF_VAR_kiro_region (mirrors how
-# claim-deploy exports TF_VAR_workshop_code). AWS_REGION (= IDC_REGION) still
-# drives the provider; this only feeds the kiro_region manifest field.
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+# Whitespace-only WORKSHOP_ID is treated as unset: strip all whitespace, then
+# fail closed (non-zero exit, no action) if what remains is empty.
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+# Slug-guard: 1-63 lowercase alphanumeric + hyphens, begin/end alphanumeric,
+# no consecutive hyphens (R5.8, R8.3). Defense-in-depth; the TF variable
+# validation is the authoritative gate.
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+
+# A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+if [ -f backend.hcl ] && grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+
+SUB_KEY="workshops/${WID}/subscription/terraform.tfstate"
+# Collision warning (not a hard stop): the subscription state key already exists
+# for this workshop (R8.5). Re-provisioning an existing workshop is legitimate.
+BUCKET="$(grep -E '^[[:space:]]*bucket' backend.hcl | sed -E 's/.*= *"(.*)".*/\\1/')"
+if [ -n "$BUCKET" ] && aws s3api head-object --bucket "$BUCKET" --key "$SUB_KEY" >/dev/null 2>&1; then
+  echo "WARNING: subscription state key already exists -> $SUB_KEY" >&2
+  echo "WARNING: workshop '$WID' may already be provisioned; proceeding." >&2
+fi
+
+# Thread the workshop namespace to OpenTofu (R6.4, R8.2). Pass the Kiro sign-in
+# region via TF_VAR_kiro_region too (AWS_REGION = IDC_REGION still drives the
+# provider; this only feeds the kiro_region manifest field).
+export TF_VAR_workshop_id="$WID"
 export TF_VAR_kiro_region="$KIRO_REGION"
-python provision.py --apply
+
+# Reconfigure the backend to THIS workshop's key BEFORE apply (R6.2) and fail
+# closed if init exits non-zero (R6.3) — set -eu already propagates the failure.
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=${SUB_KEY}" \
+  || { echo "ERROR: backend reconfiguration failed; not applying." >&2; exit 1; }
+tofu apply
+
+# Only reached after a clean apply (set -eu). Export the manifest and render
+# credentials.md — the behavior provision.py drives after an apply. Run both
+# directly here so the single reconfigured backend init above is authoritative
+# (a second un-reconfigured `tofu init` from provision.py would clobber the
+# workshop-keyed backend pointer).
+mkdir -p ../output
+tofu output -json provisioning_manifest > ../output/manifest.json
+echo "wrote ../output/manifest.json"
+( cd ../scripts && python provision.py --render-only )
 """
 
 [tasks.provision-render]
@@ -213,9 +266,39 @@ dir = "subscription/scripts"
 run = "python teardown.py --delete --delete-instance"
 
 [tasks.teardown-tofu]
-description = "Option B primary: tofu destroy (needs remote state or local state; prompts to confirm)"
+description = "Option B primary: tofu destroy a workshop's subscription state (requires WORKSHOP_ID; prompts to confirm)"
 dir = "subscription/terraform"
-run = "tofu destroy"
+run = """
+set -eu
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+
+# A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+if [ -f backend.hcl ] && grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+
+export TF_VAR_workshop_id="$WID"
+# Reconfigure to THIS workshop's key BEFORE destroy (R6.2); fail closed (R6.3).
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=workshops/${WID}/subscription/terraform.tfstate" \
+  || { echo "ERROR: backend reconfiguration failed; not destroying." >&2; exit 1; }
+tofu destroy
+"""
 
 # =============================================================================
 # === claim-service/ stack ===
@@ -273,7 +356,7 @@ tofu plan
 """
 
 [tasks.claim-deploy]
-description = "Apply: create the DynamoDB table, Lambda, and Function URL, then print the claim URL (prompts to approve)"
+description = "Apply: create a workshop's DynamoDB table, Lambda, and Function URL, then print the claim URL (requires WORKSHOP_ID + WORKSHOP_CODE; prompts to approve)"
 dir = "claim-service/terraform"
 run = """
 set -eu
@@ -281,12 +364,41 @@ if [ ! -f backend.hcl ]; then
   echo "ERROR: claim-service/terraform/backend.hcl not found (see claim-deploy-plan)." >&2
   exit 1
 fi
+# --- WORKSHOP_ID guard (namespace; R6.1, R6.7, R8.4) ---------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+# --- WORKSHOP_CODE guard (access gate; distinct from the namespace, R9.5) ------
 if [ -z "${WORKSHOP_CODE:-}" ]; then
   echo "ERROR: WORKSHOP_CODE is not set (see .env.example)." >&2
   exit 1
 fi
+
+# A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+
+# Thread both values to OpenTofu as two distinct TF vars (R6.4, R8.2, R9.5).
+export TF_VAR_workshop_id="$WID"
 export TF_VAR_workshop_code="$WORKSHOP_CODE"
-tofu init -input=false -backend-config=backend.hcl
+# Reconfigure to THIS workshop's claim-service key BEFORE apply (R6.2); fail
+# closed (R6.3).
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=workshops/${WID}/claim-service/terraform.tfstate" \
+  || { echo "ERROR: backend reconfiguration failed; not applying." >&2; exit 1; }
 tofu apply
 # Only reached after a clean apply (set -eu). Print the public HTTPS URL
 # participants hit — put it behind the workshop QR code / short link.
@@ -318,34 +430,97 @@ python seed_claim_pool.py \
 """
 
 [tasks.claim-seed]
-description = "Seed the claim pool from the subscription/ outputs (writes CRED# items; conditional, safe to re-run)"
+description = "Seed a workshop's claim pool from the subscription/ outputs (writes CRED# items; requires WORKSHOP_ID; conditional, safe to re-run)"
 dir = "claim-service/scripts"
 run = """
 set -eu
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+# Derive this workshop's table name (R6.5, R7.6); the script errors if that
+# workshop's table does not exist, touching no other workshop's table (R7.7).
 python seed_claim_pool.py \
   --otp-csv ../../subscription/output/otps.csv \
   --manifest ../../subscription/output/manifest.json \
-  --table credential-claim-service \
+  --table "credential-claim-${WID}" \
   --apply
 """
 
 # --- 4. Audit (after the workshop, before teardown) --------------------------
 [tasks.claim-audit]
-description = "Export who claimed what to a git-ignored CSV under claim-service/output/ (PII — not committed)"
+description = "Export who claimed what for a workshop to a git-ignored CSV under claim-service/output/ (PII — not committed; requires WORKSHOP_ID)"
 dir = "claim-service/scripts"
 run = """
 set -eu
-TABLE_NAME=credential-claim-service python export_audit.py
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+# Derive this workshop's table name (R6.6, R7.6); the script errors if that
+# workshop's table does not exist, reading no other workshop's table (R7.7).
+TABLE_NAME="credential-claim-${WID}" python export_audit.py
 """
 
 # --- 5. Destroy --------------------------------------------------------------
 [tasks.claim-destroy]
-description = "Tear down the claim service (table, Lambda, Function URL); never touches subscription/ identities (prompts to confirm)"
+description = "Tear down a workshop's claim service (table, Lambda, Function URL); never touches subscription/ identities (requires WORKSHOP_ID; prompts to confirm)"
 dir = "claim-service/terraform"
 run = """
 set -eu
-# workshop_code is required by the stack even to destroy (it is a required var);
-# export it from the env so destroy does not prompt for a value.
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+
+# A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+if [ -f backend.hcl ] && grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+
+# workshop_id namespaces the resources; workshop_code is required by the stack
+# even to destroy (it is a required var), so export it from the env so destroy
+# does not prompt. The two stay distinct values (R9.4, R9.5).
+export TF_VAR_workshop_id="$WID"
 export TF_VAR_workshop_code="${WORKSHOP_CODE:-unused-at-destroy}"
+# Reconfigure to THIS workshop's claim-service key BEFORE destroy (R6.2); fail
+# closed (R6.3).
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=workshops/${WID}/claim-service/terraform.tfstate" \
+  || { echo "ERROR: backend reconfiguration failed; not destroying." >&2; exit 1; }
 tofu destroy
 """

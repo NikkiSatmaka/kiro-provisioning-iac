@@ -14,7 +14,7 @@ output "region" {
 }
 
 output "account_id" {
-  description = "Child AWS account ID associated with the provisioned IdC (from idc_account_map)."
+  description = "Document-level child AWS account ID: the sole account when the workshop declares exactly one, else empty (the per-user account_id is authoritative for multi-account workshops). Resolved from workshop_accounts."
   value       = local.account_id
 }
 
@@ -72,10 +72,32 @@ output "memberships" {
 #   tofu output -json provisioning_manifest > ../output/manifest.json
 output "provisioning_manifest" {
   description = "Everything scripts/ needs in one object. No secrets."
+
+  # Halt before emitting the manifest if any participant's owning account cannot
+  # be resolved. user -> group -> account is a total function over
+  # workshop_accounts, so an unresolved (empty) account_id can only mean a user
+  # key slipped through without its 12-digit owning account; fail closed and
+  # name the offending participant/group rather than emit a manifest that would
+  # stamp a blank account onto a user downstream (R4.2).
+  precondition {
+    condition = alltrue([
+      for k, u in local.users : can(regex("^[0-9]{12}$", local.user_account_id[k]))
+    ])
+    error_message = format(
+      "Cannot resolve an owning account for participant(s): %s. Every user's account_id must be the 12-digit id of the account under which its group is nested.",
+      join(", ", [
+        for k, u in local.users :
+        "${u.username} (group ${local.groups[u.group_key].name})"
+        if !can(regex("^[0-9]{12}$", local.user_account_id[k]))
+      ])
+    )
+  }
+
   value = {
     region            = local.resolved_region # deployment / IdC region (unchanged meaning)
-    kiro_region       = var.kiro_region        # Kiro sign-in region (sign-in only)
-    account_id        = local.account_id       # document-level child AWS account ID
+    kiro_region       = var.kiro_region       # Kiro sign-in region (sign-in only)
+    account_id        = local.account_id      # document-level child AWS account ID
+    workshop_id       = var.workshop_id       # workshop namespace slug
     instance_arn      = local.instance_arn
     identity_store_id = local.identity_store_id
     kiro_tier         = var.kiro_tier

@@ -1,85 +1,93 @@
 locals {
+  # ---- Foundation IdC interface -------------------------------------------
+  # Resolved from operator-supplied inputs (see var.idc_instance_arn and
+  # var.identity_store_id). This module consumes the long-lived, org-level
+  # Foundation IdC instance; it neither creates nor destroys it.
+  identity_store_id = var.identity_store_id
+  instance_arn      = var.idc_instance_arn
+
   # Region the provider actually resolved to (from var.aws_region or the
   # AWS_REGION env fallback). Outputs/manifest report this concrete value.
   resolved_region = data.aws_region.current.region
 
-  pad = var.sequence_padding
+  # ---- Flatten workshop_accounts ------------------------------------------
+  # The operator supplies an explicit nested map:
+  #   { <account_id> => { groups = { <group> => { user_count = N } } } }
+  # Pillar 2 flattens it into the keyed maps the existing for_each resources
+  # (aws_identitystore_user/group/group_membership) consume, plus the
+  # group->account and user->account resolution tables that drive the per-group
+  # account assignments and the per-user account_id flow.
+  #
+  # Keys are built from account id + group name + per-group index only — never a
+  # global running counter — so they are deterministic and locally stable: a
+  # change confined to one account leaves every other account's keys
+  # byte-identical and OpenTofu does not churn unrelated resources (R3.7).
 
-  # Sequence numbers, e.g. start=1 count=3 => [1, 2, 3]
-  user_seq  = [for i in range(var.user_count) : i + var.sequence_start]
-  group_seq = [for i in range(var.group_count) : i + var.sequence_start]
+  # Group -> owning account. Key a group as "<account_id>:<group_name>" so the
+  # same group name under two accounts stays distinct and stable (R3.7).
+  group_account = merge([
+    for acct, cfg in var.workshop_accounts : {
+      for gname, _ in cfg.groups : "${acct}:${gname}" => acct
+    }
+  ]...)
 
-  # Zero-padded string form, e.g. 1 => "01"
-  user_seq_str  = [for n in local.user_seq : format("%0${local.pad}d", n)]
-  group_seq_str = [for n in local.group_seq : format("%0${local.pad}d", n)]
+  # Groups: group_key => { name }. (name is the human group name shown in IdC.)
+  # Same "<account_id>:<group_name>" keying as group_account so two accounts can
+  # reuse a group name without a collision.
+  groups = merge([
+    for acct, cfg in var.workshop_accounts : {
+      for gname, _ in cfg.groups : "${acct}:${gname}" => { name = gname }
+    }
+  ]...)
 
-  # Final names keyed by the padded sequence so for_each is stable.
-  # { "01" => "kiro-user-01", "02" => "kiro-user-02", ... }
-  # Users are keyed on a zero-padded sequence and named by username. Email is
-  # OPTIONAL and supplemental: looked up from var.user_emails by the same key,
-  # null when the user has no entry. A null email renders no emails block on the
-  # IdC user (see identity_center.tf) — IAM Identity Center requires none.
+  # Flatten users to a list first (so the per-group index is available), then
+  # key. width = max(2, len(str(user_count))) keeps NN zero-padded to at least
+  # two digits and wider only when a group exceeds 99 users.
+  _user_rows = flatten([
+    for acct, cfg in var.workshop_accounts : [
+      for gname, g in cfg.groups : [
+        for i in range(g.user_count) : {
+          account_id = acct
+          group      = gname
+          group_key  = "${acct}:${gname}"
+          index      = i + 1
+          width      = max(2, length(tostring(g.user_count)))
+        }
+      ]
+    ]
+  ])
+
+  # Users: "<account_id>:<group>:<NN>" => the record the resources consume.
+  # username  = "<workshop_id>-<acct_last4>-<group>-<NN>" (last 4 of the account
+  #             id keeps the name short while unique when a group name recurs
+  #             under two accounts).
+  # email     = null (anonymous OTP flow; the emails block renders nothing).
+  # The user resource reads only username/display_name/given_name/family_name/
+  # email; the extra group_key/account_id keys are carried for the membership
+  # and manifest derivations and ignored by the user resource.
   users = {
-    for s in local.user_seq_str :
-    s => {
-      username     = "${var.user_prefix}${s}"
-      email        = lookup(var.user_emails, s, null)
-      display_name = replace(replace(var.display_name_template, "{seq}", s), "{name}", "${var.user_prefix}${s}")
+    for r in local._user_rows :
+    "${r.account_id}:${r.group}:${format("%0${r.width}d", r.index)}" => {
+      username     = "${var.workshop_id}-${substr(r.account_id, 8, 4)}-${r.group}-${format("%0${r.width}d", r.index)}"
+      email        = null
+      display_name = "${r.group} participant ${format("%0${r.width}d", r.index)}"
       given_name   = "Kiro"
-      family_name  = "User ${s}"
+      family_name  = "${r.group} ${format("%0${r.width}d", r.index)}"
+      group_key    = r.group_key
+      account_id   = r.account_id
     }
   }
 
-  groups = {
-    for s in local.group_seq_str :
-    s => {
-      name = "${var.group_prefix}${s}"
-    }
+  # One membership per user, placing that user in its own group.
+  memberships = {
+    for uk, u in local.users :
+    uk => { user_key = uk, group_key = u.group_key }
   }
 
-  # ---- Account resolution -------------------------------------------------
-  # The IdC key for the single account instance this stack provisions.
-  idc_key = "default"
+  # Per-user account_id, resolved through user -> group -> owning account (R4.1).
+  user_account_id = { for uk, u in local.users : uk => u.account_id }
 
-  # The account_id for this IdC, or "" when the map has no entry (keeps the
-  # pipeline running with an empty cell rather than failing render).
-  account_id = lookup(var.idc_account_map, local.idc_key, "")
-
-  # Per-user account_id. Today every user belongs to the single IdC, so each
-  # resolves to local.account_id. Keyed per user so a future multi-IdC layout
-  # can vary it by user without changing downstream consumers.
-  user_account_id = { for k, _ in local.users : k => local.account_id }
-
-  # ---- Membership mapping -------------------------------------------------
-  # Produces a map of membership keys => { user_key, group_key } so the
-  # aws_identitystore_group_membership for_each is stable.
-
-  group_keys = keys(local.groups)
-  user_keys  = keys(local.users)
-
-  memberships_all_in_first = (
-    length(local.group_keys) == 0 ? {} : {
-      for uk in local.user_keys :
-      "${uk}->${local.group_keys[0]}" => {
-        user_key  = uk
-        group_key = local.group_keys[0]
-      }
-    }
-  )
-
-  memberships_round_robin = (
-    length(local.group_keys) == 0 ? {} : {
-      for idx, uk in local.user_keys :
-      "${uk}->${local.group_keys[idx % length(local.group_keys)]}" => {
-        user_key  = uk
-        group_key = local.group_keys[idx % length(local.group_keys)]
-      }
-    }
-  )
-
-  memberships = (
-    var.membership_strategy == "all_in_first" ? local.memberships_all_in_first :
-    var.membership_strategy == "round_robin" ? local.memberships_round_robin :
-    {}
-  )
+  # Document-level account_id: the single account when the workshop has exactly
+  # one, else "" (the per-user column is authoritative for multi-account).
+  account_id = length(keys(var.workshop_accounts)) == 1 ? keys(var.workshop_accounts)[0] : ""
 }

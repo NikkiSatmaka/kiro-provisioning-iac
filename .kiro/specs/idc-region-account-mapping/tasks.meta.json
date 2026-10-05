@@ -1,0 +1,524 @@
+{
+  "pbtResults": {
+    "1.3 Write smoke/example test for env config facts": {
+      "status": "passed",
+      "lastRunTimestamp": 1791169099155
+    },
+    "4.3 Write property test: Kiro sign-in region surfaces as KIRO_REGION": {
+      "status": "passed",
+      "lastRunTimestamp": 1791171641751
+    },
+    "4.6 Write property test: per-user account column reflects each user's account": {
+      "status": "passed",
+      "lastRunTimestamp": 1791171770036
+    },
+    "4.5 Write property test: account ID appears as a document-level header field": {
+      "status": "passed",
+      "lastRunTimestamp": 1791171826056
+    },
+    "4.4 Write property test: resource region surfaces as the deployment region": {
+      "status": "passed",
+      "lastRunTimestamp": 1791171846791
+    },
+    "8.2 Write property test: audit row carries the claimed credential's account ID": {
+      "status": "passed",
+      "lastRunTimestamp": 1791172293645
+    },
+    "7.2 Write property test: claim response excludes the account ID": {
+      "status": "passed",
+      "lastRunTimestamp": 1791172303081
+    },
+    "5.3 Write property test: each user record carries its IdC's account ID": {
+      "status": "passed",
+      "lastRunTimestamp": 1791172304071
+    }
+  },
+  "executionHistory": {
+    "1.1 Add region variables to `.env.example` and `.env`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167740776
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167752400
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791168025730
+      }
+    ],
+    "1.2 Wire region defaults and tracking in `mise.toml` `[env]`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167740864
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791168035043
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791168248147
+      }
+    ],
+    "1.3 Write smoke/example test for env config facts": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167741110
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791168254849
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791169325009
+      }
+    ],
+    "2.1 Add `kiro_region` and `idc_account_map` variables in `subscription/terraform/variables.tf`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167741342
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167753485
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791168026876
+      }
+    ],
+    "2.2 Add account-resolution locals in `subscription/terraform/locals.tf`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167741457
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791168036161
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791168247280
+      }
+    ],
+    "2.3 Add `account_id` output and extend the manifest in `subscription/terraform/outputs.tf`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167741545
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791168253465
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791169325843
+      }
+    ],
+    "2.4 Write integration/example test for Terraform schema and manifest wiring": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167741636
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791168255839
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170267848
+      }
+    ],
+    "3. Checkpoint - env + Terraform": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167741706
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172698823
+      }
+    ],
+    "4.1 Read new manifest fields in `_load_manifest`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167741782
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170285059
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170436138
+      }
+    ],
+    "4.2 Render region split and account fields in `_render`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167741841
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170442309
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171409333
+      }
+    ],
+    "4.3 Write property test: Kiro sign-in region surfaces as KIRO_REGION": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167741904
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171418389
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171889968
+      }
+    ],
+    "4.4 Write property test: resource region surfaces as the deployment region": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742004
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171419312
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171893059
+      }
+    ],
+    "4.5 Write property test: account ID appears as a document-level header field": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742092
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171420708
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171893367
+      }
+    ],
+    "4.6 Write property test: per-user account column reflects each user's account": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742151
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171422207
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171893675
+      }
+    ],
+    "4.7 Write example test for renderer backward compatibility": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742218
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171422943
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171894751
+      }
+    ],
+    "5.1 Read `account_id` from the manifest in `load_manifest`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742275
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170286119
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170437185
+      }
+    ],
+    "5.2 Stamp `account_id` onto each `CRED#` item in `credential_item`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742341
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170443767
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171410698
+      }
+    ],
+    "5.3 Write property test: each user record carries its IdC's account ID": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742417
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171900171
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172322051
+      }
+    ],
+    "5.4 Write example test for seed backward compatibility": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742474
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171901616
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172323444
+      }
+    ],
+    "6. Checkpoint - renderer + seed": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742519
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172699995
+      }
+    ],
+    "7.1 Copy `account_id` onto the `EMAIL#` lock item at claim time": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742553
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170445154
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171411649
+      }
+    ],
+    "7.2 Write property test: claim response excludes the account ID": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742600
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171902541
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172325368
+      }
+    ],
+    "7.3 Write integration test: claim transaction writes account_id onto the lock": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742642
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172329717
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172415388
+      }
+    ],
+    "8.1 Add `account_id` to `CSV_HEADER` and `email_item_to_row`": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742722
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170447152
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171412839
+      }
+    ],
+    "8.2 Write property test: audit row carries the claimed credential's account ID": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742772
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171903966
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172320667
+      }
+    ],
+    "8.3 Write example test for audit backward compatibility": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742837
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171904872
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172324394
+      }
+    ],
+    "9. Final checkpoint - full pipeline": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791167742891
+      },
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172700709
+      }
+    ],
+    "1. Environment layer: region split": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791169325076
+      }
+    ],
+    "2. Subscription Terraform: variables, locals, outputs, manifest": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791170267914
+      }
+    ],
+    "4. Credentials renderer (`subscription/scripts/provision_passwords_and_output.py`)": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791171894804
+      }
+    ],
+    "5. Seed script (`claim-service/scripts/seed_claim_pool.py`)": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172323484
+      }
+    ],
+    "8. Audit export (`claim-service/scripts/export_audit.py`)": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172324429
+      }
+    ],
+    "7. Claim handler (`claim-service/lambda/claim_handler.py`)": [
+      {
+        "executionId": "531c60ce-93ab-4d54-a1bc-830ec987db72",
+        "chatSessionId": "sess_53e7b019-cbef-439a-82c9-929853befa5a",
+        "timestamp": 1791172415449
+      }
+    ]
+  }
+}

@@ -130,12 +130,20 @@ def classify_rows(rows: list[dict[str, str]]) -> Classification:
     return result
 
 
-def credential_item(row: SeedRow, sign_in_url: str, region: str) -> dict[str, str]:
+def credential_item(
+    row: SeedRow, sign_in_url: str, region: str, account_id: str = ""
+) -> dict[str, str]:
     """Build the DynamoDB item for one valid credential row.
 
-    Pure: given a valid row plus the manifest-derived sign-in URL and region,
-    returns the exact attribute map the seed PutItem writes. ``status`` is always
-    ``"available"`` for a freshly seeded credential (Requirement 6.2).
+    Pure: given a valid row plus the manifest-derived sign-in URL, region, and
+    the account ID the user maps to, returns the exact attribute map the seed
+    PutItem writes. ``status`` is always ``"available"`` for a freshly seeded
+    credential (Requirement 6.2).
+
+    ``account_id`` is operator-facing only: it is stamped onto the ``CRED#``
+    item (Requirements 5.3, 8.1) but is never projected into the participant
+    claim response. It defaults to ``""`` so an OTP-only row (or a manifest that
+    predates the field) still produces a well-formed item.
     """
     return {
         "PK": f"CRED#{row.username}",
@@ -143,6 +151,7 @@ def credential_item(row: SeedRow, sign_in_url: str, region: str) -> dict[str, st
         "otp": row.otp,
         "sign_in_url": sign_in_url,
         "region": region,
+        "account_id": account_id,
         "status": "available",
     }
 
@@ -164,8 +173,22 @@ def load_rows(path: pathlib.Path) -> list[dict[str, str]]:
         return list(reader)
 
 
-def load_manifest(path: pathlib.Path) -> tuple[str, str]:
-    """Read ``sign_in_url`` and ``region`` from the manifest (Requirement 6.1).
+def load_manifest(path: pathlib.Path) -> tuple[str, str, str, dict[str, str]]:
+    """Read sign-in URL, region, and account info from the manifest.
+
+    Returns ``(sign_in_url, region, account_id, user_account_map)``:
+
+    * ``sign_in_url`` / ``region`` — as before (Requirement 6.1). ``region``
+      stays the deployment region stamped on each credential; it is NOT
+      repurposed for the Kiro sign-in region.
+    * ``account_id`` — the document-level child AWS account ID (default ``""``
+      for pre-change manifests that predate the field) (Requirement 5.1).
+    * ``user_account_map`` — a ``username -> account_id`` lookup built from the
+      manifest ``users`` map. Because the OTP CSV is keyed by ``username`` (not
+      by the manifest's padded-sequence key), the seed resolves each user's
+      account via this lookup (Requirement 5.3). Users whose manifest entry
+      lacks an ``account_id`` are omitted so the seed can fall back to the
+      document-level default.
 
     Accepts both the raw ``tofu output -json <name>`` shape and the wrapped
     ``{"value": ...}`` shape emitted by ``tofu output -json`` (all outputs),
@@ -186,6 +209,8 @@ def load_manifest(path: pathlib.Path) -> tuple[str, str]:
 
     region = (data.get("region") or "").strip()
     sign_in_url = (data.get("sign_in_url") or "").strip()
+    # Document-level account ID: default "" for manifests predating the field.
+    account_id = (data.get("account_id") or "").strip()
     if not region:
         sys.exit("ERROR: manifest is missing 'region'.")
     if not sign_in_url:
@@ -194,7 +219,23 @@ def load_manifest(path: pathlib.Path) -> tuple[str, str]:
             "manifest (the sign-in URL is obtained from the Kiro console) before "
             "seeding so claimed credentials carry a usable URL."
         )
-    return sign_in_url, region
+
+    # Build a username -> account_id lookup from the manifest users map. Each
+    # users[k] entry carries { username, account_id, ... }; we key by username
+    # (what the OTP CSV uses). Entries without a username or a non-empty
+    # account_id are skipped so OTP-only rows fall back to the document-level id.
+    user_account_map: dict[str, str] = {}
+    users = data.get("users") or {}
+    if isinstance(users, dict):
+        for entry in users.values():
+            if not isinstance(entry, dict):
+                continue
+            username = (entry.get("username") or "").strip()
+            user_account_id = (entry.get("account_id") or "").strip()
+            if username and user_account_id:
+                user_account_map[username] = user_account_id
+
+    return sign_in_url, region, account_id, user_account_map
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +247,8 @@ def seed(
     rows: Classification,
     sign_in_url: str,
     region: str,
+    account_id: str = "",
+    user_account_map: dict[str, str] | None = None,
     *,
     apply: bool,
 ) -> tuple[int, int]:
@@ -216,7 +259,13 @@ def seed(
     be claimed) is never clobbered — a condition failure is reported and
     counted as skipped, not raised. Invalid rows were already filtered out by
     ``classify_rows``; they are reported here for the operator.
+
+    Each item's ``account_id`` is resolved per user: the manifest-derived
+    ``user_account_map`` is consulted first (keyed by username), falling back to
+    the document-level ``account_id``, then to ``""`` for an OTP-only row with
+    no manifest entry and no document default (Requirements 5.3, 8.1).
     """
+    lookup = user_account_map or {}
     for bad in rows.invalid:
         print(
             f"SKIP (line {bad.line}): {bad.reason} -> {dict(bad.raw)}",
@@ -235,7 +284,8 @@ def seed(
     written = 0
     skipped_existing = 0
     for row in rows.valid:
-        item = credential_item(row, sign_in_url, region)
+        row_account_id = lookup.get(row.username, account_id)
+        item = credential_item(row, sign_in_url, region, row_account_id)
         try:
             table.put_item(
                 Item=item,
@@ -293,12 +343,23 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str]) -> int:
     args = _parse_args(argv)
-    sign_in_url, region = load_manifest(args.manifest)
+    # account_id is the document-level default; user_account_map resolves each
+    # user's account by username. Both are stamped onto the CRED# items by
+    # seed() -> credential_item (Requirements 5.3, 8.1).
+    sign_in_url, region, account_id, user_account_map = load_manifest(
+        args.manifest
+    )
     rows = classify_rows(load_rows(args.otp_csv))
 
     table = boto3.resource("dynamodb", region_name=args.region).Table(args.table)
     written, skipped_existing = seed(
-        table, rows, sign_in_url, region, apply=args.apply
+        table,
+        rows,
+        sign_in_url,
+        region,
+        account_id,
+        user_account_map,
+        apply=args.apply,
     )
 
     if args.apply:

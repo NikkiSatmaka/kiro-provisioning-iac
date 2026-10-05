@@ -37,6 +37,19 @@ locals {
     }
   }
 
+  # ---- Account resolution -------------------------------------------------
+  # The IdC key for the single account instance this stack provisions.
+  idc_key = "default"
+
+  # The account_id for this IdC, or "" when the map has no entry (keeps the
+  # pipeline running with an empty cell rather than failing render).
+  account_id = lookup(var.idc_account_map, local.idc_key, "")
+
+  # Per-user account_id. Today every user belongs to the single IdC, so each
+  # resolves to local.account_id. Keyed per user so a future multi-IdC layout
+  # can vary it by user without changing downstream consumers.
+  user_account_id = { for k, _ in local.users : k => local.account_id }
+
   # ---- Membership mapping -------------------------------------------------
   # Produces a map of membership keys => { user_key, group_key } so the
   # aws_identitystore_group_membership for_each is stable.

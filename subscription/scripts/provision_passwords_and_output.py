@@ -89,6 +89,16 @@ def _load_manifest(path: pathlib.Path) -> dict:
         sys.exit("ERROR: manifest 'sign_in_url' is empty. It is derived by "
                  "Terraform from the identity store id; re-export the manifest "
                  "(tofu output -json provisioning_manifest > manifest.json).")
+
+    # `kiro_region` (Kiro sign-in region) and `account_id` (child AWS account)
+    # are NEWER manifest fields. They are deliberately NOT in `required` above:
+    # manifests exported before this change must still load. Normalize them here
+    # so downstream (`_render`) can read them unconditionally.
+    #   * kiro_region falls back to the deployment `region` for old manifests,
+    #     so the sign-in instruction still renders (prior behavior).
+    #   * account_id defaults to "" when absent (renders as an empty/"—" cell).
+    data.setdefault("kiro_region", data["region"])
+    data.setdefault("account_id", "")
     return data
 
 
@@ -127,6 +137,12 @@ def _user_to_groups(manifest: dict) -> dict[str, list[str]]:
 
 def _render(manifest: dict, otps: dict[str, str], note: str) -> str:
     region = manifest["region"]
+    # `kiro_region` is the region a participant enters during Kiro sign-in; it is
+    # distinct from the deployment/resources region. _load_manifest already falls
+    # back to `region` for old manifests, so `.get(...) or region` is defensive.
+    kiro_region = manifest.get("kiro_region") or region
+    # Document-level child AWS account ID. Empty/absent renders as a dash.
+    account_id = manifest.get("account_id") or "—"
     identity_store_id = manifest["identity_store_id"]
     tier = manifest.get("kiro_tier", "(set in tfvars)")
     users = manifest["users"]
@@ -150,7 +166,9 @@ def _render(manifest: dict, otps: dict[str, str], note: str) -> str:
         lines.append("")
     lines.append(f"- **Generated (UTC):** {generated}")
     lines.append(f"- **Sign-in URL:** {url_cell}")
-    lines.append(f"- **Region code:** `{region}`")
+    lines.append(f"- **Account ID:** `{account_id}`")
+    lines.append(f"- **Region code (resources):** `{region}`")
+    lines.append(f"- **Kiro sign-in region:** `{kiro_region}`")
     lines.append(f"- **Identity store:** `{identity_store_id}`")
     lines.append(f"- **Kiro tier:** {tier}")
     lines.append(f"- **Users:** {len(users)}  |  **Groups:** {len(groups)}")
@@ -159,13 +177,13 @@ def _render(manifest: dict, otps: dict[str, str], note: str) -> str:
     lines.append("")
     lines.append("1. Open Kiro. Choose sign in with your organization.")
     lines.append("2. Choose **Sign in via IAM Identity Center**.")
-    lines.append(f"3. Enter the sign-in URL above and the region code `{region}`.")
+    lines.append(f"3. Enter the sign-in URL above and the Kiro sign-in region `{kiro_region}`.")
     lines.append("4. Sign in with the username + password below. You will be asked to set a new password on first login.")
     lines.append("")
     lines.append("## Users")
     lines.append("")
-    lines.append("| # | Username | Email | Group(s) | Password / OTP | Status |")
-    lines.append("|---|----------|-------|----------|----------------|--------|")
+    lines.append("| # | Username | Email | Account ID | Group(s) | Password / OTP | Status |")
+    lines.append("|---|----------|-------|------------|----------|----------------|--------|")
 
     missing_otp = 0
     for i, (key, u) in enumerate(sorted(users.items()), start=1):
@@ -173,6 +191,8 @@ def _render(manifest: dict, otps: dict[str, str], note: str) -> str:
         # email is optional (anonymous users have none). Null/missing => dash,
         # so the table never prints a literal "None".
         email = u.get("email") or "—"
+        # Per-user child AWS account ID (R6.2, R6.3). Empty/absent renders a dash.
+        user_account_id = u.get("account_id") or "—"
         grp = ", ".join(g for g in user_groups.get(uname, []) if g) or "—"
         otp = otps.get(uname, "")
         if otp:
@@ -182,7 +202,7 @@ def _render(manifest: dict, otps: dict[str, str], note: str) -> str:
             pw_cell = "TODO — generate one-time password in console"
             status = "pending password"
             missing_otp += 1
-        lines.append(f"| {i} | `{uname}` | {email} | {grp} | {pw_cell} | {status} |")
+        lines.append(f"| {i} | `{uname}` | {email} | {user_account_id} | {grp} | {pw_cell} | {status} |")
 
     lines.append("")
     if missing_otp:

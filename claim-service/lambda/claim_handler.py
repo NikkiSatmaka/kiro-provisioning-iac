@@ -496,7 +496,11 @@ def claim(email: str) -> dict:
     2. Commits a single ``TransactWriteItems`` holding **both** uniqueness
        checks (design: "The claim transaction", Requirement 2.3):
          * a conditional ``Put`` of ``EMAIL#<email>`` guarded by
-           ``attribute_not_exists(PK)`` — one claim per email (Req 2.2 / 8.2);
+           ``attribute_not_exists(PK)`` — one claim per email (Req 2.2 / 8.2).
+           The lock item also carries the picked credential's ``account_id``
+           (read before the transaction, default ``""``), copied so the audit
+           can read it directly without a second lookup; it is operator-only and
+           never reaches ``_credential_response`` (Requirements 7.2, 8.2, 8.3);
          * a conditional ``Update`` of ``CRED#<username>`` guarded by
            ``status = "available"`` — one claim per credential (Req 2.1 / 8.1).
 
@@ -550,6 +554,15 @@ def claim(email: str) -> dict:
         if username is None:
             raise ClaimError(409, "all claimed")
 
+        # Read the picked credential's account_id before the transaction so it
+        # can be copied onto the EMAIL# lock. The seed stamps account_id onto
+        # each CRED# item; pre-change items (or an IdC with no mapping) lack it,
+        # so we default to "" rather than fail the claim. This value is for the
+        # operator audit only and never enters _credential_response (design:
+        # "Claim handler"; Requirements 7.2, 8.2, 8.3).
+        picked = table.get_item(Key={"PK": f"CRED#{username}"}).get("Item", {})
+        cred_account_id = picked.get("account_id", "")
+
         claimed_at = datetime.now(UTC).isoformat()
 
         try:
@@ -570,6 +583,7 @@ def claim(email: str) -> dict:
                                 "PK": f"EMAIL#{email}",
                                 "username": username,
                                 "claimed_at": claimed_at,
+                                "account_id": cred_account_id,
                             },
                             "ConditionExpression": "attribute_not_exists(PK)",
                         },

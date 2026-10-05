@@ -39,7 +39,7 @@ REGION = os.environ.get("AWS_REGION", "us-east-1")
 EMAIL_PREFIX = "EMAIL#"
 
 # CSV column order for the Audit_Export (Requirement 7.1).
-CSV_HEADER = ("email", "username", "claimed_at")
+CSV_HEADER = ("email", "username", "account_id", "claimed_at")
 
 # Audit CSVs land here; the directory is git-ignored (Requirements 7.2, 13.3).
 # scripts/ -> claim-service/ -> output/
@@ -51,9 +51,10 @@ def email_item_to_row(item: dict[str, Any]) -> dict[str, str]:
 
     Pure and side-effect free so it can be exercised directly in tests
     (Property 11). The email is recovered by stripping the ``EMAIL#`` prefix
-    from the item's ``PK``; ``username`` and ``claimed_at`` are read straight
-    from the item, defaulting to empty strings when absent so a malformed item
-    still produces a row rather than crashing the export.
+    from the item's ``PK``; ``username``, ``account_id`` and ``claimed_at`` are
+    read straight from the item, defaulting to empty strings when absent so a
+    malformed or pre-change item still produces a row rather than crashing the
+    export (Requirement 7.2).
 
     Returns a dict keyed by :data:`CSV_HEADER` columns.
     """
@@ -62,6 +63,7 @@ def email_item_to_row(item: dict[str, Any]) -> dict[str, str]:
     return {
         "email": email,
         "username": str(item.get("username", "")),
+        "account_id": str(item.get("account_id", "")),
         "claimed_at": str(item.get("claimed_at", "")),
     }
 

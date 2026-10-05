@@ -101,7 +101,7 @@ tofu plan
 """
 
 [tasks.backend-bootstrap]
-description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write the subscription/ and claim-service/ backend.hcl files (prompts to approve)."
+description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write the subscription/, claim-service/, and foundation/ backend.hcl files (prompts to approve)."
 dir = "backend/terraform"
 run = """
 set -eu
@@ -118,6 +118,9 @@ cat ../../subscription/terraform/backend.hcl
 tofu output -raw backend_hcl_claim_service > ../../claim-service/terraform/backend.hcl
 echo "wrote claim-service/terraform/backend.hcl"
 cat ../../claim-service/terraform/backend.hcl
+tofu output -raw backend_hcl_foundation > ../../foundation/terraform/backend.hcl
+echo "wrote foundation/terraform/backend.hcl"
+cat ../../foundation/terraform/backend.hcl
 """
 
 [tasks.backend-destroy]
@@ -522,5 +525,95 @@ export TF_VAR_workshop_code="${WORKSHOP_CODE:-unused-at-destroy}"
 tofu init -reconfigure -input=false -backend-config=backend.hcl \
   -backend-config="key=workshops/${WID}/claim-service/terraform.tfstate" \
   || { echo "ERROR: backend reconfiguration failed; not destroying." >&2; exit 1; }
+tofu destroy
+"""
+
+# =============================================================================
+# === foundation/ stack ===
+# =============================================================================
+# Creates and owns the account-level IdC instance — the single, long-lived,
+# shared resource every workshop's subscription stack consumes. Applied ONCE and
+# reused across every workshop (NOT per workshop). Excluded from every
+# per-workshop provision/teardown task. backend.hcl must exist first (written by
+# `mise run backend-bootstrap`, same shared bucket as the other stacks).
+
+[tasks.foundation-plan]
+description = "DRY RUN: tofu init + plan for the Foundation IdC instance (creates nothing)"
+dir = "foundation/terraform"
+run = """
+set -eu
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: foundation/terraform/backend.hcl not found." >&2
+  echo "Run the backend bootstrap first (it writes this file):" >&2
+  echo "  mise run backend-bootstrap" >&2
+  echo "or copy the template by hand: cp backend.hcl.example backend.hcl" >&2
+  exit 1
+fi
+# A residual 'key' in backend.hcl conflicts with the init-time key (R4.7).
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=foundation/terraform.tfstate" \
+  || { echo "ERROR: backend init failed; not planning." >&2; exit 1; }
+tofu plan
+"""
+
+[tasks.foundation-apply]
+description = "Apply: create (or re-converge) the Foundation IdC instance (prompts to approve)"
+dir = "foundation/terraform"
+run = """
+set -eu
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: foundation/terraform/backend.hcl not found (see foundation-plan)." >&2
+  exit 1
+fi
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=foundation/terraform.tfstate" \
+  || { echo "ERROR: backend init failed; not applying." >&2; exit 1; }
+tofu apply
+# Only reached after a clean apply (set -eu). Surface the values to wire forward.
+echo ""
+echo "Foundation IdC applied. Wire these into the subscription stack:"
+echo "  export TF_VAR_idc_instance_arn=\"$(tofu output -raw instance_arn)\""
+echo "  export TF_VAR_identity_store_id=\"$(tofu output -raw identity_store_id)\""
+echo "Sign-in URL: $(tofu output -raw sign_in_url)  (region: $(tofu output -raw region))"
+"""
+
+[tasks.foundation-destroy]
+description = "DESTRUCTIVE: delete the shared Foundation IdC instance. Requires typing 'destroy-foundation'; then prompts tofu's own approval."
+dir = "foundation/terraform"
+run = """
+set -eu
+# --- Typed-phrase guard (R7.2-R7.5) --------------------------------------------
+# The IdC instance is shared across every workshop; deleting it is deliberate.
+# Require the operator to type the fixed phrase before anything proceeds. A
+# mismatch exits non-zero and deletes nothing; a match proceeds to tofu's OWN
+# apply/destroy approval prompt (a second, independent gate).
+printf 'This DELETES the shared Foundation IdC instance.\\n'
+printf 'Type exactly "destroy-foundation" to proceed: '
+read -r CONFIRM
+if [ "$CONFIRM" != "destroy-foundation" ]; then
+  echo "ERROR: confirmation phrase did not match 'destroy-foundation'; deleting nothing." >&2
+  exit 1
+fi
+
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: foundation/terraform/backend.hcl not found (see foundation-plan)." >&2
+  exit 1
+fi
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=foundation/terraform.tfstate" \
+  || { echo "ERROR: backend init failed; not destroying." >&2; exit 1; }
+# tofu destroy still prompts for its own approval before deleting (R7.5).
 tofu destroy
 """

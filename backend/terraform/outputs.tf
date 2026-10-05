@@ -39,6 +39,7 @@ locals {
   _backend_hcl_for = {
     subscription  = local._backend_hcl_body
     claim_service = local._backend_hcl_body
+    foundation    = local._backend_hcl_body
   }
 }
 
@@ -56,4 +57,13 @@ output "backend_hcl" {
 output "backend_hcl_claim_service" {
   description = "The full claim-service/terraform/backend.hcl body (mise writes it for you; tofu init -backend-config=backend.hcl reads it)."
   value       = local._backend_hcl_for["claim_service"]
+}
+
+# Ready-to-use backend.hcl body for the foundation stack. Same shared bucket
+# + lock table as the other stacks, isolated by a distinct init-time state key
+# (foundation/terraform.tfstate). `mise run backend-bootstrap` writes this to
+# ../../foundation/terraform/backend.hcl.
+output "backend_hcl_foundation" {
+  description = "The full foundation/terraform/backend.hcl body (mise writes it for you; tofu init -backend-config=backend.hcl reads it)."
+  value       = local._backend_hcl_for["foundation"]
 }

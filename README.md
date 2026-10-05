@@ -22,12 +22,15 @@ one links to the detailed doc for that step. New here? Just go top to bottom.
 | ----- | ----------- | ------------ |
 | **0. Set up** | Install the toolchain, point it at your AWS account, authenticate | this README ↓ |
 | **1. Backend** | Create the shared S3 remote-state bucket (one-time, required) | [`backend/README.md`](./backend/README.md) · [RUNBOOK Step 1b](./subscription/RUNBOOK.md#step-1b--iac-one-time-set-up-the-remote-s3-state-backend-required) |
-| **2. Provision** | Create the IdC instance, users, groups; the console-only Kiro steps; render credentials | [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) |
-| **3. Distribute** | Hand out credentials directly, **or** deploy the self-serve claim service | [`claim-service/README.md`](./claim-service/README.md) |
+| **2. Foundation** | Create the account-level IdC instance (one-time, reused by every workshop) | [`foundation/README.md`](./foundation/README.md) · [`foundation/RUNBOOK.md`](./foundation/RUNBOOK.md) |
+| **3. Provision** | Create the users, groups, memberships; the console-only Kiro steps; render credentials | [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) |
+| **4. Distribute** | Hand out credentials directly, **or** deploy the self-serve claim service | [`claim-service/README.md`](./claim-service/README.md) |
 | **Teardown** | Remove everything when the workshop/engagement ends | [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) |
 
-The phases chain: **2 produces `subscription/output/otps.csv` + `manifest.json`,
-which 3 consumes.** So always provision before you distribute.
+The phases chain: **2 creates the shared IdC instance and emits its ARN +
+identity store id, which 3 consumes; 3 produces `subscription/output/otps.csv` +
+`manifest.json`, which 4 consumes.** So lay the foundation, then provision,
+then distribute.
 
 ---
 
@@ -56,7 +59,7 @@ Prerequisites:
 - AWS credentials for the target **child/member** account (the CSVs land in
   `creds/`), and the org management account must already permit member-account
   IdC instances (that is **RUNBOOK Step 0** — a one-time, irreversible toggle in
-  the Organizations management account; do it before Phase 2's apply).
+  the Organizations management account; do it before Phase 2's foundation apply).
 
 ```bash
 # 1. Install the toolchain + create the Python venv
@@ -67,7 +70,7 @@ mise run setup
 
 # 3. Point the repo at your account/region (git-ignored)
 cp .env.example .env    # then edit AWS_PROFILE / AWS_REGION
-#   (set WORKSHOP_CODE too if you will use the claim service in Phase 3)
+#   (set WORKSHOP_CODE too if you will use the claim service in Phase 4)
 
 # 4. Create the project-local AWS profile (writes to .aws/, not ~/.aws)
 mise run aws-configure   # runs `aws configure --profile <AWS_PROFILE>`
@@ -109,7 +112,33 @@ by hand. `provision-*` tasks fail closed until the subscription one exists.
 
 ---
 
-## Phase 2 — Provision the subscription
+## Phase 2 — Foundation (the shared IdC instance, one-time)
+
+The account-level IAM Identity Center instance is a **long-lived, shared**
+resource every workshop reuses. `foundation/` is the one stack that creates and
+owns it; apply it **once per account**, after the backend bootstrap and before
+provisioning. It creates nothing else — no users, groups, or memberships — those
+stay in the subscription stack.
+
+```bash
+mise run foundation-plan    # DRY RUN: tofu init + plan, creates nothing
+mise run foundation-apply   # create the IdC instance AND print the TF_VAR_* export lines
+```
+
+`foundation-apply` emits the `instance_arn` and `identity_store_id`. You export
+those into the subscription stack as `TF_VAR_idc_instance_arn` /
+`TF_VAR_identity_store_id` (or put them in tfvars) — the two stacks are wired by
+these variables, not by remote state. Creating an account instance first
+requires the AWS Organizations management account to have enabled member-account
+IdC instances (a one-time, irreversible toggle).
+
+→ **Details:** [`foundation/README.md`](./foundation/README.md) for the concepts
+and [`foundation/RUNBOOK.md`](./foundation/RUNBOOK.md) for the create-then-wire
+run order and the management-account prerequisite. **Next:** Phase 3.
+
+---
+
+## Phase 3 — Provision the subscription
 
 ```bash
 # 1. Choose what to provision (git-ignored)
@@ -129,11 +158,11 @@ in the RUNBOOK.
 
 → **Follow the full run order:** [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md)
 from **Step 0** (the management-account toggle) through credential rendering
-(Step 5). **Next:** Phase 3.
+(Step 5). **Next:** Phase 4.
 
 ---
 
-## Phase 3 — Distribute the credentials
+## Phase 4 — Distribute the credentials
 
 Two ways to get credentials to users — pick one:
 
@@ -142,7 +171,7 @@ Two ways to get credentials to users — pick one:
 - **Self-serve claim service (optional):** deploy a single public HTTPS Lambda
   Function URL and let participants claim their own credential from a QR code /
   short link using a workshop code. It seeds its pool from the **same**
-  `subscription/output/otps.csv` + `manifest.json` you produced in Phase 2, so
+  `subscription/output/otps.csv` + `manifest.json` you produced in Phase 3, so
   run it only after provisioning. Set `WORKSHOP_CODE` in `.env` first.
 
 ```bash
@@ -193,6 +222,8 @@ Kiro-subscription deactivation that must happen first):**
 | Doc | Purpose |
 | --- | ------- |
 | [`backend/README.md`](./backend/README.md) | The shared remote-state backend: the S3 bucket + lock table the other stacks store state in |
+| [`foundation/README.md`](./foundation/README.md) | Concepts: the single owned account-level IdC instance, the decoupling-via-variables boundary, the shared backend with a foundation-scoped key |
+| [`foundation/RUNBOOK.md`](./foundation/RUNBOOK.md) | Create-then-wire run order: the management-account prerequisite, applying once and exporting the IDs into the subscription stack |
 | [`subscription/README.md`](./subscription/README.md) | Concepts: what is provisioned, why an account instance, what AWS won't automate, reusability knobs |
 | [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) | End-to-end run order, including the console-only steps |
 | [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) | Cleanup: remote-state `tofu destroy` (primary) + state-free script (fallback) |
@@ -214,7 +245,11 @@ state:
 ├── backend/                  ← shared remote-state backend (LOCAL state, run once)
 │   ├── README.md             ← why it exists + how to run
 │   └── terraform/            ← S3 state bucket + DynamoDB lock table
-├── subscription/             ← IdC account instance + users + groups + Kiro subscription
+├── foundation/               ← the account-level IdC instance (shared; run once per account)
+│   ├── README.md             ← concepts + the decoupling-via-variables boundary
+│   ├── RUNBOOK.md            ← create-then-wire run order + the mgmt-account step
+│   └── terraform/            ← the single awscc_sso_instance "this" + wiring outputs
+├── subscription/             ← IdC users + groups + memberships + Kiro subscription
 │   ├── README.md             ← concepts + reusability
 │   ├── RUNBOOK.md            ← run order
 │   ├── TEARDOWN.md           ← cleanup

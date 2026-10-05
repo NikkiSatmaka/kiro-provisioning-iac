@@ -27,6 +27,10 @@ __pycache__/
 # directories are backed by the shared .git store and must never be committed.
 .worktrees/
 
+# Foundation IdC service local-only backend config. The backend.hcl holds the
+# per-account state config; the tracked backend.hcl.example stays tracked.
+foundation/terraform/backend.hcl
+
 # Credential Claim Service local-only artifacts. The audit CSVs contain claimed
 # emails (PII) and the backend.hcl holds the per-account state config; the
 # tracked backend.hcl.example stays tracked.

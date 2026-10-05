@@ -171,3 +171,37 @@ variable "kiro_tier" {
     error_message = "kiro_tier must be one of: PRO, PRO_PLUS, PRO_MAX, POWER."
   }
 }
+# ---------------------------------------------------------------------------
+# IdC region + account mapping
+# ---------------------------------------------------------------------------
+
+variable "kiro_region" {
+  description = <<-EOT
+    Region a participant enters when signing in to Kiro. Kiro supports only
+    us-east-1 today. Inherited from KIRO_REGION in the environment via
+    TF_VAR_kiro_region (the provisioning task exports it). This value is used
+    ONLY for the Kiro sign-in instruction in credentials.md; it never changes
+    where AWS resources are created (that is AWS_REGION / IDC_REGION).
+  EOT
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "idc_account_map" {
+  description = <<-EOT
+    Maps each IdC to its child AWS account ID (12-digit string). Supports
+    management-account-style IdC creation where a child account is associated.
+    Keyed by an IdC key; this repo provisions one IdC account instance per run,
+    so the common case is a single entry under the key "default". Every
+    provisioned user resolves to the account of the IdC they belong to.
+  EOT
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for v in values(var.idc_account_map) : can(regex("^[0-9]{12}$", v))
+    ])
+    error_message = "Every idc_account_map value must be a 12-digit AWS account ID."
+  }
+}

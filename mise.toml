@@ -32,7 +32,16 @@ AWS_SHARED_CREDENTIALS_FILE = "{{config_root}}/.aws/credentials"
 # Fallbacks only. `.env` (or the shell) overrides these; `default` keeps any
 # existing non-empty value and applies the fallback only when unset.
 AWS_PROFILE = { default = "kiro-provisioning" }
-AWS_REGION = { default = "us-east-1" }
+
+# Region split: KIRO_REGION is the sign-in region (Kiro-only), IDC_REGION is
+# where all AWS resources are provisioned.
+# Kiro sign-in region (Kiro-only). Default is Kiro's single supported region.
+KIRO_REGION = { default = "us-east-1" }
+# Resource-provisioning region. Default is the operator's target region.
+IDC_REGION = { default = "ap-southeast-1" }
+# AWS_REGION tracks IDC_REGION so every AWS CLI/SDK/OpenTofu call targets the
+# provisioning region. `.env` (or the shell) may still override IDC_REGION.
+AWS_REGION = "{{ env.IDC_REGION }}"
 # Mirror AWS_REGION so the two never diverge, whatever .env/shell set it to.
 AWS_DEFAULT_REGION = "{{ env.AWS_REGION }}"
 
@@ -138,12 +147,26 @@ tofu destroy -var force_destroy=true
 [tasks.provision-plan]
 description = "DRY RUN: tofu init + plan for the IdC provisioning (no changes)"
 dir = "subscription/scripts"
-run = "python provision.py"
+run = """
+set -eu
+# Pass the Kiro sign-in region to Terraform via TF_VAR_kiro_region (mirrors how
+# claim-deploy exports TF_VAR_workshop_code). AWS_REGION (= IDC_REGION) still
+# drives the provider; this only feeds the kiro_region manifest field.
+export TF_VAR_kiro_region="$KIRO_REGION"
+python provision.py
+"""
 
 [tasks.provision]
 description = "Apply: create IdC instance + users + groups + memberships, then render credentials (prompts to approve)"
 dir = "subscription/scripts"
-run = "python provision.py --apply"
+run = """
+set -eu
+# Pass the Kiro sign-in region to Terraform via TF_VAR_kiro_region (mirrors how
+# claim-deploy exports TF_VAR_workshop_code). AWS_REGION (= IDC_REGION) still
+# drives the provider; this only feeds the kiro_region manifest field.
+export TF_VAR_kiro_region="$KIRO_REGION"
+python provision.py --apply
+"""
 
 [tasks.provision-render]
 description = "Re-render output/credentials.md from an existing manifest (pass --otp-csv as needed)"

@@ -13,6 +13,11 @@ output "region" {
   value       = local.resolved_region
 }
 
+output "account_id" {
+  description = "Child AWS account ID associated with the provisioned IdC (from idc_account_map)."
+  value       = local.account_id
+}
+
 output "kiro_tier" {
   description = "Configured Kiro tier (applied to groups by scripts/)."
   value       = var.kiro_tier
@@ -68,7 +73,9 @@ output "memberships" {
 output "provisioning_manifest" {
   description = "Everything scripts/ needs in one object. No secrets."
   value = {
-    region            = local.resolved_region
+    region            = local.resolved_region # deployment / IdC region (unchanged meaning)
+    kiro_region       = var.kiro_region        # Kiro sign-in region (sign-in only)
+    account_id        = local.account_id       # document-level child AWS account ID
     instance_arn      = local.instance_arn
     identity_store_id = local.identity_store_id
     kiro_tier         = var.kiro_tier
@@ -76,9 +83,10 @@ output "provisioning_manifest" {
     users = {
       for k, u in aws_identitystore_user.this :
       k => {
-        username = u.user_name
-        email    = local.users[k].email
-        user_id  = u.user_id
+        username   = u.user_name
+        email      = local.users[k].email
+        user_id    = u.user_id
+        account_id = local.user_account_id[k]
       }
     }
     groups = {

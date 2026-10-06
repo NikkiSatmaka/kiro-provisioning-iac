@@ -31,6 +31,25 @@ variable "account_ids" {
   }
 }
 
+# --- Shared primitives from foundation/ (wired forward as variables) --------
+# These three are once-per-management-account singletons owned by foundation/
+# and consumed here by id/ARN. No defaults: a missing wire-forward fails closed.
+
+variable "budgets_execution_role_arn" {
+  description = "From foundation/: ARN of the shared least-privilege role AWS Budgets assumes to attach/detach the freeze SCP."
+  type        = string
+}
+
+variable "kiro_guardrail_scp_id" {
+  description = "From foundation/: id of the shared Kiro guardrail SCP this stack attaches to the workshop OU."
+  type        = string
+}
+
+variable "freeze_scp_id" {
+  description = "From foundation/: id of the shared deny-all freeze SCP AWS Budgets attaches to a breaching account on breach."
+  type        = string
+}
+
 # --- Provider wiring (referenced by providers.tf) ---------------------------
 
 variable "aws_region" {
@@ -65,27 +84,6 @@ variable "default_tags" {
     ManagedBy = "opentofu"
     Purpose   = "workshop-account-governance"
   }
-}
-
-# --- Kiro guardrail SCP ------------------------------------------------------
-
-variable "kiro_allowed_actions" {
-  description = <<-EOT
-    Allowlist of IAM actions the Kiro guardrail SCP permits (deny-by-default).
-    The default is a CONSERVATIVE STARTER permitting Kiro + IAM Identity Center
-    sign-in plus read-only basics; it is a TUNABLE starting point — widen or
-    narrow it per workshop (see README).
-  EOT
-  type        = list(string)
-  default = [
-    "sso:*",
-    "sso-directory:*",
-    "identitystore:*",
-    "signin:*",
-    "sts:GetCallerIdentity",
-    "codewhisperer:*",
-    "q:*",
-  ]
 }
 
 # --- Budgets and freeze automation ------------------------------------------

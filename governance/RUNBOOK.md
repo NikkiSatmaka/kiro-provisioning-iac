@@ -24,9 +24,10 @@ distinct is its *targets*: the SCPs and budgets act on the **member accounts** i
 never creates or invites accounts; account creation is out of scope).
 
 > ⚠️ **High blast radius.** `tofu apply` here mutates the **live AWS
-> Organizations management account** — it moves accounts, attaches SCPs, and
-> wires automatic freeze actions. Apply only with an explicit go-ahead. See the
-> verification-only note at the end.
+> Organizations management account** — it creates the OU, attaches SCPs, and
+> wires automatic freeze actions. (Moving the existing accounts into the OU is a
+> separate out-of-band step, `governance-place-accounts` — see Step 3.) Apply
+> only with an explicit go-ahead. See the verification-only note at the end.
 
 ---
 
@@ -139,8 +140,6 @@ What a clean apply produces (confirm this plan shape before approving):
 
 - **1** `aws_organizations_organizational_unit.workshop` named
   `workshop-<workshop_id>` under `var.parent_id`.
-- **N** account placements (one per `var.account_ids`) — see the placement
-  mechanism below.
 - **2** SCPs: `kiro-guardrail-<id>` (attached to the OU) and `freeze-<id>`
   (created with **0 attachments**).
 - **1** budgets execution role (`governance-budgets-exec-<id>`) + its inline
@@ -149,53 +148,48 @@ What a clean apply produces (confirm this plan shape before approving):
   `LinkedAccount`.
 - **N** `AUTOMATIC` SCP budget actions, each targeting **only its own account**.
 
-### Account placement — the chosen mechanism (read `organizations.tf`)
+The accounts themselves are **not** in the plan — the stack owns no account
+resource. They are moved into the OU in the next step.
 
-`organizations.tf` records the placement mechanism in its
-`RUNBOOK (task 10) — RECORD THIS:` comment block. Lifted verbatim:
+---
 
-- **Chosen mechanism:** each pre-existing account is placed via
-  `aws_organizations_account.placed["<id>"]` — **adopted via `tofu import`,
-  never created** — with `parent_id` pointed at the workshop OU, so the only
-  change the provider ever makes is the **move into the OU**. Confirmed against
-  the installed provider `hashicorp/aws` **v6.67.0**, which still exposes no
-  standalone "move account into an OU" resource.
-- `close_on_deletion` is left unset (`false`) — a destroy only **removes** the
-  account from the org, it never **closes** it.
-- `lifecycle { prevent_destroy = true }` is a second explicit guard: a destroy
-  of this stack errors out rather than touching these accounts.
-- `ignore_changes = [name, email, role_name]` — these satisfy the importable
-  schema but are reconciled from AWS (and `role_name` is unreadable after
-  import), so ignoring them keeps the plan to the one meaningful attribute,
-  `parent_id` (the placement itself).
+## Step 3 — (out-of-band) Move the existing accounts into the OU
 
-**Import is required** before plan/apply shows a clean move — one per supplied
-id:
+The governance stack creates **only** the OU. The pre-existing, in-org accounts
+in `var.account_ids` are moved into that OU **outside Terraform**, by a dedicated
+task that runs `aws organizations move-account` once per id:
 
 ```bash
-cd governance/terraform
-tofu import 'aws_organizations_account.placed["111111111111"]' 111111111111
-# repeat for each id in var.account_ids
+# Reads account_ids from the stack output (terraform.tfvars is the source of
+# truth); WORKSHOP_ID comes from .env. Set ACCOUNT_IDS only to move a subset.
+mise run governance-place-accounts
 ```
 
-After import, the only planned change is the move into the workshop OU; if an
-account is already in the OU, its plan is a no-op.
-
-#### `moveAccount` fallback
-
-If you prefer not to adopt accounts into state, or the import is impractical:
-place the accounts **out-of-band** and let the stack own only the OU + SCP
-attachment. Run once per account:
+The task reuses the governance `WORKSHOP_ID` guard and `backend.hcl` checks,
+runs `tofu init -reconfigure` to this workshop's key, reads the destination OU
+from `tofu output -raw workshop_ou_id`, and for each id finds its current parent
+(`aws organizations list-parents`) and moves it:
 
 ```bash
 aws organizations move-account \
   --account-id <id> \
-  --source-parent-id <current root/parent id> \
+  --source-parent-id <current parent id> \
   --destination-parent-id <workshop OU id>
 ```
 
-(or the console **"Move AWS account"** action). The move is recorded here rather
-than driven by `tofu`.
+It is **idempotent** — an account already in the destination OU is skipped with
+no error — and it echoes every move. It runs only `tofu output` (never
+`tofu apply`), so it does **not** need the three foundation `TF_VAR_*`
+wire-forwards, but it does need a working `tofu init`; if `workshop_ou_id` cannot
+be read it fails closed (run `governance-apply` for this workshop first).
+
+> ⚠️ **Why out-of-band, not Terraform:** `hashicorp/aws` v6.67.0 has no
+> standalone "move account into an OU" resource. The only resource carrying
+> account→OU placement is `aws_organizations_account` — AWS's *create*-an-account
+> resource — so expressing placement in Terraform risks **creating brand-new
+> accounts** on an apply with no prior state. Keeping the move out-of-band makes
+> it structurally impossible for this stack to create, invite, close, or own an
+> account.
 
 ---
 
@@ -244,33 +238,35 @@ raise the budget) before un-freezing, or the next breach re-attaches it.
 
 ## Teardown — (IaC) two steps, each typed-phrase guarded
 
-Teardown is **two tasks, in order**. Because account placements carry
-`prevent_destroy = true`, a destroy **will not touch (or close) a pre-existing
-account** — and OpenTofu refuses to remove an OU that still holds accounts or a
-policy that is still attached. So you must empty the OU and drop the placed
-accounts from state **first**, then destroy.
+Teardown is **two tasks, in order**. Account placement is out-of-band (the
+stack owns only the OU, never an account resource), so there is nothing in
+Terraform state to clean up and no `prevent_destroy` guard to clear. But AWS
+Organizations refuses to delete a **non-empty** OU, so you must move the
+accounts back **out** of the OU first, then destroy.
 
-### Step A — move the placed accounts out of the OU
+### Step A — move the accounts out of the OU
 
 ```bash
 mise run governance-move-accounts-out
 ```
 
-This clears both teardown blockers **without touching the real accounts**:
+This empties the OU **without touching the accounts themselves** — it is the
+exact mirror of `governance-place-accounts` (which moved them in):
 
 1. It prompts you to type exactly **`move-accounts-out`**. Any other string
    (including empty or whitespace) exits non-zero and **moves nothing**.
 2. On a match (and after the shared `WORKSHOP_ID` guard + backend reconfigure),
-   it enumerates **only** the accounts this stack adopted
-   (`aws_organizations_account.placed[...]` in state — never any account outside
-   `var.account_ids`), and for each one:
+   it reads this workshop's `account_ids` and `workshop_ou_id` from
+   `tofu output` (the same single source of truth `governance-place-accounts`
+   uses — never any account outside `var.account_ids`), and for each one:
    - resolves the account's real current parent via
      `aws organizations list-parents` (the move source);
    - moves it back to `var.parent_id` (the parent the workshop OU hangs under)
-     with `aws organizations move-account`, skipping any account already there;
-   - runs `tofu state rm` on the placement — which only drops Terraform's
-     tracking and **never calls AWS**. This is what clears the
-     `prevent_destroy` guard so Step B can proceed.
+     with `aws organizations move-account`, skipping any account already there.
+
+   It runs only `tofu output` (never `tofu apply`) and touches **no** Terraform
+   state. Set `ACCOUNT_IDS="<id> <id>"` to override the tfvars-derived list with
+   a deliberate subset.
 
 > ⚠️ Moving the accounts back to `var.parent_id` (typically the org root) takes
 > them out from under the workshop OU, so they **lose the Kiro guardrail (and
@@ -279,7 +275,7 @@ This clears both teardown blockers **without touching the real accounts**:
 
 The `moveAccount` fallback still applies if you prefer to do it entirely by hand:
 `aws organizations move-account` (destination = root or another parent), or the
-console "Move AWS account" action, then `tofu state rm` each placement yourself.
+console "Move AWS account" action, once per account.
 
 ### Step B — destroy the stack
 
@@ -294,9 +290,18 @@ That task puts two gates in front of the delete, mirroring `foundation-destroy`:
 2. On a match, it still requires `tofu`'s **own** apply/destroy approval prompt
    before anything is deleted.
 
+The stack owns **no account resource**, so a destroy can never touch (or close)
+a pre-existing account. But OpenTofu refuses to remove an OU that still holds
+accounts or a policy that is still attached — which is exactly why Step A runs
+first. With the OU emptied:
+
+- **Detach the SCPs:** the guardrail detaches as part of destroy once the OU is
+  empty; detach any freeze SCP still attached to a (now-moved) account first
+  (see the manual un-freeze above).
+
 Only then does `governance-destroy` remove the OU, the two SCPs, the budgets
 execution role, and the per-account budgets + actions. The accounts themselves
-remain — created and closed externally, never by this stack.
+remain — created, moved, and closed externally, never by this stack.
 
 ---
 
@@ -322,9 +327,9 @@ mise run governance-plan     # sample-tfvars plan; creates/closes nothing
 | ---- | --------------- | --- |
 | All-features + SCP policy type on the root (Step 0) | ❌ (mgmt account console) | Org-level platform precondition; the stack cannot enable it |
 | Shared backend bucket + `backend.hcl` (Step 1b) | ✅ (IaC, `backend-bootstrap`) | — |
-| Create OU + guardrail + freeze SCP + budgets (Step 2) | ✅ (IaC, `governance-apply`) | High blast radius; apply only with explicit go-ahead |
-| Adopt pre-existing accounts into the OU | ⚠️ `tofu import` then plan (or `move-account` fallback) | No standalone move-into-OU resource in hashicorp/aws v6.67.0 |
+| Create OU + guardrail attachment + budgets (Step 2) | ✅ (IaC, `governance-apply`) | High blast radius; apply only with explicit go-ahead |
+| Move pre-existing accounts into the OU (Step 3) | ✅ (out-of-band, `governance-place-accounts`) | No standalone move-into-OU resource in hashicorp/aws v6.67.0; a TF resource would risk CREATING accounts |
 | Automatic freeze on budget breach | ✅ (IaC, `AUTOMATIC` SCP budget action) | Attaches freeze SCP to the single breaching account |
 | Un-freeze a frozen account | ❌ (console / `aws organizations detach-policy`) | No recovery automation by design |
-| Empty the OU before teardown | ✅ (`governance-move-accounts-out`, typed-phrase `move-accounts-out`) | Moves placed accounts back to `parent_id` + `state rm`; never closes accounts |
+| Empty the OU before teardown | ✅ (out-of-band, `governance-move-accounts-out`, typed-phrase `move-accounts-out`) | Mirror of `governance-place-accounts`: moves accounts back to `parent_id` via `move-account`; no TF state, never closes accounts |
 | Destroy the governance stack | ✅ (`governance-destroy`, typed-phrase `destroy-governance`) | Run `governance-move-accounts-out` first; never closes accounts |

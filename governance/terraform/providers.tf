@@ -22,7 +22,3 @@ provider "aws" {
 # Resolve the region the provider actually used (var.aws_region or the
 # AWS_REGION env fallback), so any region reporting reflects a concrete value.
 data "aws_region" "current" {}
-
-# The management account id — used for the budget-action target scope and, more
-# importantly, the aws:SourceAccount confused-deputy guard on the budgets role.
-data "aws_caller_identity" "current" {}

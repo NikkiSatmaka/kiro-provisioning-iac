@@ -27,8 +27,15 @@ notification_emails = ["ops@example.com"]
 
 # ---- Workshop OU placement (REQUIRED) ---------------------------------------
 # parent_id: the parent OU or org-root id the workshop OU hangs under.
-# account_ids: pre-existing, in-org 12-digit account ids to place in the OU.
-# The stack never CREATES accounts.
+# account_ids: pre-existing, in-org 12-digit account ids to move into the OU.
+#
+# The stack creates ONLY the OU — it never creates, invites, closes, or owns an
+# account. Placing the accounts into the OU is a separate OUT-OF-BAND step run
+# AFTER governance-apply:
+#   mise run governance-place-accounts
+# which reads these account_ids from the stack's own output (terraform.tfvars is
+# the single source of truth — no retyping) and runs `aws organizations
+# move-account` once per id.
 parent_id   = "ou-xxxx-xxxxxxxx"
 account_ids = ["111122223333"]
 
@@ -41,18 +48,10 @@ budget_limit_amount = 100
 # freeze_threshold_percent = 100   # percent of limit that fires the freeze SCP
 # notify_threshold_percent = null  # optional softer notify-only threshold (%)
 
-# ---- Kiro guardrail SCP (optional) ------------------------------------------
-# Allowlist of IAM actions the Kiro guardrail SCP permits (deny-by-default).
-# The default below is a CONSERVATIVE starter — widen or narrow per workshop.
-# kiro_allowed_actions = [
-#   "sso:*",
-#   "sso-directory:*",
-#   "identitystore:*",
-#   "signin:*",
-#   "sts:GetCallerIdentity",
-#   "codewhisperer:*",
-#   "q:*",
-# ]
+# ---- Kiro guardrail SCP ------------------------------------------------------
+# The guardrail allowlist (kiro_allowed_actions) is NOT a governance input. It
+# now lives in the foundation/ stack as a single org-standard policy shared by
+# every workshop. This stack only ATTACHES the shared guardrail SCP to the OU.
 
 # ---- Tags (optional) --------------------------------------------------------
 # workshop_id is merged into default_tags UNCONDITIONALLY by the provider, so it

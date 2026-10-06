@@ -1,68 +1,16 @@
 # =============================================================================
-# budgets.tf — execution role, per-account budgets, and SCP freeze actions
+# budgets.tf — per-account budgets and SCP freeze actions
 #
-# Task 5.1 (this file, below): the budgets EXECUTION ROLE only — a
-# least-privilege IAM role AWS Budgets assumes to attach/detach the freeze SCP,
-# with an aws:SourceAccount confused-deputy guard on the trust policy.
+# Per-workshop budgets concerns ONLY:
+#   - the per-account COST budgets (keyed by var.account_ids), and
+#   - the per-account AUTOMATIC SCP freeze actions.
 #
-# Tasks 5.2 (per-account budgets) and 5.3 (per-account AUTOMATIC SCP freeze
-# actions) APPEND to this file below the execution-role section. Keep the
-# execution-role resources above that boundary; add later resources beneath it.
+# The shared budgets EXECUTION ROLE and the deny-all freeze SCP are
+# once-per-management-account singletons owned by foundation/ and consumed here
+# by ARN/id (var.budgets_execution_role_arn / var.freeze_scp_id) — they are no
+# longer defined in this stack.
 # =============================================================================
 
-# --- Budgets execution role (least privilege + confused-deputy guard) --------
-# AWS Budgets assumes this role to attach the freeze SCP to a breaching account.
-# The trust policy only permits budgets.amazonaws.com when the request's
-# aws:SourceAccount equals THIS management account (Requirement 6.1, 6.2) — the
-# confused-deputy guard that stops another account's Budgets service from
-# borrowing this role.
-data "aws_iam_policy_document" "budgets_trust" {
-  statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["budgets.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [data.aws_caller_identity.current.account_id] # Requirement 6.2
-    }
-  }
-}
-
-# Permissions scoped to the Organizations attach/detach of the freeze SCP plus
-# the minimal reads the service needs to resolve the policy and its targets.
-# No org-wide admin (Requirement 6.3, 6.4).
-data "aws_iam_policy_document" "budgets_permissions" {
-  statement {
-    sid    = "AttachDetachFreezeSCP"
-    effect = "Allow"
-    actions = [
-      "organizations:AttachPolicy",
-      "organizations:DetachPolicy",
-      # Minimal reads Budgets needs to resolve the policy/targets:
-      "organizations:ListPolicies",
-      "organizations:DescribePolicy",
-      "organizations:ListTargetsForPolicy",
-    ]
-    resources = ["*"] # scoped by the action set above; no org-wide admin (Requirement 6.4)
-  }
-}
-
-resource "aws_iam_role" "budgets_execution" {
-  name               = "governance-budgets-exec-${var.workshop_id}"
-  assume_role_policy = data.aws_iam_policy_document.budgets_trust.json
-}
-
-resource "aws_iam_role_policy" "budgets_execution" {
-  name   = "attach-detach-freeze"
-  role   = aws_iam_role.budgets_execution.id
-  policy = data.aws_iam_policy_document.budgets_permissions.json
-}
 # --- Per-account COST budgets (task 5.2) -------------------------------------
 # One COST budget per supplied account, keyed by account id. Each budget is
 # scoped to just that linked account via a cost_filter and carries the required
@@ -112,10 +60,11 @@ resource "aws_budgets_budget" "account" {
 
 # --- Per-account AUTOMATIC SCP freeze actions (task 5.3) ---------------------
 # One AUTOMATIC budget action per supplied account, keyed by account id. On
-# breach of the freeze threshold AWS Budgets assumes the execution role (5.1)
-# and attaches the deny-all freeze SCP (scps.tf) to the SINGLE breaching
-# account — never the OU — so one account's overrun never freezes the whole
-# workshop (Requirement 7.4).
+# breach of the freeze threshold AWS Budgets assumes the SHARED execution role
+# (var.budgets_execution_role_arn, from foundation/) and attaches the SHARED
+# deny-all freeze SCP (var.freeze_scp_id, from foundation/) to the SINGLE
+# breaching account — never the OU — so one account's overrun never freezes the
+# whole workshop (Requirement 7.4).
 #
 # Schema confirmed against the installed hashicorp/aws v6.67.0 provider:
 #   - action_type is a required top-level attribute; the SCP enum value is
@@ -131,10 +80,10 @@ resource "aws_budgets_budget_action" "freeze" {
   for_each = toset(var.account_ids)
 
   budget_name        = aws_budgets_budget.account[each.key].name
-  action_type        = "APPLY_SCP_POLICY"                 # Requirements 7.2, 7.3
-  notification_type  = "ACTUAL"                           # required by the provider schema
-  approval_model     = "AUTOMATIC"                        # Requirement 7.2 (no human in the loop)
-  execution_role_arn = aws_iam_role.budgets_execution.arn # Requirement 7.5
+  action_type        = "APPLY_SCP_POLICY"             # Requirements 7.2, 7.3
+  notification_type  = "ACTUAL"                       # required by the provider schema
+  approval_model     = "AUTOMATIC"                    # Requirement 7.2 (no human in the loop)
+  execution_role_arn = var.budgets_execution_role_arn # Requirement 7.5 (shared role from foundation/)
 
   # Fire at the freeze threshold, matching the budget's freeze-threshold
   # notification so the attach happens exactly when the breach notifies.
@@ -144,11 +93,11 @@ resource "aws_budgets_budget_action" "freeze" {
   }
 
   # Attach the freeze SCP to THIS account only (Requirement 7.4) using the
-  # least-privilege execution role (Requirement 7.5).
+  # shared least-privilege execution role (Requirement 7.5).
   definition {
     scp_action_definition {
-      policy_id  = aws_organizations_policy.freeze.id
-      target_ids = [each.key] # the breaching account, NEVER the OU
+      policy_id  = var.freeze_scp_id # shared freeze SCP from foundation/
+      target_ids = [each.key]        # the breaching account, NEVER the OU
     }
   }
 

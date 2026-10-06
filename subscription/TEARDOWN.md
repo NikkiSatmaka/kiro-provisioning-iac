@@ -1,5 +1,10 @@
 # Teardown — remove this workshop's Kiro IdC users, groups, and subscription
 
+This is the **Teardown** phase of the journey (root [`README.md`](../README.md)):
+it removes one workshop's provisioning. **Prerequisites:** the workshop was
+provisioned (Phase 3); if you deployed the Phase 4 claim service, tear it down
+first with `mise run claim-destroy`.
+
 Goal: wipe **this workshop's** provisioning from the management account
 completely, and have that stay possible **a month later, from a different
 computer** — without ever touching the shared organization IdC instance or any

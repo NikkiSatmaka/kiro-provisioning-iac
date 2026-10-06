@@ -1,5 +1,9 @@
 # Runbook — Provision Kiro subscriptions in the management account
 
+This is **Phase 3** of the journey (root [`README.md`](../README.md)).
+**Prerequisites:** Phase 2 (foundation adopt) complete and the two IDs
+exported as `TF_VAR_idc_instance_arn` / `TF_VAR_identity_store_id`.
+
 End-to-end order of operations. Steps marked **(IaC)** or **(script)** are
 automated here; steps marked **(console)** are AWS platform limits you must do
 by hand. Nothing in this repo runs on its own — you invoke each step.
@@ -259,6 +263,10 @@ Then, however it was distributed:
    Identity Center** → enter the **Sign-in URL** + **region code** → username +
    OTP → set a new password → **Allow access**.
 2. Confirm the Kiro subscription is visible/active inside Kiro.
+
+> **Next:** Phase 4 — Distribute via the self-serve claim service
+> ([`../claim-service/README.md`](../claim-service/README.md)), or clean up later
+> with [`TEARDOWN.md`](./TEARDOWN.md).
 
 ---
 

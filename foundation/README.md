@@ -1,5 +1,12 @@
 # Foundation IdC service (adopts the organization Identity Center instance)
 
+This is **Phase 2** of the root README journey.
+
+- **Prerequisites:** Phase 1 backend bootstrap done
+  ([`../backend/README.md`](../backend/README.md)) and IAM Identity Center
+  enabled in the management account ([`RUNBOOK.md`](./RUNBOOK.md) Step 0).
+- **Next:** Phase 3 — Provision ([`../subscription/README.md`](../subscription/README.md)).
+
 The one stack that **adopts (reads)** the management account's existing
 **organization** IAM Identity Center (IdC) instance that every workshop's
 `subscription/` stack consumes. Run it **once per management account**, after

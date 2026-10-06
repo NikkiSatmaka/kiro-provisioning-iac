@@ -1,5 +1,9 @@
 # Runbook — Adopt the organization IdC instance and wire it forward
 
+This is **Phase 2** of the journey (root [`README.md`](../README.md)).
+**Prerequisites:** Phase 1 (the `../backend/` bootstrap) complete and IAM
+Identity Center enabled in the management account (Step 0 below).
+
 End-to-end order of operations for reading the shared, organization-level IAM
 Identity Center (IdC) instance and wiring its IDs forward. Steps marked **(IaC)**
 are automated here; steps marked **(mgmt account)** or **(console)** are AWS
@@ -157,6 +161,8 @@ reference. From here, follow [`../subscription/RUNBOOK.md`](../subscription/RUNB
 for the per-workshop steps. Because the foundation instance is read once and
 reused across every workshop, you do this wiring once per management account and
 reuse the same two IDs for every subsequent workshop.
+
+> **Next:** Phase 3 — Provision ([`../subscription/RUNBOOK.md`](../subscription/RUNBOOK.md)).
 
 ---
 

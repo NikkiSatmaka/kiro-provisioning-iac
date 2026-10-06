@@ -1,7 +1,12 @@
-# Shared remote-state backend (FUNCTION 1)
+# Phase 1 — Shared remote-state backend
 
-The S3 bucket + DynamoDB lock table that hold the other stacks' OpenTofu state.
-Run this **once per account**, before the `subscription/` stack.
+This is **Phase 1** of the root README journey: the S3 bucket + DynamoDB lock
+table that hold the other stacks' OpenTofu state. Run it **once per account**,
+before the `subscription/` stack.
+
+- **Prerequisites:** Phase 0 (toolchain + management-account AWS auth) — see the
+  root [`README.md`](../README.md).
+- **Next:** Phase 2 — Foundation ([`../foundation/README.md`](../foundation/README.md)).
 
 ## Why it exists (and why its own state)
 

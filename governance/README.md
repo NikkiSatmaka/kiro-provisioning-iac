@@ -1,5 +1,16 @@
 # Governance stack (the workshop OU, guardrails, and budget freeze)
 
+This is the **optional Governance track** of the repo (see the journey table in
+the root [`README.md`](../README.md)). It is **not a step in the linear**
+Phase 0→4 provisioning flow — run it when you want to put a workshop's **member
+accounts** under an OU + guardrail SCP + auto-freeze budgets.
+
+- **Prerequisites:** Phase 0 (toolchain + management-account auth) and Phase 1
+  (shared backend) done, and the member accounts already exist in the
+  organization.
+- **Next:** teardown is the guarded `mise run governance-destroy` (see
+  [`RUNBOOK.md`](./RUNBOOK.md)).
+
 The management-account-scoped stack that governs a single workshop's accounts:
 it creates **one OU per workshop**, attaches a **deny-by-default Kiro guardrail**
 SCP to that OU, and wires **per-account budgets** that **automatically freeze**

@@ -30,6 +30,7 @@ one links to the detailed doc for that step. New here? Just go top to bottom.
 | **3. Provision** | Create the users, groups, memberships; the console-only Kiro steps; render credentials | [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) |
 | **4. Distribute** | Hand out credentials directly, **or** deploy the self-serve claim service | [`claim-service/README.md`](./claim-service/README.md) |
 | **Teardown** | Remove everything when the workshop/engagement ends | [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) |
+| **Optional — Governance** | Put a workshop's member accounts under an OU with a Kiro guardrail SCP + auto-freeze budgets (runs in the management account; targets member accounts) | [`governance/README.md`](./governance/README.md) · [`governance/RUNBOOK.md`](./governance/RUNBOOK.md) |
 
 The phases chain: **2 reads the shared org IdC instance and emits its ARN +
 identity store id, which 3 consumes; 3 produces `subscription/output/otps.csv` +
@@ -236,6 +237,17 @@ mise run teardown-run     # state-free fallback: delete this workshop's users/gr
 → **Details (including teardown from a different machine a month later, and the
 Kiro-subscription deactivation that must happen first):**
 [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md).
+
+---
+
+## Governance (optional track)
+
+Governance (optional) is a separate track — see
+[`governance/README.md`](./governance/README.md). It runs in the same
+management account and governs the member accounts a workshop uses; it is **not
+part of the linear** Phase 0→4 provisioning flow. Run it when you want a
+workshop's member accounts under an OU with a Kiro guardrail SCP and auto-freeze
+budgets.
 
 ---
 

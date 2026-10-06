@@ -1,5 +1,13 @@
 # Kiro Subscription Provisioning (management-account organization IdC)
 
+This is **Phase 3** of the root README journey.
+
+- **Prerequisites:** Phase 2 foundation adopt done and its two IDs wired forward
+  ([`../foundation/README.md`](../foundation/README.md)) — this stack consumes
+  `idc_instance_arn` / `identity_store_id`.
+- **Next:** Phase 4 — Distribute ([`../claim-service/README.md`](../claim-service/README.md)),
+  or the direct-handout path ([`RUNBOOK.md`](./RUNBOOK.md) Step 6).
+
 Infrastructure-as-Code (**OpenTofu**) + Python tooling to provision **Kiro
 enterprise subscriptions** for a workshop's users in the AWS Organizations
 **management account**, using its **IAM Identity Center _organization

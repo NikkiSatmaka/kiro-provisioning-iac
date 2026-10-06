@@ -1,5 +1,10 @@
 # Runbook — Govern a workshop's accounts (OU + guardrail + auto-freeze budgets)
 
+This is the **optional Governance track** (root [`README.md`](../README.md)),
+run in the management account against a workshop's **member accounts**; it is
+not part of the linear Phase 0→4 flow. **Prerequisites:** Phase 0 auth +
+Phase 1 backend, and member accounts already in the organization.
+
 End-to-end order of operations for the **management-account-scoped** governance
 stack: one OU per workshop, a Kiro-only guardrail SCP on the OU, an unattached
 deny-all freeze SCP, and per-account budgets whose breach **automatically**

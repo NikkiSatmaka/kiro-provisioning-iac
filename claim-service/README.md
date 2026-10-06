@@ -1,5 +1,8 @@
 # Credential Claim Service
 
+This is the optional self-serve path of **Phase 4 — Distribute** (root
+[`README.md`](../README.md)).
+
 Self-serve, race-proof distribution of pre-provisioned Kiro IAM Identity Center
 credentials to workshop participants. Participants scan a QR code (or open a
 short link), enter their email and a workshop code, and receive exactly one
@@ -64,6 +67,11 @@ API Gateway + Route 53 + ACM, which this service deliberately avoids.)
 
 ## Prerequisites
 
+**Phase 3 provisioning must be complete first.** The seed step consumes the
+Subscription→Claim handoff files — `../../subscription/output/otps.csv` and
+`../../subscription/output/manifest.json` — so they must already exist (the
+"Notes on the steps" Seed bullet below names the same files).
+
 From the repo root, once:
 
 ```bash
@@ -125,6 +133,10 @@ All are run from the repo root.
   git-ignored because the rows contain participant emails (PII).
 - **Region** everywhere is derived from `AWS_REGION` (default `us-east-1`); it is
   never hardcoded in the handler, scripts, or Terraform.
+
+> **Next:** Teardown — see [`../subscription/TEARDOWN.md`](../subscription/TEARDOWN.md);
+> `mise run claim-destroy` tears down just this stack (never touches
+> `subscription/` identities).
 
 ## Testing it: local vs. deployed
 

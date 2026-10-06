@@ -1,0 +1,64 @@
+# Copy to terraform.tfvars and edit per workshop. terraform.tfvars is git-ignored.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# This stack's HEADLINE input is notification_emails: the recipients of the
+# budget-breach alerts. Without at least one address a budget breach would be
+# silent, so notification_emails is REQUIRED and validated non-empty below.
+
+# ---- Provider / environment -------------------------------------------------
+# This stack targets the AWS Organizations MANAGEMENT account (or a delegated
+# Org-admin). Region/profile usually come from the environment (mise sources
+# AWS_PROFILE / AWS_REGION from the git-ignored .env). Leave aws_region empty to
+# inherit AWS_REGION. Uncomment to pin explicitly instead.
+# aws_region  = "us-east-1"
+# aws_profile = "kiro-mgmt"
+
+# ---- Workshop namespace -----------------------------------------------------
+# workshop_id is NOT set here: it comes from the environment (WORKSHOP_ID in
+# .env via TF_VAR_workshop_id, exported by the governance mise tasks). It names
+# the OU (workshop-<id>) and keys the state.
+
+# ---- Budget alert recipients (REQUIRED) -------------------------------------
+# Who receives the budget-breach notifications. This is the main reason this
+# file exists. Must be non-empty — an empty list fails validation so a breach is
+# never silent. These are notify-only (they do not grant any access).
+notification_emails = ["ops@example.com"]
+
+# ---- Workshop OU placement (REQUIRED) ---------------------------------------
+# parent_id: the parent OU or org-root id the workshop OU hangs under.
+# account_ids: pre-existing, in-org 12-digit account ids to place in the OU.
+# The stack never CREATES accounts.
+parent_id   = "ou-xxxx-xxxxxxxx"
+account_ids = ["111122223333"]
+
+# ---- Budget (REQUIRED) ------------------------------------------------------
+# Per-account COST budget limit amount.
+budget_limit_amount = 100
+
+# ---- Budget (optional overrides) --------------------------------------------
+# budget_limit_unit        = "USD"
+# freeze_threshold_percent = 100   # percent of limit that fires the freeze SCP
+# notify_threshold_percent = null  # optional softer notify-only threshold (%)
+
+# ---- Kiro guardrail SCP (optional) ------------------------------------------
+# Allowlist of IAM actions the Kiro guardrail SCP permits (deny-by-default).
+# The default below is a CONSERVATIVE starter — widen or narrow per workshop.
+# kiro_allowed_actions = [
+#   "sso:*",
+#   "sso-directory:*",
+#   "identitystore:*",
+#   "signin:*",
+#   "sts:GetCallerIdentity",
+#   "codewhisperer:*",
+#   "q:*",
+# ]
+
+# ---- Tags (optional) --------------------------------------------------------
+# workshop_id is merged into default_tags UNCONDITIONALLY by the provider, so it
+# does not need to be listed here.
+# default_tags = {
+#   Project   = "kiro-provisioning-iac"
+#   ManagedBy = "opentofu"
+#   Purpose   = "workshop-account-governance"
+# }

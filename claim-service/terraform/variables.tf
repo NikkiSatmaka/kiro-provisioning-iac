@@ -29,6 +29,16 @@ variable "aws_region" {
   default     = ""
 }
 
+variable "default_tags" {
+  description = "Tags applied to every taggable resource via the aws provider default_tags block."
+  type        = map(string)
+  default = {
+    Project   = "kiro-provisioning-iac"
+    Service   = "claim-service"
+    ManagedBy = "opentofu"
+  }
+}
+
 variable "workshop_id" {
   description = <<-EOT
     Slug that namespaces this workshop's claim resources and state key, e.g.

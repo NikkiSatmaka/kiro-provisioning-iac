@@ -25,6 +25,9 @@ variable "default_tags" {
     Project   = "kiro-subscriptions"
     ManagedBy = "opentofu"
     Purpose   = "kiro-login-only"
+    # Shared infra, not attributable per workshop; keeps the cost-allocation tag
+    # key present on every line item so there are no untagged items.
+    workshop_id = "shared"
   }
 }
 

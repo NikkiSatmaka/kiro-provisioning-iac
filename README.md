@@ -311,3 +311,6 @@ full list.
 - The claim service's Function URL is **public**; access is gated by the
   `WORKSHOP_CODE` and a per-IP cap. Pick a fresh code per workshop and don't
   share it before the event.
+- Every stack stamps a `workshop_id` cost-allocation tag for per-workshop cost
+  attribution — activate the tag once in the Billing console; see
+  [`backend/README.md`](./backend/README.md#cost-allocation).

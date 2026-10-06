@@ -21,8 +21,10 @@ provider "aws" {
   region  = var.aws_region != "" ? var.aws_region : null
   profile = var.aws_profile != "" ? var.aws_profile : null
 
+  # workshop_id is merged in UNCONDITIONALLY (not left to the operator) so every
+  # taggable resource is attributable per workshop in Cost Explorer / CUR.
   default_tags {
-    tags = var.default_tags
+    tags = merge(var.default_tags, { workshop_id = var.workshop_id })
   }
 }
 

@@ -89,9 +89,9 @@ variable "default_tags" {
 # --- Budgets and freeze automation ------------------------------------------
 
 variable "freeze_threshold_percent" {
-  description = "Percent of the budget limit at which the AUTOMATIC freeze SCP action fires (and the required notify-only notification is sent)."
+  description = "Percent of the budget limit at which the AUTOMATIC freeze SCP action fires. An alert is ALSO sent at this level, so this is the highest tier: alert + freeze. Default 90."
   type        = number
-  default     = 100
+  default     = 90
 }
 
 variable "notification_emails" {
@@ -103,10 +103,23 @@ variable "notification_emails" {
   }
 }
 
-variable "notify_threshold_percent" {
-  description = "Optional softer notify-only threshold (%). When null, no extra notify-only threshold is created."
-  type        = number
-  default     = null
+variable "notify_threshold_percents" {
+  description = <<-EOT
+    Notify-only alert tiers (percent of the budget limit), BELOW the freeze
+    level. Each value produces one ACTUAL-cost notification that only emails the
+    recipients — it never freezes. The freeze (and its own alert) is a separate,
+    higher tier set by var.freeze_threshold_percent.
+
+    Default [50, 75] pairs with the default freeze at 90 to give three tiers:
+    alert at 50%, alert at 75%, alert + freeze at 90%. Empty list = no softer
+    tiers (only the freeze-level alert fires).
+  EOT
+  type        = list(number)
+  default     = [50, 75]
+  validation {
+    condition     = alltrue([for p in var.notify_threshold_percents : p > 0 && p < var.freeze_threshold_percent])
+    error_message = "Every notify tier must be > 0 and strictly below freeze_threshold_percent (the freeze level already sends its own alert)."
+  }
 }
 
 variable "budget_limit_amount" {

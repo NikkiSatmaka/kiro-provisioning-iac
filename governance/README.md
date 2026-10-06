@@ -119,10 +119,13 @@ foundation-level decision affecting every workshop; adjust it deliberately.
 
 Each account in `var.account_ids` gets its own `COST` budget
 (`var.budget_limit_amount` / `var.budget_limit_unit`, default `USD`), scoped to
-just that linked account. Each budget carries a **required notify-only**
-notification to every address in `var.notification_emails` at
-`var.freeze_threshold_percent` (default `100`), plus an optional softer
-notify-only threshold when `var.notify_threshold_percent` is set.
+just that linked account. Each budget carries a **tiered set of ACTUAL-cost
+alerts** to every address in `var.notification_emails`: one notify-only alert
+per entry in `var.notify_threshold_percents` (default `[50, 75]`), plus a
+**required** alert at `var.freeze_threshold_percent` (default `90`) that
+accompanies the automatic freeze. With the defaults that is three tiers — alert
+at 50%, alert at 75%, and alert + freeze at 90% — so a breach is never silent.
+Every notify tier must sit strictly below the freeze level (validated).
 
 Alongside each budget sits an **AUTOMATIC** budget action (no human in the
 loop). On breach of `var.freeze_threshold_percent`, AWS Budgets assumes the
@@ -181,9 +184,9 @@ authorization / policy-type error; [`RUNBOOK.md`](./RUNBOOK.md) names that error
 | `budgets_execution_role_arn`   | **From `foundation/`.** ARN of the shared role each freeze action assumes.    |
 | `kiro_guardrail_scp_id`        | **From `foundation/`.** Id of the shared guardrail SCP attached to the OU.     |
 | `freeze_scp_id`                | **From `foundation/`.** Id of the shared freeze SCP Budgets attaches on breach.|
-| `freeze_threshold_percent`     | Percent of the limit at which the freeze fires and notifies (default `100`).   |
+| `freeze_threshold_percent`     | Percent of the limit at which the freeze fires AND an alert is sent (default `90`). |
 | `notification_emails`          | **Required**, non-empty notify-only recipients; a breach must never be silent. |
-| `notify_threshold_percent`     | Optional softer notify-only threshold; `null` means none.                      |
+| `notify_threshold_percents`    | Notify-only alert tiers below the freeze level (default `[50, 75]`); each must be `> 0` and `<` the freeze threshold. |
 | `budget_limit_amount`          | Per-account COST budget limit amount.                                          |
 | `budget_limit_unit`            | Currency unit for the budget limit (default `USD`).                            |
 | `aws_region`                   | Provider region; empty falls back to `AWS_REGION`.                             |

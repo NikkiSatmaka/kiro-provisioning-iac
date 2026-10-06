@@ -198,15 +198,17 @@ be read it fails closed (run `governance-apply` for this workshop first).
 Each account carries a COST budget (`aws_budgets_budget.account[<id>]`) with a
 matching `AUTOMATIC` SCP action (`aws_budgets_budget_action.freeze[<id>]`):
 
-- **On breach** of `var.freeze_threshold_percent` (default `100`), AWS Budgets
+- **On breach** of `var.freeze_threshold_percent` (default `90`), AWS Budgets
   assumes the budgets execution role and **attaches the freeze SCP to the single
   breaching account** — `scp_action_definition.target_ids = [<that account>]`,
   **never the OU**, so one account's overrun never freezes the whole workshop.
 - Because `approval_model = "AUTOMATIC"`, the freeze happens with **no human in
   the loop**.
 - Every address in `var.notification_emails` is subscribed **notify-only** on
-  each budget, so a breach is never silent. An optional softer notify-only
-  threshold is added when `var.notify_threshold_percent` is set.
+  each budget across a tiered set of ACTUAL-cost alerts: one per entry in
+  `var.notify_threshold_percents` (default `[50, 75]`) plus the freeze-level
+  alert at `var.freeze_threshold_percent` (default `90`). Default tiers: alert
+  at 50%, alert at 75%, alert + freeze at 90% — so a breach is never silent.
 
 A frozen account's users can no longer operate it (the deny-all SCP overrides
 the guardrail). Recovery is **manual** — see the next section.

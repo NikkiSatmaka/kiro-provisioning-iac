@@ -44,9 +44,11 @@ account_ids = ["111122223333"]
 budget_limit_amount = 100
 
 # ---- Budget (optional overrides) --------------------------------------------
-# budget_limit_unit        = "USD"
-# freeze_threshold_percent = 100   # percent of limit that fires the freeze SCP
-# notify_threshold_percent = null  # optional softer notify-only threshold (%)
+# budget_limit_unit         = "USD"
+# freeze_threshold_percent  = 90        # alert + AUTOMATIC freeze tier (default 90)
+# notify_threshold_percents = [50, 75]  # notify-only alert tiers below the freeze
+# Default tiers: alert at 50%, alert at 75%, alert + freeze at 90%. Each notify
+# tier must be > 0 and strictly below freeze_threshold_percent.
 
 # ---- Kiro guardrail SCP ------------------------------------------------------
 # The guardrail allowlist (kiro_allowed_actions) is NOT a governance input. It

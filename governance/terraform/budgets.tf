@@ -13,9 +13,11 @@
 
 # --- Per-account COST budgets (task 5.2) -------------------------------------
 # One COST budget per supplied account, keyed by account id. Each budget is
-# scoped to just that linked account via a cost_filter and carries the required
-# notify-only recipients at the freeze threshold, plus an optional softer
-# notify-only threshold when var.notify_threshold_percent is set.
+# scoped to just that linked account via a cost_filter and carries a tiered set
+# of ACTUAL-cost alerts: one notification per entry in
+# var.notify_threshold_percents (notify-only, default [50, 75]) plus one at
+# var.freeze_threshold_percent (default 90) that accompanies the automatic
+# freeze action. Default tiers: 50% alert, 75% alert, 90% alert + freeze.
 #
 # cost_filter / notification are block (set) forms in hashicorp/aws v6.67.0 —
 # confirmed against the installed provider schema (the deprecated cost_filters
@@ -35,7 +37,10 @@ resource "aws_budgets_budget" "account" {
     values = [each.key]
   }
 
-  # Required notify-only recipients at the freeze threshold (Requirement 8.3).
+  # Alert tier at the freeze level: an ACTUAL-cost notification at
+  # var.freeze_threshold_percent (default 90). This is the required
+  # never-silent alert that accompanies the automatic freeze (the freeze itself
+  # is the budget action below, which fires at the same threshold).
   notification {
     comparison_operator        = "GREATER_THAN"
     threshold                  = var.freeze_threshold_percent
@@ -44,10 +49,12 @@ resource "aws_budgets_budget" "account" {
     subscriber_email_addresses = var.notification_emails
   }
 
-  # Optional softer notify-only threshold (Requirements 8.4, 8.5). When
-  # var.notify_threshold_percent is null, no extra notification is created.
+  # Softer notify-only tiers BELOW the freeze level, one notification per entry
+  # in var.notify_threshold_percents (default [50, 75]). These only email the
+  # recipients; they never freeze. Together with the freeze-level alert above,
+  # the default set gives three tiers: 50% alert, 75% alert, 90% alert + freeze.
   dynamic "notification" {
-    for_each = var.notify_threshold_percent != null ? [var.notify_threshold_percent] : []
+    for_each = toset(var.notify_threshold_percents)
     content {
       comparison_operator        = "GREATER_THAN"
       threshold                  = notification.value

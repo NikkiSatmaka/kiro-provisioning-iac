@@ -29,6 +29,12 @@ variable "aws_region" {
   default     = ""
 }
 
+variable "aws_profile" {
+  description = "AWS CLI/SDK profile (MUST be a management-account profile). Empty falls back to the AWS_PROFILE env / default chain."
+  type        = string
+  default     = ""
+}
+
 variable "default_tags" {
   description = "Tags applied to every taggable resource via the aws provider default_tags block."
   type        = map(string)

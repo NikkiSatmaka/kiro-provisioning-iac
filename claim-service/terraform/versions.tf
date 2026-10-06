@@ -2,8 +2,8 @@ terraform {
   # OpenTofu 1.12 is pinned in the project mise.toml. This stack needs the
   # hashicorp/aws provider for the DynamoDB table, Lambda, Function URL, and IAM
   # role, plus hashicorp/archive to zip the handler + inlined index.html into
-  # the deployment package (lambda.tf). (Unlike subscription/, there is no awscc
-  # provider: this stack creates no IdC instance.)
+  # the deployment package (lambda.tf). Like every other stack it deploys in
+  # the management account and needs only hashicorp/aws (+ archive).
   required_version = ">= 1.6"
 
   required_providers {

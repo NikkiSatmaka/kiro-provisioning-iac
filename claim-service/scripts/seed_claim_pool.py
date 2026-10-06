@@ -238,7 +238,8 @@ def load_manifest(path: pathlib.Path) -> tuple[str, str, str, dict[str, str]]:
     * ``sign_in_url`` / ``region`` — as before (Requirement 6.1). ``region``
       stays the deployment region stamped on each credential; it is NOT
       repurposed for the Kiro sign-in region.
-    * ``account_id`` — the document-level child AWS account ID (default ``""``
+    * ``account_id`` — the document-level member AWS account ID for billing
+      attribution (default ``""``
       for pre-change manifests that predate the field) (Requirement 5.1).
     * ``user_account_map`` — a ``username -> account_id`` lookup built from the
       manifest ``users`` map. Because the OTP CSV is keyed by ``username`` (not

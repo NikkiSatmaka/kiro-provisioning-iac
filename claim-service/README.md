@@ -10,6 +10,15 @@ This is an opt-in, self-contained subtree with its own OpenTofu state. It does
 not alter or depend on the `../subscription/` provisioning flow and can be torn
 down independently without touching provisioned identities.
 
+It deploys in the AWS Organizations **management account**, alongside every
+other stack. Many workshops' claim services coexist there side by side: every
+resource name derives from `local.name = credential-claim-<workshop_id>`, so
+each workshop gets its own table, Lambda, Function URL, IAM role, and policy
+with an independent lifecycle, and its spend is attributable through the
+unconditional `workshop_id` cost tag. One Function URL serves one workshop; a
+single workshop can serve participants across multiple member accounts.
+`AWS_PROFILE` must be a management-account profile.
+
 The full requirements and design live in the specs, not here:
 
 - `.kiro/specs/credential-claim-service/` — the service (table, Lambda, scripts).
@@ -65,7 +74,10 @@ cp .env.example .env  # then edit .env
 
 In `.env` set at least:
 
-- `AWS_PROFILE` / `AWS_REGION` — region defaults to `us-east-1`.
+- `AWS_PROFILE` / `AWS_REGION` — `AWS_PROFILE` must be a management-account
+  profile; region defaults to `us-east-1`. The provider also accepts an explicit
+  `aws_profile` variable (empty by default, falling back to `AWS_PROFILE` / the
+  SDK chain), mirroring the other stacks.
 - `WORKSHOP_CODE` — the shared gate secret for this workshop (required by deploy).
 
 The remote state bucket must already exist (created by the `backend/` stack —

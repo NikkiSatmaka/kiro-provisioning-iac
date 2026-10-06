@@ -4,8 +4,8 @@
 
 variable "aws_region" {
   description = <<-EOT
-    Region to create the IAM Identity Center account instance in. Must be a
-    region Kiro supports for IdC.
+    Region of the management-account IAM Identity Center organization instance
+    this stack writes identities into. Must be a region Kiro supports for IdC.
 
     Leave empty (the default) to inherit AWS_REGION from the environment —
     mise sources it from the git-ignored .env file, so change the region there
@@ -17,9 +17,25 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS CLI/SDK profile to use. Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
+  description = "AWS CLI/SDK profile to use (MUST be a management-account profile). Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
   type        = string
   default     = ""
+}
+
+# ---------------------------------------------------------------------------
+# Account-access gate
+# ---------------------------------------------------------------------------
+
+variable "enable_account_access" {
+  description = <<-EOT
+    When false (default), create NO permission sets and NO account
+    assignments: users are Kiro-login-only with zero AWS console access.
+    When true, create a shared permission set and one account assignment
+    per group binding it to that group's owning account id. Flip to true
+    only when deliberately granting console access.
+  EOT
+  type        = bool
+  default     = false
 }
 
 variable "default_tags" {
@@ -84,9 +100,14 @@ variable "workshop_id" {
 
 variable "workshop_accounts" {
   description = <<-EOT
-    Explicit nested map describing this workshop's child accounts, the groups in
-    each account, and the user count of each group. Keyed by 12-digit account id.
-    Replaces the removed count/prefix/strategy generators.
+    Explicit nested map describing this workshop's member accounts, the groups
+    in each account, and the user count of each group. Keyed by 12-digit account
+    id. Replaces the removed count/prefix/strategy generators.
+
+    The account id is billing/attribution metadata, NOT an access grant: it is
+    the target an account assignment binds to only when enable_account_access is
+    true. When the flag is false (the default) these ids grant no console access
+    whatsoever. Access is governed solely by enable_account_access.
   EOT
   type = map(object({
     groups = map(object({

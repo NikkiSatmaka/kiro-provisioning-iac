@@ -1,7 +1,11 @@
 # AWS provider.
 #
+# This stack targets the AWS Organizations MANAGEMENT account; AWS_PROFILE must
+# be a management-account profile (the account that owns the organization IdC
+# instance identities are written into).
+#
 # Region and credentials are intentionally NOT hard-coded. They come from the
-# environment so the same config is reusable across accounts:
+# environment so the same config is reusable:
 #
 #   AWS_PROFILE / AWS_REGION          (set by the project mise.toml), or
 #   -var "aws_region=..."             (explicit override), or
@@ -12,8 +16,8 @@
 # the environment. mise sources AWS_REGION from the git-ignored .env file —
 # change the region there (`cp .env.example .env`), no edits here.
 #
-# IMPORTANT: the IdC account instance is created in whatever region this
-# provider targets. Kiro must support that region for IdC. Keep region
+# IMPORTANT: identities are written into the org IdC instance in whatever region
+# this provider targets. Kiro must support that region for IdC. Keep region
 # consistent across tofu, the Kiro console, and user sign-in.
 
 provider "aws" {

@@ -3,40 +3,43 @@
 #   cp terraform.tfvars.example terraform.tfvars
 
 # ---- Provider / environment -------------------------------------------------
-# Usually left to the environment (mise sources AWS_PROFILE / AWS_REGION from
-# the git-ignored .env). Leave aws_region empty to inherit AWS_REGION.
-# Uncomment to pin explicitly instead.
+# This stack targets the AWS Organizations MANAGEMENT account. AWS_PROFILE must
+# be a management-account profile. Usually left to the environment (mise sources
+# AWS_PROFILE / AWS_REGION from the git-ignored .env). Leave aws_region empty to
+# inherit AWS_REGION. Uncomment to pin explicitly instead.
 # aws_region  = "us-east-1"
-# aws_profile = "kiro-provisioning"
+# aws_profile = "kiro-mgmt"
 
-instance_name = "kiro-login"
+# ---- Foundation IdC interface (consumed, never created) ---------------------
+# Export these from the foundation stack (tofu output). They point at the
+# management account's existing ORGANIZATION IdC instance.
+# idc_instance_arn  = "arn:aws:sso:::instance/ssoins-xxxxxxxxxxxx"
+# identity_store_id = "d-xxxxxxxxxx"
 
-# ---- Naming -----------------------------------------------------------------
-user_prefix      = "kiro-user-"
-group_prefix     = "kiro-team-"
-sequence_padding = 2   # => 01, 02, ...
-sequence_start   = 1
+# ---- Workshop namespace -----------------------------------------------------
+# Namespaces this workshop's state key, usernames, and group display names so
+# many workshops coexist in the one management-account org IdC directory.
+workshop_id = "kiro-2025-10-10"
 
-# ---- Counts -----------------------------------------------------------------
-user_count  = 10
-group_count = 1
+# ---- Account-access gate ----------------------------------------------------
+# false (default) => create NO permission sets and NO account assignments:
+# workshop users are Kiro-login-only with ZERO AWS console access. Flip to true
+# ONLY when deliberately granting console access (binds each group to its
+# owning account id below).
+enable_account_access = false
 
-# ---- User attributes --------------------------------------------------------
-# Users are provisioned anonymously (username only) by default.
-#
-# Email is OPTIONAL and supplemental: set an address only for the users that
-# need one, keyed by the same padded sequence as the username ("01", "02", ...).
-# Keys must fall within user_count. Any user not listed stays anonymous.
-# Leave user_emails unset (empty) for the all-anonymous OTP flow.
-# user_emails = {
-#   "01" = "alice@corp.com"
-#   "03" = "carol@corp.com"
-# }
-display_name_template = "Kiro User {seq}"
-
-# ---- Membership strategy ----------------------------------------------------
-#   all_in_first | round_robin | none
-membership_strategy = "all_in_first"
+# ---- Workshop accounts (billing attribution; NOT an access grant) -----------
+# Nested map: 12-digit account id => { groups = { <group> => { user_count } } }.
+# The account id is billing/attribution metadata only — it is the assignment
+# target used ONLY when enable_account_access = true. With the flag false (the
+# default) these ids grant no console access whatsoever.
+workshop_accounts = {
+  "111122223333" = {
+    groups = {
+      "team-a" = { user_count = 10 }
+    }
+  }
+}
 
 # ---- Kiro tier --------------------------------------------------------------
 #   PRO | PRO_PLUS | PRO_MAX | POWER
@@ -44,6 +47,8 @@ membership_strategy = "all_in_first"
 kiro_tier = "PRO"
 
 # ---- Tags -------------------------------------------------------------------
+# workshop_id is merged into default_tags UNCONDITIONALLY by the provider, so it
+# does not need to be listed here.
 default_tags = {
   Project   = "kiro-subscriptions"
   ManagedBy = "opentofu"

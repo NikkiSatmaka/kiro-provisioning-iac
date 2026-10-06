@@ -33,8 +33,9 @@ USAGE
   # Dry run — init + plan only, no changes (safe, default):
   python provision.py
 
-  # Apply (creates the IdC instance, users, groups, memberships), then export
-  # the manifest and render credentials.md with a TODO password column:
+  # Apply (creates users, groups, memberships in the shared org IdC instance),
+  # then export the manifest and render credentials.md with a TODO password
+  # column:
   python provision.py --apply
 
   # Apply and auto-approve (non-interactive / CI):
@@ -212,8 +213,9 @@ def main(argv: list[str]) -> int:
     print(f"Terraform dir: {TERRAFORM_DIR}")
     print(f"Mode:          {'APPLY' if args.apply else 'DRY RUN (plan only)'}")
     print()
-    print("Reminder: Step 0 (org management account: permit member-account IdC "
-          "instances) must already be done, or `apply` will be denied.")
+    print("Reminder: Step 0 (enable IAM Identity Center in the management "
+          "account) must already be done, or there is no org instance to write "
+          "identities into and `apply` will fail.")
     print("Reminder: remote S3 state is required and set up once via "
           "`mise run backend-bootstrap` (writes backend.hcl; RUNBOOK step 1b); "
           "init uses backend.hcl.")
@@ -242,7 +244,7 @@ def main(argv: list[str]) -> int:
     if not args.no_render:
         _render(args.otp_csv)
 
-    print("\nIaC steps done: IdC instance + users + groups + memberships created.")
+    print("\nIaC steps done: users + groups + memberships created in the shared org IdC instance.")
     print(CONSOLE_STEPS)
     return 0
 

@@ -31,12 +31,24 @@ locals {
     }
   ]...)
 
-  # Groups: group_key => { name }. (name is the human group name shown in IdC.)
+  # Groups: group_key => { name, display_name }.
+  #   name         = the raw human group name (used by the manifest/membership
+  #                  derivations and credentials rendering).
+  #   display_name = the workshop-namespaced name actually written to IdC:
+  #                  "<workshop_id>-<group_name>". Because many workshops' groups
+  #                  now coexist in the ONE management-account org IdC directory,
+  #                  the display name must be workshop-prefixed to stay
+  #                  distinguishable (usernames already are). workshop_id is
+  #                  <=63 chars and group names are short, so the combined
+  #                  display name is well within IdC's display_name length limit.
   # Same "<account_id>:<group_name>" keying as group_account so two accounts can
   # reuse a group name without a collision.
   groups = merge([
     for acct, cfg in var.workshop_accounts : {
-      for gname, _ in cfg.groups : "${acct}:${gname}" => { name = gname }
+      for gname, _ in cfg.groups : "${acct}:${gname}" => {
+        name         = gname
+        display_name = "${var.workshop_id}-${gname}"
+      }
     }
   ]...)
 

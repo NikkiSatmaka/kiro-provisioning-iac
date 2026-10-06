@@ -10,23 +10,27 @@ the local state still on disk).
 This script is the FALLBACK for when `tofu destroy` cannot help: a fresh clone
 on a different machine a month later, with LOCAL state that never traveled with
 the repo, so OpenTofu's state is empty and would delete nothing. This script
-needs NO state. It rediscovers everything from the live account by naming
-convention and the account's single IdC instance, then deletes it.
+needs NO state. It rediscovers everything from the live management account by
+naming convention and the organization IdC instance, then deletes only this
+workshop's users/groups/memberships.
 
 WHAT IT DELETES (and in the correct order)
 ------------------------------------------
   1. Group memberships for the matched users/groups.
   2. The matched IdC users   (default name prefix: "kiro-user-").
   3. The matched IdC groups  (default name prefix: "kiro-team-").
-  4. The IdC ACCOUNT INSTANCE itself (optional, --delete-instance).
+
+It NEVER deletes the IAM Identity Center instance. All stacks now run in the
+management account against its single, shared ORGANIZATION instance; deleting it
+would wipe every other workshop's identities, so this script refuses to.
 
 WHAT IT CANNOT DO (prints guided manual steps instead)
 ------------------------------------------------------
   * Deactivate Kiro subscriptions / tier assignments.
   * Remove the Kiro-created IdC application assignment that is NOT auto-removed
     when you stop Kiro access.
-  * Reverse the org-level "permit member account instances" toggle (irreversible
-    by design).
+  * Disable IAM Identity Center in the management account (a deliberate console
+    action; never a per-workshop teardown step).
 These are console-only; the script prints the exact steps at the end.
 
 SAFETY
@@ -34,9 +38,8 @@ SAFETY
   * DRY RUN by default. It only reports what it WOULD delete.
   * Mutating requires BOTH --delete and typing the confirmation phrase (or
     passing --yes for non-interactive use).
-  * It will only ever touch the ACCOUNT instance in the targeted region, and
-    only users/groups whose names match the configured prefixes. It never
-    deletes an organization instance.
+  * It only ever deletes users/groups whose names match the configured
+    prefixes. It NEVER deletes the shared organization IdC instance.
 
 USAGE
 -----
@@ -47,14 +50,12 @@ USAGE
   python teardown.py --user-prefix kiro-user- --group-prefix kiro-team- \
       --region us-east-1
 
-  # Actually delete users, groups, memberships (keep the instance):
+  # Actually delete users, groups, memberships (the shared org instance is
+  # always kept):
   python teardown.py --delete
 
-  # Also delete the IdC account instance:
-  python teardown.py --delete --delete-instance
-
   # Non-interactive (CI / scripted):
-  python teardown.py --delete --delete-instance --yes
+  python teardown.py --delete --yes
 
   # Prefer the manifest if you still have it (exact ids, no prefix guessing):
   python teardown.py --manifest ../output/manifest.json --delete
@@ -79,11 +80,10 @@ MANUAL CONSOLE CLEANUP — these cannot be done via API, do them to finish
 2. IAM Identity Center -> Applications. Kiro creates an application assignment
    that is NOT auto-removed when access ends. Remove the Kiro application /
    its assignments manually.
-3. (Cannot be reversed) The org management account's "permit member account
-   instances" toggle is irreversible by design — nothing to clean up, just be
-   aware it stays on.
-If you deleted the account instance, items 1-2 may already be gone with it;
-verify in both consoles.
+3. Do NOT disable IAM Identity Center in the management account to clean up a
+   single workshop — the organization instance is shared by every workshop.
+   Disabling it is a deliberate, standalone console action, never part of a
+   per-workshop teardown.
 ================================================================================
 """
 
@@ -93,7 +93,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p.add_argument("--region", default=None,
-                   help="Region of the IdC account instance. Defaults to AWS_REGION env / manifest.")
+                   help="Region of the organization IdC instance. Defaults to AWS_REGION env / manifest.")
     p.add_argument("--profile", default=None,
                    help="AWS profile. Defaults to the standard SDK chain / AWS_PROFILE env.")
     p.add_argument("--user-prefix", default="kiro-user-",
@@ -101,15 +101,13 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--group-prefix", default="kiro-team-",
                    help="Delete groups whose display_name starts with this. Default: kiro-team-")
     p.add_argument("--instance-arn", default=None,
-                   help="IdC instance ARN. If omitted, the single account instance is auto-discovered.")
+                   help="IdC instance ARN. If omitted, the single organization instance is auto-discovered.")
     p.add_argument("--identity-store-id", default=None,
                    help="Identity store id. If omitted, taken from the discovered instance.")
     p.add_argument("--manifest", type=pathlib.Path, default=None,
                    help="Optional manifest.json. If present, its exact ids/arn are used in preference to discovery.")
     p.add_argument("--delete", action="store_true",
                    help="Actually delete. Without this flag the script is a DRY RUN.")
-    p.add_argument("--delete-instance", action="store_true",
-                   help="Also delete the IdC ACCOUNT INSTANCE after users/groups are gone.")
     p.add_argument("--yes", action="store_true",
                    help="Skip the interactive confirmation prompt (for CI). Still requires --delete.")
     return p.parse_args(argv)
@@ -128,12 +126,14 @@ def _load_manifest(path: pathlib.Path | None) -> dict:
 
 
 def _discover_instance(sso_admin) -> dict | None:
-    """Return the single account instance dict, or None. Refuses org instances."""
+    """Return the single organization IdC instance dict, or None.
+
+    The management account has exactly one organization instance. We only read
+    its ARN / identity store id to scope user and group deletions; the instance
+    itself is never deleted.
+    """
     resp = sso_admin.list_instances()
     instances = resp.get("Instances", [])
-    # An account instance has OwnerAccountId == this account (and typically no
-    # organization owner). We do not try to delete anything that looks like an
-    # org instance; account instances are what this repo creates.
     if not instances:
         return None
     if len(instances) > 1:
@@ -214,7 +214,6 @@ def main(argv: list[str]) -> int:
     print(f"Identity store:   {store_id}")
     print(f"User prefix:      {args.user_prefix!r}")
     print(f"Group prefix:     {args.group_prefix!r}")
-    print(f"Delete instance:  {args.delete_instance}")
     print(f"Mode:             {'DELETE' if args.delete else 'DRY RUN'}")
     print()
 
@@ -230,7 +229,7 @@ def main(argv: list[str]) -> int:
         print(f"  - {g.get('DisplayName')}  ({g.get('GroupId')})")
     print()
 
-    if not users and not groups and not args.delete_instance:
+    if not users and not groups:
         print("Nothing matched. If you used different prefixes, pass --user-prefix / --group-prefix.")
         print(MANUAL_STEPS)
         return 0
@@ -238,8 +237,7 @@ def main(argv: list[str]) -> int:
     # --- Dry run stops here ---------------------------------------------------
     if not args.delete:
         print("DRY RUN — nothing deleted. Re-run with --delete to apply.")
-        if args.delete_instance:
-            print("(--delete-instance would also delete the account instance above.)")
+        print("(The shared organization IdC instance is never deleted.)")
         print()
         print(MANUAL_STEPS)
         return 0
@@ -289,14 +287,9 @@ def main(argv: list[str]) -> int:
             errors += 1
             print(f"  FAIL group {g.get('DisplayName')}: {exc}")
 
-    # --- Optionally delete the account instance -------------------------------
-    if args.delete_instance:
-        try:
-            sso_admin.delete_instance(InstanceArn=instance_arn)
-            print(f"  deleted account instance {instance_arn}")
-        except ClientError as exc:
-            errors += 1
-            print(f"  FAIL delete instance {instance_arn}: {exc}")
+    # The shared organization IdC instance is NEVER deleted — all stacks run in
+    # the management account against the one org instance, so removing it would
+    # wipe every other workshop's identities.
 
     print()
     if errors:
@@ -304,8 +297,7 @@ def main(argv: list[str]) -> int:
         print(MANUAL_STEPS)
         return 4
 
-    print("Done. IdC users/groups/memberships removed"
-          + (" and account instance deleted." if args.delete_instance else " (instance kept)."))
+    print("Done. IdC users/groups/memberships removed (shared org instance kept).")
     print(MANUAL_STEPS)
     return 0
 

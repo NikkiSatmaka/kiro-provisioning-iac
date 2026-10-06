@@ -539,16 +539,17 @@ tofu destroy
 # =============================================================================
 # === foundation/ stack ===
 # =============================================================================
-# ADOPTS (reads) the management account's organization IdC instance — the
-# single, long-lived, shared resource every workshop's subscription stack
-# consumes. Read ONCE and reused across every workshop (NOT per workshop); it
-# creates and owns nothing. Runs in the management account; AWS_PROFILE must be
-# a management-account profile. Excluded from every per-workshop
-# provision/teardown task. backend.hcl must exist first (written by
+# The once-per-management-account shared layer. It ADOPTS (reads) the management
+# account's organization IdC instance AND CREATES the shared primitives every
+# workshop's governance stack consumes: the budgets execution role and the two
+# SCP policy objects (Kiro guardrail + deny-all freeze). Read/created ONCE and
+# reused across every workshop (NOT per workshop). Runs in the management
+# account; AWS_PROFILE must be a management-account profile. Excluded from every
+# per-workshop provision/teardown task. backend.hcl must exist first (written by
 # `mise run backend-bootstrap`, same shared bucket as the other stacks).
 
 [tasks.foundation-plan]
-description = "DRY RUN: tofu init + plan to read the org IdC instance (a pure read; creates nothing)"
+description = "DRY RUN: tofu init + plan (reads the org IdC instance; shows the shared budgets role + 2 SCP policies to create)"
 dir = "foundation/terraform"
 run = """
 set -eu
@@ -571,7 +572,7 @@ tofu plan
 """
 
 [tasks.foundation-apply]
-description = "Apply: resolve the org IdC instance IDs and print the wire-forward exports (reads the instance; creates nothing)"
+description = "Apply: read the org IdC instance, create the shared budgets role + 2 SCP policies, and print the wire-forward exports (prompts to approve)"
 dir = "foundation/terraform"
 run = """
 set -eu
@@ -589,29 +590,61 @@ tofu init -reconfigure -input=false -backend-config=backend.hcl \
 tofu apply
 # Only reached after a clean apply (set -eu). Surface the values to wire forward.
 echo ""
-echo "Foundation IdC applied. Wire these into the subscription stack:"
+echo "Foundation applied. Wire these into the subscription stack (IdC handoff):"
 echo "  export TF_VAR_idc_instance_arn=\"$(tofu output -raw instance_arn)\""
 echo "  export TF_VAR_identity_store_id=\"$(tofu output -raw identity_store_id)\""
 echo "Sign-in URL: $(tofu output -raw sign_in_url)  (region: $(tofu output -raw region))"
+echo ""
+echo "Wire these into the governance stack (shared-primitives handoff):"
+echo "  export TF_VAR_budgets_execution_role_arn=\"$(tofu output -raw budgets_execution_role_arn)\""
+echo "  export TF_VAR_kiro_guardrail_scp_id=\"$(tofu output -raw kiro_guardrail_scp_id)\""
+echo "  export TF_VAR_freeze_scp_id=\"$(tofu output -raw freeze_scp_id)\""
 """
 
 [tasks.foundation-destroy]
-description = "NO-OP: foundation adopts the org IdC instance read-only and owns nothing to destroy. Disabling IdC is a mgmt-account console action, never a task."
+description = "DESTRUCTIVE: delete the shared budgets role + 2 SCP policies. Requires typing 'destroy-foundation'; then prompts tofu's own approval. Mgmt-account decommission only."
 dir = "foundation/terraform"
 run = """
 set -eu
-# The foundation stack ADOPTS (reads) the management account's organization IdC
-# instance via `data "aws_ssoadmin_instances"`; it never creates or owns it, so
-# there is nothing for a destroy to remove. This task is a deliberate, documented
-# no-op that deletes NOTHING. It exists only to make that explicit and to catch
-# muscle memory from the old create-and-own design.
+# --- Typed-phrase guard --------------------------------------------------------
+# Foundation now OWNS three destroyable resources: the shared budgets execution
+# role and the two SCP policy objects (Kiro guardrail + deny-all freeze). The
+# organization IdC instance is read-only (a `data "aws_ssoadmin_instances"`
+# source), so it is NOT in state and `tofu destroy` will NOT touch it.
 #
-# The shared organization instance belongs to every workshop. Disabling IAM
-# Identity Center is a deliberate console action in the management account, done
-# only when no workshop depends on the directory — never a repo task. See
-# foundation/RUNBOOK.md ("Teardown — nothing to destroy here").
-echo "foundation-destroy is a no-op: foundation reads the org IdC instance and owns nothing to destroy."
-echo "Disabling IAM Identity Center is a management-account console action; this task deletes nothing."
+# WARNING: run this ONLY at management-account decommission, after every
+# workshop's governance/ and subscription/ state is already gone. Destroying the
+# shared freeze/guardrail SCP policies while a live workshop's governance stack
+# still references them breaks that workshop's attachment and freeze automation.
+#
+# Require the operator to type the fixed phrase before anything proceeds. A
+# mismatch exits non-zero and destroys nothing; a match proceeds to tofu's OWN
+# destroy approval prompt (a second, independent gate).
+printf 'This deletes the SHARED budgets role + 2 SCP policies owned by foundation/.\\n'
+printf 'Run this ONLY at mgmt-account decommission, after every workshop is gone.\\n'
+printf 'Type exactly "destroy-foundation" to proceed: '
+read -r CONFIRM
+if [ "$CONFIRM" != "destroy-foundation" ]; then
+  echo "ERROR: confirmation phrase did not match 'destroy-foundation'; destroying nothing." >&2
+  exit 1
+fi
+
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: foundation/terraform/backend.hcl not found (see foundation-plan)." >&2
+  exit 1
+fi
+# A residual 'key' in backend.hcl conflicts with the init-time key.
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+# Reconfigure to the foundation state key BEFORE destroy; fail closed.
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=foundation/terraform.tfstate" \
+  || { echo "ERROR: backend init failed; not destroying." >&2; exit 1; }
+# tofu destroy still prompts for its own approval before deleting. Only the role
+# + 2 SCP policies are in state; the read-only org IdC instance is untouched.
+tofu destroy
 """
 
 # =============================================================================
@@ -648,6 +681,20 @@ if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
   echo "and ending alphanumeric, with no consecutive hyphens." >&2
   exit 1
 fi
+# --- Shared-primitive wire-forward guard (from foundation/) --------------------
+# These three come from foundation/ (OpenTofu picks TF_VAR_* up automatically).
+# They have no defaults, so fail closed with a pointer to foundation-apply if any
+# is missing rather than letting tofu prompt for them.
+MISSING=""
+[ -z "${TF_VAR_budgets_execution_role_arn:-}" ] && MISSING="$MISSING TF_VAR_budgets_execution_role_arn"
+[ -z "${TF_VAR_kiro_guardrail_scp_id:-}" ] && MISSING="$MISSING TF_VAR_kiro_guardrail_scp_id"
+[ -z "${TF_VAR_freeze_scp_id:-}" ] && MISSING="$MISSING TF_VAR_freeze_scp_id"
+if [ -n "$MISSING" ]; then
+  echo "ERROR: missing required input(s) from foundation/:$MISSING" >&2
+  echo "These come from the foundation stack. Run 'mise run foundation-apply' and" >&2
+  echo "export the three TF_VAR_* it prints before running governance." >&2
+  exit 1
+fi
 if [ ! -f backend.hcl ]; then
   echo "ERROR: governance/terraform/backend.hcl not found." >&2
   echo "Run the backend bootstrap first (it writes this file):" >&2
@@ -670,10 +717,82 @@ tofu plan
 """
 
 [tasks.governance-apply]
-description = "Apply: create (or re-converge) a workshop's OU, guardrail SCP, freeze SCP, budgets role, and per-account budgets (requires WORKSHOP_ID; prompts to approve)"
+description = "Apply: create (or re-converge) a workshop's OU, guardrail SCP attachment, and per-account budgets using the shared SCPs + budgets role from foundation/ (requires WORKSHOP_ID; prompts to approve)"
 dir = "governance/terraform"
 run = """
 set -eu
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+# --- Shared-primitive wire-forward guard (from foundation/) --------------------
+# These three come from foundation/ (OpenTofu picks TF_VAR_* up automatically).
+# They have no defaults, so fail closed with a pointer to foundation-apply if any
+# is missing rather than letting tofu prompt for them.
+MISSING=""
+[ -z "${TF_VAR_budgets_execution_role_arn:-}" ] && MISSING="$MISSING TF_VAR_budgets_execution_role_arn"
+[ -z "${TF_VAR_kiro_guardrail_scp_id:-}" ] && MISSING="$MISSING TF_VAR_kiro_guardrail_scp_id"
+[ -z "${TF_VAR_freeze_scp_id:-}" ] && MISSING="$MISSING TF_VAR_freeze_scp_id"
+if [ -n "$MISSING" ]; then
+  echo "ERROR: missing required input(s) from foundation/:$MISSING" >&2
+  echo "These come from the foundation stack. Run 'mise run foundation-apply' and" >&2
+  echo "export the three TF_VAR_* it prints before running governance." >&2
+  exit 1
+fi
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: governance/terraform/backend.hcl not found (see governance-plan)." >&2
+  exit 1
+fi
+# A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+export TF_VAR_workshop_id="$WID"
+# Reconfigure to THIS workshop's governance key BEFORE apply (R6.2); fail
+# closed (R6.3).
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=workshops/${WID}/governance/terraform.tfstate" \
+  || { echo "ERROR: backend init failed; not applying." >&2; exit 1; }
+tofu apply
+# Only reached after a clean apply (set -eu). Surface the governance-OWNED
+# outputs (the shared SCP ids / budgets role ARN are inputs from foundation/,
+# not outputs of this stack).
+echo ""
+echo "Governance stack applied for workshop '$WID':"
+echo "  workshop OU id:      $(tofu output -raw workshop_ou_id)"
+echo "  per-account budgets (account id -> budget name / freeze action id):"
+# `tofu output -json` is self-contained (no external parser); print the map
+# verbatim so an operator sees every account's budget + freeze-action id. Avoids
+# shelling out to python just to count keys.
+tofu output -json per_account_budgets
+"""
+
+[tasks.governance-place-accounts]
+description = "Move the stack's account_ids (from terraform.tfvars) into this workshop's OU via `aws organizations move-account` (requires WORKSHOP_ID; optional ACCOUNT_IDS override; real Organizations mutation; idempotent)"
+dir = "governance/terraform"
+run = """
+set -eu
+# Out-of-band account placement. The governance stack owns ONLY the OU; this
+# task moves the pre-existing, in-org accounts into it with `aws organizations
+# move-account`. It never creates, invites, or closes an account. It runs only
+# `tofu output` (to read workshop_ou_id AND the account_ids list) — NOT
+# `tofu apply` — so it does NOT need the three foundation TF_VAR_* wire-forwards,
+# but it does need a successful `tofu init` to read those outputs. The account
+# ids come from the stack's own state (terraform.tfvars is the single source of
+# truth); set ACCOUNT_IDS only to override with a deliberate subset.
+
 # --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
 WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
 if [ -z "$WID" ]; then
@@ -698,39 +817,89 @@ if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
   echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
   exit 1
 fi
-export TF_VAR_workshop_id="$WID"
-# Reconfigure to THIS workshop's governance key BEFORE apply (R6.2); fail
-# closed (R6.3).
+
+# Reconfigure to THIS workshop's governance key BEFORE reading outputs (R6.2);
+# fail closed (R6.3). Needed so `tofu output` reads this workshop's state.
 tofu init -reconfigure -input=false -backend-config=backend.hcl \
   -backend-config="key=workshops/${WID}/governance/terraform.tfstate" \
-  || { echo "ERROR: backend init failed; not applying." >&2; exit 1; }
-tofu apply
-# Only reached after a clean apply (set -eu). Surface the governance outputs.
-echo ""
-echo "Governance stack applied for workshop '$WID':"
-echo "  workshop OU id:    $(tofu output -raw workshop_ou_id)"
-echo "  guardrail SCP id:  $(tofu output -raw kiro_guardrail_scp_id)"
-echo "  freeze SCP id:     $(tofu output -raw freeze_scp_id)"
-echo "  budgets role arn:  $(tofu output -raw budgets_execution_role_arn)"
+  || { echo "ERROR: backend init failed; not moving accounts." >&2; exit 1; }
+
+# Read the destination OU id from the stack output. Fail closed if unreadable
+# (e.g. governance-apply has not run yet for this workshop).
+OU_ID="$(tofu output -raw workshop_ou_id 2>/dev/null)" || true
+if [ -z "${OU_ID:-}" ]; then
+  echo "ERROR: could not read workshop_ou_id from the governance state." >&2
+  echo "Run 'mise run governance-apply' for WORKSHOP_ID='$WID' first." >&2
+  exit 1
+fi
+
+# --- Account ids: single source of truth is the stack's own state --------------
+# Read account_ids from `tofu output` so terraform.tfvars is the ONE place the
+# list is declared — no parallel env var to drift out of sync. An optional
+# ACCOUNT_IDS env override is honored for moving a deliberate subset; when it is
+# unset (the normal case) the authoritative tfvars-derived list is used.
+if [ -n "${ACCOUNT_IDS:-}" ]; then
+  ACCT_IDS="$(printf '%s' "$ACCOUNT_IDS" | tr -s '[:space:],' '  ' | sed -E 's/^ | $//g')"
+  echo "Using ACCOUNT_IDS override from the environment."
+else
+  # `tofu output -json` is self-contained; map the JSON string array to a
+  # space-separated list without needing jq (tr/grep only).
+  ACCT_IDS="$(tofu output -json account_ids 2>/dev/null \
+    | tr -d '[]" ' | tr ',' ' ' | sed -E 's/^ | $//g')"
+fi
+if [ -z "$ACCT_IDS" ]; then
+  echo "ERROR: no account ids to place." >&2
+  echo "Set account_ids in governance/terraform/terraform.tfvars and run" >&2
+  echo "'mise run governance-apply' first, or pass ACCOUNT_IDS=\\"<id> <id>\\" to override." >&2
+  exit 1
+fi
+
+echo "About to MOVE existing accounts into OU $OU_ID (workshop '$WID')."
+echo "This is a real AWS Organizations mutation. Accounts: $ACCT_IDS"
+
+for ID in $ACCT_IDS; do
+  # Current parent of the account (root or an OU). move-account needs the source.
+  SRC="$(aws organizations list-parents --child-id "$ID" \
+    --query 'Parents[0].Id' --output text)"
+  if [ -z "$SRC" ] || [ "$SRC" = "None" ]; then
+    echo "ERROR: could not determine current parent of account $ID; skipping is unsafe, aborting." >&2
+    exit 1
+  fi
+  if [ "$SRC" = "$OU_ID" ]; then
+    echo "  $ID already in $OU_ID — skipping (idempotent)."
+    continue
+  fi
+  echo "  moving $ID: $SRC -> $OU_ID"
+  aws organizations move-account \
+    --account-id "$ID" \
+    --source-parent-id "$SRC" \
+    --destination-parent-id "$OU_ID"
+done
+echo "Done. All of the stack's account_ids are now under OU $OU_ID."
 """
 
 [tasks.governance-move-accounts-out]
-description = "PREREQUISITE for governance-destroy: move the placed accounts out of the workshop OU (back to parent_id) and drop them from state so prevent_destroy no longer blocks teardown. Requires WORKSHOP_ID; prompts to confirm."
+description = "PREREQUISITE for governance-destroy: move the stack's account_ids out of the workshop OU (back to parent_id) so the empty OU can be destroyed. The mirror of governance-place-accounts; a real Organizations move only — no account is created, closed, or TF-managed. Requires WORKSHOP_ID; optional ACCOUNT_IDS override; prompts to confirm."
 dir = "governance/terraform"
 run = """
 set -eu
-# The placed accounts carry prevent_destroy=true and live UNDER the workshop OU,
-# so `governance-destroy` would (a) error on the guarded accounts and (b) fail
-# to delete a non-empty OU. This task clears both blockers WITHOUT touching the
-# real accounts: it MOVES each account out of the workshop OU back to the OU's
-# parent (var.parent_id), then REMOVES it from state (`tofu state rm` only drops
-# Terraform's tracking — it never calls AWS). Run this, then `governance-destroy`.
+# Out-of-band teardown prerequisite — the exact mirror of
+# `governance-place-accounts`. The governance stack owns ONLY the OU (accounts
+# are placed OUTSIDE Terraform), so there is nothing in state to remove and no
+# prevent_destroy guard to clear. AWS Organizations simply refuses to delete a
+# non-empty OU, so before `governance-destroy` can remove it this task moves the
+# stack's account_ids back OUT of the workshop OU to its parent (var.parent_id)
+# with `aws organizations move-account`. It never creates, invites, or closes an
+# account, and it touches NO Terraform state. It runs only `tofu output` (to
+# read workshop_ou_id, parent_id, and account_ids) — NOT `tofu apply` — so it
+# does not need the foundation TF_VAR_* wire-forwards, but it does need a
+# successful `tofu init`. Run this, then `governance-destroy`.
 
 # --- Confirmation guard --------------------------------------------------------
 # This mutates the LIVE Organizations management account (it moves member
 # accounts between OUs). Require an explicit typed phrase before anything runs.
-printf 'This MOVES the placed member accounts out of the workshop OU in the LIVE\\n'
-printf 'Organizations management account, then drops them from Terraform state.\\n'
+printf 'This MOVES the stack'"'"'s member accounts out of the workshop OU in the\\n'
+printf 'LIVE Organizations management account (back to parent_id).\\n'
 printf 'Type exactly "move-accounts-out" to proceed: '
 read -r CONFIRM
 if [ "$CONFIRM" != "move-accounts-out" ]; then
@@ -762,71 +931,71 @@ if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
   echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
   exit 1
 fi
-export TF_VAR_workshop_id="$WID"
-# Reconfigure to THIS workshop's governance key BEFORE reading state (R6.2);
-# fail closed (R6.3).
+# Reconfigure to THIS workshop's governance key BEFORE reading outputs (R6.2);
+# fail closed (R6.3). Needed so `tofu output` reads this workshop's state.
 tofu init -reconfigure -input=false -backend-config=backend.hcl \
   -backend-config="key=workshops/${WID}/governance/terraform.tfstate" \
-  || { echo "ERROR: backend init failed; moving nothing." >&2; exit 1; }
+  || { echo "ERROR: backend init failed; not moving accounts." >&2; exit 1; }
 
-# Resolve the workshop OU id (where the accounts currently live) and the parent
-# the OU hangs under (var.parent_id — the destination for the moves) from state.
-OU_ID="$(tofu output -raw workshop_ou_id)"
+# Source OU (where the accounts currently live) and destination parent
+# (var.parent_id — where the OU hangs under, and where the accounts return to).
+OU_ID="$(tofu output -raw workshop_ou_id 2>/dev/null)" || true
+if [ -z "${OU_ID:-}" ]; then
+  echo "ERROR: could not read workshop_ou_id from the governance state." >&2
+  echo "Run 'mise run governance-apply' for WORKSHOP_ID='$WID' first." >&2
+  exit 1
+fi
 # parent_id is an INPUT, not an output; read it from the applied variable via a
 # plan-free `tofu console` so the destination is authoritative, not re-typed.
 DEST_PARENT="$(printf 'var.parent_id\\n' | tofu console 2>/dev/null | tr -d '\"[:space:]')"
-if [ -z "$OU_ID" ] || [ -z "$DEST_PARENT" ]; then
-  echo "ERROR: could not resolve workshop OU id and/or parent_id from state/vars." >&2
-  echo "       OU_ID='$OU_ID' DEST_PARENT='$DEST_PARENT'" >&2
-  echo "       Has this workshop's governance stack been applied?" >&2
+if [ -z "$DEST_PARENT" ]; then
+  echo "ERROR: could not resolve parent_id (destination) from the stack vars." >&2
   exit 1
 fi
-echo "Workshop OU: $OU_ID  ->  destination parent: $DEST_PARENT"
 
-# Enumerate the placed accounts straight from state so we only ever touch the
-# accounts THIS stack adopted (never any account outside var.account_ids).
-PLACED="$(tofu state list 2>/dev/null | grep '^aws_organizations_account.placed\\[' || true)"
-if [ -z "$PLACED" ]; then
-  echo "No aws_organizations_account.placed resources in state; nothing to move."
-  exit 0
+# --- Account ids: single source of truth is the stack's own state --------------
+# Read account_ids from `tofu output` so terraform.tfvars is the ONE place the
+# list is declared — identical to governance-place-accounts. An optional
+# ACCOUNT_IDS env override is honored for moving a deliberate subset.
+if [ -n "${ACCOUNT_IDS:-}" ]; then
+  ACCT_IDS="$(printf '%s' "$ACCOUNT_IDS" | tr -s '[:space:],' '  ' | sed -E 's/^ | $//g')"
+  echo "Using ACCOUNT_IDS override from the environment."
+else
+  ACCT_IDS="$(tofu output -json account_ids 2>/dev/null \
+    | tr -d '[]" ' | tr ',' ' ' | sed -E 's/^ | $//g')"
 fi
-
-printf '%s\\n' "$PLACED" | while IFS= read -r ADDR; do
-  # Extract the 12-digit account id from the state address key.
-  ACCT="$(printf '%s' "$ADDR" | sed -E 's/.*\\["([0-9]{12})"\\].*/\\1/')"
-  if ! printf '%s' "$ACCT" | grep -Eq '^[0-9]{12}$'; then
-    echo "WARNING: could not parse account id from '$ADDR'; skipping." >&2
+if [ -z "$ACCT_IDS" ]; then
+  echo "ERROR: no account ids to move out." >&2
+  echo "Set account_ids in governance/terraform/terraform.tfvars (and run" >&2
+  echo "'mise run governance-apply' first), or pass ACCOUNT_IDS=\\"<id> <id>\\" to override." >&2
+  exit 1
+fi
+echo "Moving accounts OUT of OU $OU_ID -> parent $DEST_PARENT (workshop '$WID')."
+echo "This is a real AWS Organizations mutation. Accounts: $ACCT_IDS"
+for ID in $ACCT_IDS; do
+  # Current parent of the account is the move source (robust if already moved).
+  SRC="$(aws organizations list-parents --child-id "$ID" \
+    --query 'Parents[0].Id' --output text)"
+  if [ -z "$SRC" ] || [ "$SRC" = "None" ]; then
+    echo "ERROR: could not determine current parent of account $ID; aborting." >&2
+    exit 1
+  fi
+  if [ "$SRC" = "$DEST_PARENT" ]; then
+    echo "  $ID already under $DEST_PARENT — skipping (idempotent)."
     continue
   fi
-  # The real current parent is the source for the move (robust even if an
-  # account was moved out-of-band). If it is already at the destination, the
-  # move is skipped; otherwise move it, then drop it from state.
-  SRC_PARENT="$(aws organizations list-parents --child-id "$ACCT" \
-    --query 'Parents[0].Id' --output text 2>/dev/null || echo '')"
-  if [ -z "$SRC_PARENT" ] || [ "$SRC_PARENT" = "None" ]; then
-    echo "WARNING: could not resolve current parent of $ACCT; skipping move." >&2
-  elif [ "$SRC_PARENT" = "$DEST_PARENT" ]; then
-    echo "$ACCT already under $DEST_PARENT; no move needed."
-  else
-    echo "Moving $ACCT: $SRC_PARENT -> $DEST_PARENT"
-    aws organizations move-account \
-      --account-id "$ACCT" \
-      --source-parent-id "$SRC_PARENT" \
-      --destination-parent-id "$DEST_PARENT"
-  fi
-  # Drop from state regardless (state rm never calls AWS); this is what clears
-  # the prevent_destroy guard so governance-destroy can proceed.
-  echo "Removing $ADDR from state (does not touch the real account)."
-  tofu state rm "$ADDR"
+  echo "  moving $ID: $SRC -> $DEST_PARENT"
+  aws organizations move-account \
+    --account-id "$ID" \
+    --source-parent-id "$SRC" \
+    --destination-parent-id "$DEST_PARENT"
 done
-
 echo ""
-echo "Done. The placed accounts are out of the workshop OU and no longer in state."
-echo "You can now run: mise run governance-destroy"
+echo "Done. The workshop OU is empty; you can now run: mise run governance-destroy"
 """
 
 [tasks.governance-destroy]
-description = "DESTRUCTIVE: delete a workshop's OU, SCPs, budgets role, and budgets. Run governance-move-accounts-out FIRST. Requires typing 'destroy-governance'; then prompts tofu's own approval."
+description = "DESTRUCTIVE: delete a workshop's OU, guardrail attachment, and budgets. Run governance-move-accounts-out FIRST (AWS refuses to delete a non-empty OU). Requires typing 'destroy-governance'; then prompts tofu's own approval."
 dir = "governance/terraform"
 run = """
 set -eu
@@ -856,6 +1025,20 @@ if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
   echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
   echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
   echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+# --- Shared-primitive wire-forward guard (from foundation/) --------------------
+# destroy also instantiates the provider/vars, so the three no-default inputs
+# must be present (OpenTofu picks TF_VAR_* up automatically). Fail closed with a
+# pointer to foundation-apply if any is missing.
+MISSING=""
+[ -z "${TF_VAR_budgets_execution_role_arn:-}" ] && MISSING="$MISSING TF_VAR_budgets_execution_role_arn"
+[ -z "${TF_VAR_kiro_guardrail_scp_id:-}" ] && MISSING="$MISSING TF_VAR_kiro_guardrail_scp_id"
+[ -z "${TF_VAR_freeze_scp_id:-}" ] && MISSING="$MISSING TF_VAR_freeze_scp_id"
+if [ -n "$MISSING" ]; then
+  echo "ERROR: missing required input(s) from foundation/:$MISSING" >&2
+  echo "These come from the foundation stack. Run 'mise run foundation-apply' and" >&2
+  echo "export the three TF_VAR_* it prints before running governance." >&2
   exit 1
 fi
 if [ ! -f backend.hcl ]; then

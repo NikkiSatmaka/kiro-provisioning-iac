@@ -31,6 +31,25 @@ variable "account_ids" {
   }
 }
 
+# --- Shared primitives from foundation/ (wired forward as variables) --------
+# These three are once-per-management-account singletons owned by foundation/
+# and consumed here by id/ARN. No defaults: a missing wire-forward fails closed.
+
+variable "budgets_execution_role_arn" {
+  description = "From foundation/: ARN of the shared least-privilege role AWS Budgets assumes to attach/detach the freeze SCP."
+  type        = string
+}
+
+variable "kiro_guardrail_scp_id" {
+  description = "From foundation/: id of the shared Kiro guardrail SCP this stack attaches to the workshop OU."
+  type        = string
+}
+
+variable "freeze_scp_id" {
+  description = "From foundation/: id of the shared deny-all freeze SCP AWS Budgets attaches to a breaching account on breach."
+  type        = string
+}
+
 # --- Provider wiring (referenced by providers.tf) ---------------------------
 
 variable "aws_region" {
@@ -67,33 +86,12 @@ variable "default_tags" {
   }
 }
 
-# --- Kiro guardrail SCP ------------------------------------------------------
-
-variable "kiro_allowed_actions" {
-  description = <<-EOT
-    Allowlist of IAM actions the Kiro guardrail SCP permits (deny-by-default).
-    The default is a CONSERVATIVE STARTER permitting Kiro + IAM Identity Center
-    sign-in plus read-only basics; it is a TUNABLE starting point — widen or
-    narrow it per workshop (see README).
-  EOT
-  type        = list(string)
-  default = [
-    "sso:*",
-    "sso-directory:*",
-    "identitystore:*",
-    "signin:*",
-    "sts:GetCallerIdentity",
-    "codewhisperer:*",
-    "q:*",
-  ]
-}
-
 # --- Budgets and freeze automation ------------------------------------------
 
 variable "freeze_threshold_percent" {
-  description = "Percent of the budget limit at which the AUTOMATIC freeze SCP action fires (and the required notify-only notification is sent)."
+  description = "Percent of the budget limit at which the AUTOMATIC freeze SCP action fires. An alert is ALSO sent at this level, so this is the highest tier: alert + freeze. Default 90."
   type        = number
-  default     = 100
+  default     = 90
 }
 
 variable "notification_emails" {
@@ -105,10 +103,23 @@ variable "notification_emails" {
   }
 }
 
-variable "notify_threshold_percent" {
-  description = "Optional softer notify-only threshold (%). When null, no extra notify-only threshold is created."
-  type        = number
-  default     = null
+variable "notify_threshold_percents" {
+  description = <<-EOT
+    Notify-only alert tiers (percent of the budget limit), BELOW the freeze
+    level. Each value produces one ACTUAL-cost notification that only emails the
+    recipients — it never freezes. The freeze (and its own alert) is a separate,
+    higher tier set by var.freeze_threshold_percent.
+
+    Default [50, 75] pairs with the default freeze at 90 to give three tiers:
+    alert at 50%, alert at 75%, alert + freeze at 90%. Empty list = no softer
+    tiers (only the freeze-level alert fires).
+  EOT
+  type        = list(number)
+  default     = [50, 75]
+  validation {
+    condition     = alltrue([for p in var.notify_threshold_percents : p > 0 && p < var.freeze_threshold_percent])
+    error_message = "Every notify tier must be > 0 and strictly below freeze_threshold_percent (the freeze level already sends its own alert)."
+  }
 }
 
 variable "budget_limit_amount" {

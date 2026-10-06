@@ -140,12 +140,20 @@ run order and the management-account prerequisite. **Next:** Phase 3.
 
 ## Phase 3 — Provision the subscription
 
+Each workshop is namespaced by a `WORKSHOP_ID` — a short slug (1-63 lowercase
+alphanumerics and hyphens, e.g. `kiro-2025-10-10`) that keys this workshop's
+remote state and resources so independent workshops never collide. Set it in
+the git-ignored `.env` (see `.env.example`); `mise run provision` fails closed
+if it is unset.
+
 ```bash
 # 1. Choose what to provision (git-ignored)
 cp subscription/terraform/terraform.tfvars.example subscription/terraform/terraform.tfvars
 #   then edit prefixes, counts, membership strategy, Kiro tier
 
-# 2. Dry run, then apply (prompts)
+# 2. Name this workshop in .env (git-ignored), e.g. WORKSHOP_ID=kiro-2025-10-10
+
+# 3. Dry run, then apply (prompts) — apply requires WORKSHOP_ID
 mise run provision-plan   # tofu init + plan, no changes
 mise run provision        # create IdC instance + users + groups + memberships
 ```
@@ -172,17 +180,21 @@ Two ways to get credentials to users — pick one:
   Function URL and let participants claim their own credential from a QR code /
   short link using a workshop code. It seeds its pool from the **same**
   `subscription/output/otps.csv` + `manifest.json` you produced in Phase 3, so
-  run it only after provisioning. Set `WORKSHOP_CODE` in `.env` first.
+  run it only after provisioning. Set `WORKSHOP_CODE` **and** the same
+  `WORKSHOP_ID` from Phase 3 in `.env` first — the mutating tasks below
+  (`claim-deploy`, `claim-seed`, `claim-audit`, `claim-destroy`) are namespaced
+  by `WORKSHOP_ID` and fail closed if it is unset.
 
 ```bash
-# Claim-service lifecycle (only if you chose the self-serve path):
+# Claim-service lifecycle (only if you chose the self-serve path).
+# Set WORKSHOP_CODE + WORKSHOP_ID in .env first; the mutating tasks need both.
 mise run claim-deploy-plan # DRY RUN: plan the table + Lambda + Function URL
-mise run claim-deploy      # apply (prompts), then print the public HTTPS claim URL
+mise run claim-deploy      # requires WORKSHOP_ID + WORKSHOP_CODE; apply (prompts), print the claim URL
 mise run claim-url         # print the claim URL for the QR code / short link
 mise run claim-seed-plan   # DRY RUN: what would seed from subscription/output/
-mise run claim-seed        # write the pool from otps.csv + manifest.json
-mise run claim-audit       # after the workshop: export who claimed what (git-ignored CSV)
-mise run claim-destroy     # tear down the claim stack (never touches subscription/)
+mise run claim-seed        # requires WORKSHOP_ID; write the pool from otps.csv + manifest.json
+mise run claim-audit       # requires WORKSHOP_ID; after the workshop, export who claimed what (git-ignored CSV)
+mise run claim-destroy     # requires WORKSHOP_ID; tear down the claim stack (never touches subscription/)
 ```
 
 However it was distributed, a user signs in via Kiro → IAM Identity Center with
@@ -199,13 +211,19 @@ for direct distribution and sign-in verification.
 When the engagement ends, remove everything. The remote state from Phase 1 is
 what lets `tofu destroy` work from any machine.
 
+Teardown targets a single workshop, so set that workshop's `WORKSHOP_ID` in
+`.env` first — the namespaced tasks below (`claim-destroy`, `teardown-tofu`)
+fail closed if it is unset.
+
 ```bash
+# Set WORKSHOP_ID in .env to the workshop you are tearing down.
+
 # Claim service first, if you deployed it:
-mise run claim-destroy    # remove the table, Lambda, Function URL (prompts)
+mise run claim-destroy    # requires WORKSHOP_ID; remove the table, Lambda, Function URL (prompts)
 
 # Then the subscription:
 mise run teardown-plan    # DRY RUN: discover what teardown would delete (no changes)
-mise run teardown-tofu    # tofu destroy (standard path; uses the required remote state)
+mise run teardown-tofu    # requires WORKSHOP_ID; tofu destroy (standard path; uses the required remote state)
 mise run teardown-run     # state-free fallback: delete users/groups/instance (confirms)
 ```
 

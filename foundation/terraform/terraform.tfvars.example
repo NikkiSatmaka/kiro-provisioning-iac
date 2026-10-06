@@ -1,0 +1,28 @@
+# OPTIONAL — you normally do NOT need this file.
+#
+# Every variable below has a working default, so the foundation stack runs with
+# NO terraform.tfvars: region/profile come from the git-ignored .env (via mise)
+# and the tags have sensible defaults. Only create this file to OVERRIDE a
+# default:
+#
+#   cp terraform.tfvars.example terraform.tfvars   # then uncomment what you override
+#
+# terraform.tfvars is git-ignored.
+
+# ---- Provider / environment (override) --------------------------------------
+# Region/profile usually come from the environment (mise sources them from the
+# git-ignored .env). Leave aws_region empty to inherit AWS_REGION. Uncomment to
+# pin instead; this stack targets the management account's org IdC instance.
+# aws_region  = "us-east-1"
+# aws_profile = "kiro-mgmt"
+
+# ---- Tags (override) --------------------------------------------------------
+# foundation's provider does NOT auto-merge workshop_id (unlike the other
+# stacks), so if you override default_tags here keep the workshop_id = "shared"
+# key — foundation is shared infra, not attributable to one workshop.
+# default_tags = {
+#   Project   = "kiro-provisioning-iac"
+#   ManagedBy = "opentofu"
+#   Purpose   = "kiro-login-only"
+#   workshop_id = "shared"
+# }

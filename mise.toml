@@ -101,7 +101,7 @@ tofu plan
 """
 
 [tasks.backend-bootstrap]
-description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write the subscription/, claim-service/, and foundation/ backend.hcl files (prompts to approve)."
+description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write the subscription/, claim-service/, foundation/, and governance/ backend.hcl files (prompts to approve)."
 dir = "backend/terraform"
 run = """
 set -eu
@@ -121,6 +121,9 @@ cat ../../claim-service/terraform/backend.hcl
 tofu output -raw backend_hcl_foundation > ../../foundation/terraform/backend.hcl
 echo "wrote foundation/terraform/backend.hcl"
 cat ../../foundation/terraform/backend.hcl
+tofu output -raw backend_hcl_governance > ../../governance/terraform/backend.hcl
+echo "wrote governance/terraform/backend.hcl"
+cat ../../governance/terraform/backend.hcl
 """
 
 [tasks.backend-destroy]
@@ -615,5 +618,157 @@ tofu init -reconfigure -input=false -backend-config=backend.hcl \
   -backend-config="key=foundation/terraform.tfstate" \
   || { echo "ERROR: backend init failed; not destroying." >&2; exit 1; }
 # tofu destroy still prompts for its own approval before deleting (R7.5).
+tofu destroy
+"""
+
+# =============================================================================
+# === governance/ stack ===
+# =============================================================================
+# Standalone, MANAGEMENT-ACCOUNT-scoped stack: one OU per workshop, a Kiro
+# guardrail SCP on the OU, an unattached deny-all freeze SCP, a least-privilege
+# budgets execution role, and per-account budgets whose breach AUTOMATICALLY
+# attaches the freeze SCP to the single breaching account. High blast radius —
+# apply mutates the live AWS Organizations management account. backend.hcl must
+# exist first (written by `mise run backend-bootstrap`, same shared bucket as
+# the other stacks). Namespaced per workshop by WORKSHOP_ID, exactly like the
+# subscription/ and claim-service/ stacks. There is intentionally NO un-freeze
+# task: recovering a frozen account is a deliberate manual detach (see
+# governance/RUNBOOK.md).
+
+[tasks.governance-plan]
+description = "DRY RUN: tofu init + plan for a workshop's governance stack (requires WORKSHOP_ID; creates nothing)"
+dir = "governance/terraform"
+run = """
+set -eu
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: governance/terraform/backend.hcl not found." >&2
+  echo "Run the backend bootstrap first (it writes this file):" >&2
+  echo "  mise run backend-bootstrap" >&2
+  echo "or copy the template by hand: cp backend.hcl.example backend.hcl" >&2
+  exit 1
+fi
+# A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+export TF_VAR_workshop_id="$WID"
+# Reconfigure to THIS workshop's governance key BEFORE plan (R6.2); fail
+# closed (R6.3).
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=workshops/${WID}/governance/terraform.tfstate" \
+  || { echo "ERROR: backend init failed; not planning." >&2; exit 1; }
+tofu plan
+"""
+
+[tasks.governance-apply]
+description = "Apply: create (or re-converge) a workshop's OU, guardrail SCP, freeze SCP, budgets role, and per-account budgets (requires WORKSHOP_ID; prompts to approve)"
+dir = "governance/terraform"
+run = """
+set -eu
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: governance/terraform/backend.hcl not found (see governance-plan)." >&2
+  exit 1
+fi
+# A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+export TF_VAR_workshop_id="$WID"
+# Reconfigure to THIS workshop's governance key BEFORE apply (R6.2); fail
+# closed (R6.3).
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=workshops/${WID}/governance/terraform.tfstate" \
+  || { echo "ERROR: backend init failed; not applying." >&2; exit 1; }
+tofu apply
+# Only reached after a clean apply (set -eu). Surface the governance outputs.
+echo ""
+echo "Governance stack applied for workshop '$WID':"
+echo "  workshop OU id:    $(tofu output -raw workshop_ou_id)"
+echo "  guardrail SCP id:  $(tofu output -raw kiro_guardrail_scp_id)"
+echo "  freeze SCP id:     $(tofu output -raw freeze_scp_id)"
+echo "  budgets role arn:  $(tofu output -raw budgets_execution_role_arn)"
+"""
+
+[tasks.governance-destroy]
+description = "DESTRUCTIVE: delete a workshop's OU, SCPs, budgets role, and budgets. Requires typing 'destroy-governance'; then prompts tofu's own approval."
+dir = "governance/terraform"
+run = """
+set -eu
+# --- Typed-phrase guard (R12.3, R12.4) -----------------------------------------
+# This mutates the LIVE Organizations management account; deleting it is
+# deliberate. Require the operator to type the fixed phrase before anything
+# proceeds. A mismatch exits non-zero and deletes nothing; a match proceeds to
+# tofu's OWN destroy approval prompt (a second, independent gate).
+printf 'This mutates the LIVE Organizations management account (OU + SCPs + budgets).\\n'
+printf 'Type exactly "destroy-governance" to proceed: '
+read -r CONFIRM
+if [ "$CONFIRM" != "destroy-governance" ]; then
+  echo "ERROR: confirmation phrase did not match 'destroy-governance'; destroying nothing." >&2
+  exit 1
+fi
+
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: governance/terraform/backend.hcl not found (see governance-plan)." >&2
+  exit 1
+fi
+# A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+export TF_VAR_workshop_id="$WID"
+# Reconfigure to THIS workshop's governance key BEFORE destroy (R6.2); fail
+# closed (R6.3).
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=workshops/${WID}/governance/terraform.tfstate" \
+  || { echo "ERROR: backend init failed; not destroying." >&2; exit 1; }
+# tofu destroy still prompts for its own approval before deleting (R12.5).
 tofu destroy
 """

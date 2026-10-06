@@ -41,6 +41,13 @@ claim-service/terraform/backend.hcl
 # rebuilt from the handler + frontend on every plan/apply.
 claim-service/terraform/build/
 
-# Governance stack local-only backend config + tfvars (per-account/state + inputs).
+# Governance stack local-only backend config.
 governance/terraform/backend.hcl
-governance/terraform/*.tfvars
+
+# Per-stack tfvars hold local inputs (and sometimes secrets) and must never be
+# committed; the tracked *.tfvars.example templates stay in git. These rules
+# apply to every stack (backend, subscription, foundation, claim-service,
+# governance). Keep the example negation LAST so it always wins.
+**/terraform.tfvars
+**/*.auto.tfvars
+!**/terraform.tfvars.example

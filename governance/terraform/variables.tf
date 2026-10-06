@@ -61,7 +61,7 @@ variable "default_tags" {
   description = "Tags applied to every taggable resource via the aws provider default_tags block."
   type        = map(string)
   default = {
-    Project   = "kiro-subscriptions"
+    Project   = "kiro-provisioning-iac"
     ManagedBy = "opentofu"
     Purpose   = "workshop-account-governance"
   }

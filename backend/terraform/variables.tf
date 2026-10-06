@@ -53,7 +53,7 @@ variable "default_tags" {
   description = "Tags applied to the bucket + lock table."
   type        = map(string)
   default = {
-    Project   = "kiro-subscriptions"
+    Project   = "kiro-provisioning-iac"
     ManagedBy = "opentofu"
     Purpose   = "tofu-remote-state"
     # Shared infra, not attributable per workshop; keeps the cost-allocation tag

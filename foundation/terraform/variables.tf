@@ -30,3 +30,25 @@ variable "default_tags" {
     workshop_id = "shared"
   }
 }
+
+# --- Kiro guardrail SCP ------------------------------------------------------
+
+variable "kiro_allowed_actions" {
+  description = <<-EOT
+    Allowlist of IAM actions the shared Kiro guardrail SCP permits
+    (deny-by-default). The default is a CONSERVATIVE STARTER permitting Kiro +
+    IAM Identity Center sign-in plus read-only basics; it is a single
+    org-standard allowlist tuned ONCE here in foundation and shared by every
+    workshop (widen or narrow it here, not per workshop — see README).
+  EOT
+  type        = list(string)
+  default = [
+    "sso:*",
+    "sso-directory:*",
+    "identitystore:*",
+    "signin:*",
+    "sts:GetCallerIdentity",
+    "codewhisperer:*",
+    "q:*",
+  ]
+}

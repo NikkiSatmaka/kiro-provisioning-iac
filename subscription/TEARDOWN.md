@@ -1,7 +1,14 @@
-# Teardown — remove every Kiro IdC user, group, and subscription
+# Teardown — remove this workshop's Kiro IdC users, groups, and subscription
 
-Goal: wipe this provisioning from the account completely, and have that stay
-possible **a month later, from a different computer**.
+This is the **Teardown** phase of the journey (root [`README.md`](../README.md)):
+it removes one workshop's provisioning. **Prerequisites:** the workshop was
+provisioned (Phase 3); if you deployed the Phase 4 claim service, tear it down
+first with `mise run claim-destroy`.
+
+Goal: wipe **this workshop's** provisioning from the management account
+completely, and have that stay possible **a month later, from a different
+computer** — without ever touching the shared organization IdC instance or any
+other workshop's identities.
 
 There are two paths. **Option B (remote state + `tofu destroy`) is the primary
 one.** **Option A (a state-free discovery script) is the fallback** for when
@@ -14,18 +21,20 @@ one.** **Option A (a state-free discovery script) is the fallback** for when
 
 | Thing | Created by | Removed by |
 | ----- | ---------- | ---------- |
-| IdC users (`kiro-user-NN`) | OpenTofu | Option B or A |
-| IdC groups (`kiro-team-NN`) | OpenTofu | Option B or A |
+| IdC users (`<workshop_id>-…`) | OpenTofu | Option B or A |
+| IdC groups (`<workshop_id>-<group>`) | OpenTofu | Option B or A |
 | Group memberships | OpenTofu | Option B or A |
-| IdC **account instance** | OpenTofu | Option B or A (opt-in) |
+| Permission set / account assignments (only if `enable_account_access` was true) | OpenTofu | Option B |
+| IdC **organization instance** | NOT this stack (adopted read-only) | **NEVER deleted** — shared by every workshop |
 | **Kiro subscriptions / tier assignments** | Kiro console | **Manual** (console) |
 | **Kiro IdC application assignment** | Kiro (service) | **Manual** (console) — not auto-removed |
-| Org "permit account instances" toggle | Mgmt account | **Irreversible** (leave as-is) |
 | Local `output/credentials.md`, `output/otps.csv` | scripts | `rm` by hand |
 
-> The three IdC resource rows are the fully-automatable part. The Kiro
-> subscription and application-assignment rows are console-only on AWS's side —
-> no stable API exists — so every path below ends by pointing you at them.
+> The IdC user/group/membership rows (plus the flag-gated permission set and
+> assignments) are the fully-automatable part. The Kiro subscription and
+> application-assignment rows are console-only on AWS's side — no stable API
+> exists — so every path below ends by pointing you at them. The shared
+> organization instance is never in scope for a per-workshop teardown.
 
 ---
 
@@ -33,8 +42,8 @@ one.** **Option A (a state-free discovery script) is the fallback** for when
 
 `tofu destroy` only deletes what is in its **state**. Local state is git-ignored
 and does **not** travel with the repo. On a fresh clone, local state is empty,
-so `tofu destroy` would delete **nothing** and silently leave every user, group,
-and the instance orphaned. That is why remote S3 state is **required** and set
+so `tofu destroy` would delete **nothing** and silently leave this workshop's
+users and groups orphaned. That is why remote S3 state is **required** and set
 up at provision time (RUNBOOK step 1b) — `backend.tf` is tracked and active, so
 state always lives in S3.
 
@@ -84,19 +93,14 @@ cp terraform/backend.hcl.example terraform/backend.hcl   # edit region
 cd terraform
 tofu init -backend-config=backend.hcl   # one-time on a fresh clone (no task)
 cd ../..
-mise run teardown-tofu                  # tofu destroy: users, groups, memberships, instance
+mise run teardown-tofu                  # tofu destroy: this workshop's users, groups, memberships
 ```
 
 `mise run teardown-tofu` runs `tofu destroy`, which reads the real state from S3
-and deletes the IdC users, groups, memberships, and the account instance. The
-`tofu init` above is only needed once per clone to wire up the S3 backend.
-
-> **You barely need to remember anything** to do this a month later: the bucket
-> name is the derived default `kiro-tofu-state-<account-id>` (so just your
-> **account id**), the lock table is the default `kiro-tofu-locks`, and the
-> **region** matches your `.env`. Store the account id + region somewhere
-> durable if you like, or just regenerate `backend.hcl` with `mise run
-> backend-bootstrap`. If all else fails, fall back to Option A.
+and deletes this workshop's IdC users, groups, and memberships (plus the
+permission set / assignments if `enable_account_access` was true). It never
+touches the shared organization instance, which is not in this stack's state.
+The `tofu init` above is only needed once per clone to wire up the S3 backend.
 
 ### After `tofu destroy`
 
@@ -121,9 +125,8 @@ local state is gone (fresh clone). It needs **no state** — it finds everything
 live from the account by naming convention.
 
 The common cases have mise tasks — `mise run teardown-plan` (dry run) and
-`mise run teardown-run` (delete everything incl. instance). Drop to the raw
-script only for the variants no task covers (keep-the-instance, custom
-prefixes):
+`mise run teardown-run` (delete this workshop's users/groups/memberships). Drop
+to the raw script only for the variants no task covers (custom prefixes):
 
 ```bash
 cd subscription/scripts
@@ -132,29 +135,26 @@ cd subscription/scripts
 # 1. DRY RUN (default, safe) — see exactly what it would delete:
 python teardown.py                           # or: mise run teardown-plan
 
-# 2. Delete users, groups, memberships (keep the account instance) — no task:
-python teardown.py --delete
-
-# 3. Also delete the IdC account instance:
-python teardown.py --delete --delete-instance   # or: mise run teardown-run
+# 2. Delete users, groups, memberships (the shared org instance is always kept):
+python teardown.py --delete                  # or: mise run teardown-run
 ```
 
 Behavior:
 
 - **Dry run by default.** Mutating needs `--delete` **and** typing the
   confirmation phrase `delete kiro provisioning` (or `--yes` for CI).
-- Discovers the account's single IdC instance automatically; matches users by
-  `--user-prefix` (default `kiro-user-`) and groups by `--group-prefix`
-  (default `kiro-team-`). Override if you changed the prefixes in `tfvars`.
-- Deletes in the correct order: memberships → users → groups → (optional)
-  instance.
+- Discovers the organization IdC instance automatically (only to scope the
+  lookup); matches users by `--user-prefix` (default `kiro-user-`) and groups by
+  `--group-prefix` (default `kiro-team-`). Override if you changed the prefixes.
+- Deletes in the correct order: memberships → users → groups. **It never deletes
+  the IdC instance** — there is no `--delete-instance` flag.
 - If you still have `output/manifest.json`, pass `--manifest ../output/manifest.json`
   to use exact ids instead of prefix matching.
 
 ```bash
 # Example: custom prefixes / explicit region, non-interactive
 python teardown.py --user-prefix acme-dev- --group-prefix acme-team- \
-    --region us-east-1 --delete --delete-instance --yes
+    --region us-east-1 --delete --yes
 ```
 
 The script prints the same manual cleanup steps when it finishes.
@@ -173,13 +173,9 @@ path:
    Applications → remove the Kiro application / its assignments. This is the
    piece that lingers if you skip it.
 3. **Delete local secrets.** `rm -f subscription/output/credentials.md subscription/output/otps.csv`.
-4. **Org toggle is irreversible.** The management account's "permit member
-   account instances" setting (RUNBOOK step 0) cannot be turned back off. There
-   is nothing to clean up — just know it stays enabled.
-
-> If you deleted the account instance (either option with instance deletion),
-> items 1–2 may already be gone with it. Verify in both the Kiro and IAM
-> Identity Center consoles.
+4. **Do NOT disable IAM Identity Center** to clean up one workshop. The
+   organization instance is shared by every workshop; disabling it is a
+   deliberate, standalone console action, never part of a per-workshop teardown.
 
 ---
 
@@ -190,7 +186,7 @@ prompt; `teardown-plan` is a safe dry run.
 
 ```bash
 mise run teardown-plan    # Option A DRY RUN — report only, no changes
-mise run teardown-run     # Option A — delete users/groups/memberships + instance (confirms)
+mise run teardown-run     # Option A — delete this workshop's users/groups/memberships (confirms)
 mise run teardown-tofu    # Option B — tofu destroy (confirms)
 ```
 
@@ -204,4 +200,5 @@ Start with `mise run teardown-plan` to see exactly what would be removed.
   It's the clean, auditable path and the one the repo is designed around.
 - **Keep Option A as the safety net.** If you're reading this a month later on a
   new laptop and don't have the state or the bucket name, `python teardown.py`
-  will still find and remove everything. Then do the manual console steps.
+  will still find and remove this workshop's identities. Then do the manual
+  console steps.

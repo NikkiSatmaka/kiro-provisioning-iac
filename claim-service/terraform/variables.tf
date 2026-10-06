@@ -2,14 +2,20 @@
 # Input variables for the Credential Claim Service stack
 # =============================================================================
 #
-# These five inputs parameterize the single table, the Lambda, and its abuse
-# gate. Names line up with what the rest of the stack and the handler expect:
-# `table_name` feeds dynamodb.tf (`var.table_name`), and `workshop_code`,
-# `allowed_origin`, `retry_bound`, and `per_ip_cap` are wired into the Lambda's
-# TABLE_NAME / WORKSHOP_CODE / ALLOWED_ORIGIN / RETRY_BOUND / PER_IP_CAP
-# environment variables in lambda.tf (design: "Lambda packaging and
-# configuration"). The handler reads each with a sensible fallback, so only
-# `workshop_code` is strictly required at apply time.
+# These inputs parameterize the single table, the Lambda, and its abuse gate.
+# `workshop_id` is the namespace: every claim resource name derives from
+# `local.name = credential-claim-<workshop_id>` (dynamodb.tf / lambda.tf), so
+# the table name is no longer a direct input. `workshop_code`, `allowed_origin`,
+# `retry_bound`, and `per_ip_cap` are wired into the Lambda's TABLE_NAME /
+# WORKSHOP_CODE / ALLOWED_ORIGIN / RETRY_BOUND / PER_IP_CAP environment
+# variables in lambda.tf (design: "Lambda packaging and configuration"). The
+# handler reads each with a sensible fallback, so only `workshop_id` and
+# `workshop_code` are strictly required at apply time.
+#
+# `workshop_id` (the namespace) and `workshop_code` (the handler access-gate
+# secret) are deliberately distinct values: `workshop_id` is never used for
+# access-gate validation, and `workshop_code` is never used in a resource name
+# or state key (design: "workshop_id vs workshop_code coexist", R9.3/R9.4).
 # =============================================================================
 
 variable "aws_region" {
@@ -23,10 +29,37 @@ variable "aws_region" {
   default     = ""
 }
 
-variable "table_name" {
-  description = "Name of the single DynamoDB table backing the service (CRED#/EMAIL#/RATE# items share it)."
+variable "aws_profile" {
+  description = "AWS CLI/SDK profile (MUST be a management-account profile). Empty falls back to the AWS_PROFILE env / default chain."
   type        = string
-  default     = "credential-claim-service"
+  default     = ""
+}
+
+variable "default_tags" {
+  description = "Tags applied to every taggable resource via the aws provider default_tags block."
+  type        = map(string)
+  default = {
+    Project   = "kiro-provisioning-iac"
+    Service   = "claim-service"
+    ManagedBy = "opentofu"
+  }
+}
+
+variable "workshop_id" {
+  description = <<-EOT
+    Slug that namespaces this workshop's claim resources and state key, e.g.
+    kiro-2025-10-10. Threaded from WORKSHOP_ID via TF_VAR_workshop_id. Every
+    claim resource name derives from it through
+    local.name = "credential-claim-$${workshop_id}". Distinct from
+    workshop_code (the claim access-gate secret) — the namespace is never the
+    access gate.
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", var.workshop_id)) && !can(regex("--", var.workshop_id))
+    error_message = "workshop_id must be a slug: 1-63 lowercase alphanumeric characters and hyphens, starting and ending alphanumeric, with no consecutive hyphens."
+  }
 }
 
 variable "workshop_code" {

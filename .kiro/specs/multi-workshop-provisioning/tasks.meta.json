@@ -1,0 +1,576 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Remove the created instance and awscc provider": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187317761
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187328195
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187899364
+      }
+    ],
+    "1.2 Add the Foundation IdC input variables": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187317830
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187917525
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188019285
+      }
+    ],
+    "1.3 Point the foundation locals at the variables": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187317874
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187918009
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188020225
+      }
+    ],
+    "1.4 Add the shared permission set and per-group account assignments": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187317912
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188025107
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188173705
+      }
+    ],
+    "1.5 Write integration test: Foundation IdC inputs and assignment wiring": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187317963
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188180856
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791189936750
+      }
+    ],
+    "1.6 Write property test: every group maps to exactly one account assignment": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318011
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188181727
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791189937632
+      }
+    ],
+    "2. Checkpoint - Pillar 1 (Foundation IdC consumption)": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318060
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206227270
+      }
+    ],
+    "3.1 Add `workshop_accounts` and `workshop_id` variables; remove the generators": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318112
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188182963
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791189938839
+      }
+    ],
+    "3.2 Rewrite `locals.tf` to flatten `workshop_accounts`": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318182
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791189943914
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791202595393
+      }
+    ],
+    "3.3 Thread per-user account_id and surface workshop_id in outputs": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318228
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791202600626
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203010179
+      }
+    ],
+    "3.4 Write property test: user and membership counts equal the declared user_count": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318278
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203032752
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203677972
+      }
+    ],
+    "3.5 Write property test: flatten keys are deterministic and locally stable": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318329
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203034164
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203679227
+      }
+    ],
+    "3.6 Write property test: flattened maps match the for_each value shapes": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318386
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203035081
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203680627
+      }
+    ],
+    "3.7 Write property test: each participant's account_id is its owning account": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318432
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203036542
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203681591
+      }
+    ],
+    "3.8 Write integration/example test: variable validations and removed-variable supersession": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318482
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203690030
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205110622
+      }
+    ],
+    "4. Checkpoint - Pillar 2 (nested map + per-user account resolution)": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318531
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206228649
+      }
+    ],
+    "5.1 Remove the key line from the backend configs": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318577
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188026037
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188175112
+      }
+    ],
+    "5.2 Render a keyless backend body": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318629
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188027155
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791188175855
+      }
+    ],
+    "5.3 Parameterize the mise tasks on WORKSHOP_ID": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318679
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203688963
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205111999
+      }
+    ],
+    "5.4 Write property test: state keys follow the workshop-scoped scheme": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318730
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205119889
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205740366
+      }
+    ],
+    "5.5 Write property test: the slug validator accepts exactly the slug grammar": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318780
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205120845
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205741760
+      }
+    ],
+    "5.6 Write smoke/integration test: keyless backend.hcl and init-time key": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318829
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205122621
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205743196
+      }
+    ],
+    "6. Checkpoint - Pillar 3 (workshop-keyed state + mise tasks)": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318867
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206229796
+      }
+    ],
+    "7.1 Add var.workshop_id and derive claim resource names": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318915
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791202601626
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203008980
+      }
+    ],
+    "7.2 Resolve the seed/audit table name from workshop_id with a not-found path": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187318963
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203037546
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203682858
+      }
+    ],
+    "7.3 Write property test: distinct workshop_ids yield fully distinct names and state keys": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187319012
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205123957
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205744576
+      }
+    ],
+    "7.4 Write property test: workshop_id is the sole namespace; workshop_code never namespaces": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187319063
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205124689
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205745428
+      }
+    ],
+    "7.5 Write property test: claim response excludes account_id": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187319109
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205751128
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206012621
+      }
+    ],
+    "7.6 Write example test: seed/audit table resolution and not-found path": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187319166
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205753459
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206013996
+      }
+    ],
+    "8. Checkpoint - Pillar 4 (per-workshop claim service)": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187319244
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206231231
+      }
+    ],
+    "9.1 Create verify_isolation.py with baseline/verify phases and a pure diff": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187319300
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791203687793
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205112959
+      }
+    ],
+    "9.2 Write property test: isolation diff flags any removal or modification": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187319348
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205752509
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206014897
+      }
+    ],
+    "10. Final checkpoint - full pipeline": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791187319397
+      },
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206231980
+      }
+    ],
+    "1. Pillar 1 — Consume the Foundation IdC": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791189937683
+      }
+    ],
+    "3. Pillar 2 — Explicit nested account > groups > users map": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205110736
+      }
+    ],
+    "5. Pillar 3 — Workshop-keyed state in the shared S3 backend": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791205743261
+      }
+    ],
+    "7. Pillar 4 — One claim service per workshop": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206014046
+      }
+    ],
+    "9. Pillar 5 — Teardown + cross-workshop isolation": [
+      {
+        "executionId": "23f8e4d3-2f2a-4c56-acee-b14cf32a8322",
+        "chatSessionId": "sess_1c4932be-86bb-4649-805a-612b811d54ad",
+        "timestamp": 1791206014945
+      }
+    ]
+  }
+}

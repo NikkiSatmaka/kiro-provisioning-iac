@@ -4,8 +4,8 @@
 
 variable "aws_region" {
   description = <<-EOT
-    Region to create the IAM Identity Center account instance in. Must be a
-    region Kiro supports for IdC.
+    Region of the management-account IAM Identity Center organization instance
+    this stack writes identities into. Must be a region Kiro supports for IdC.
 
     Leave empty (the default) to inherit AWS_REGION from the environment —
     mise sources it from the git-ignored .env file, so change the region there
@@ -17,9 +17,25 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS CLI/SDK profile to use. Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
+  description = "AWS CLI/SDK profile to use (MUST be a management-account profile). Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
   type        = string
   default     = ""
+}
+
+# ---------------------------------------------------------------------------
+# Account-access gate
+# ---------------------------------------------------------------------------
+
+variable "enable_account_access" {
+  description = <<-EOT
+    When false (default), create NO permission sets and NO account
+    assignments: users are Kiro-login-only with zero AWS console access.
+    When true, create a shared permission set and one account assignment
+    per group binding it to that group's owning account id. Flip to true
+    only when deliberately granting console access.
+  EOT
+  type        = bool
+  default     = false
 }
 
 variable "default_tags" {
@@ -32,128 +48,94 @@ variable "default_tags" {
   }
 }
 
-variable "instance_name" {
-  description = "Name for the IAM Identity Center account instance (shown in the console)."
-  type        = string
-  default     = "kiro-login"
-}
-
 # ---------------------------------------------------------------------------
-# Naming: prefix + zero-padded sequence
+# Foundation IdC (consumed, never created)
 # ---------------------------------------------------------------------------
 
-variable "user_prefix" {
-  description = "Prefix for IdC usernames. Final name = <user_prefix><NN> where NN is a zero-padded sequence."
-  type        = string
-  default     = "kiro-user-"
-}
-
-variable "group_prefix" {
-  description = "Prefix for IdC group names. Final name = <group_prefix><NN>."
-  type        = string
-  default     = "kiro-team-"
-}
-
-variable "sequence_padding" {
-  description = "How many digits to zero-pad the sequence to. 2 => 01, 02, ... ; 3 => 001, 002, ..."
-  type        = number
-  default     = 2
-
-  validation {
-    condition     = var.sequence_padding >= 1 && var.sequence_padding <= 6
-    error_message = "sequence_padding must be between 1 and 6."
-  }
-}
-
-variable "sequence_start" {
-  description = "First sequence number (inclusive). Usually 1."
-  type        = number
-  default     = 1
-}
-
-# ---------------------------------------------------------------------------
-# Counts
-# ---------------------------------------------------------------------------
-
-variable "user_count" {
-  description = "How many IdC users to create."
-  type        = number
-  default     = 1
-
-  validation {
-    condition     = var.user_count >= 0 && var.user_count <= 500
-    error_message = "user_count must be between 0 and 500."
-  }
-}
-
-variable "group_count" {
-  description = "How many IdC groups to create."
-  type        = number
-  default     = 1
-
-  validation {
-    condition     = var.group_count >= 0 && var.group_count <= 100
-    error_message = "group_count must be between 0 and 100."
-  }
-}
-
-# ---------------------------------------------------------------------------
-# User attributes
-# ---------------------------------------------------------------------------
-
-variable "user_emails" {
+variable "idc_instance_arn" {
   description = <<-EOT
-    OPTIONAL map of padded-sequence key => email address, e.g.
-    { "01" = "alice@corp.com", "02" = "bob@corp.com" }.
-
-    Keys MUST match the generated sequence keys ("01", "02", ... per
-    sequence_padding / sequence_start). Any user without an entry is created
-    anonymously, with no email set. The default (empty map) leaves every user
-    anonymous — which is the normal flow for OTP sign-in.
-
-    Only populate this for users who genuinely need an email on their IdC
-    record (e.g. the console "send email" password flow).
-  EOT
-  type        = map(string)
-  default     = {}
-
-  validation {
-    # Keys must be a subset of the generated sequence keys, so a typo'd or
-    # out-of-range key fails loudly instead of being silently ignored.
-    condition = alltrue([
-      for k in keys(var.user_emails) :
-      contains([for i in range(var.user_count) : format("%0${var.sequence_padding}d", i + var.sequence_start)], k)
-    ])
-    error_message = "Every user_emails key must match a generated sequence key (e.g. \"01\" ... up to user_count). Check sequence_padding, sequence_start, and user_count."
-  }
-}
-
-variable "display_name_template" {
-  description = "Template for a user's display name. {seq} is replaced by the padded sequence, {name} by the full username."
-  type        = string
-  default     = "Kiro User {seq}"
-}
-
-# ---------------------------------------------------------------------------
-# Membership strategy: how users map into groups
-# ---------------------------------------------------------------------------
-
-variable "membership_strategy" {
-  description = <<-EOT
-    How to assign users to groups:
-      "all_in_first" - every user joins the first group (group_count can be 1).
-      "round_robin"  - users are spread evenly across all groups.
-      "none"         - create users and groups but no memberships.
-    Kiro subscriptions are assigned per GROUP, so every user that needs Kiro
-    must belong to at least one subscribed group. "all_in_first" is the simplest
-    setup for a single-tier team.
+    ARN of the long-lived Foundation IdC instance to consume
+    (arn:aws:sso:::instance/ssoins-xxxxxxxxxxxx). Supplied via tfvars or
+    TF_VAR_idc_instance_arn. This module NEVER creates or destroys the instance.
   EOT
   type        = string
-  default     = "all_in_first"
 
   validation {
-    condition     = contains(["all_in_first", "round_robin", "none"], var.membership_strategy)
-    error_message = "membership_strategy must be one of: all_in_first, round_robin, none."
+    condition     = length(trimspace(var.idc_instance_arn)) > 0
+    error_message = "idc_instance_arn is required (the Foundation IdC instance ARN). Set it in tfvars or via TF_VAR_idc_instance_arn."
+  }
+}
+
+variable "identity_store_id" {
+  description = <<-EOT
+    Identity store ID backing the Foundation IdC instance (d-xxxxxxxxxx).
+    Supplied via tfvars or TF_VAR_identity_store_id. Users, groups, and
+    memberships are created against this identity store.
+  EOT
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.identity_store_id)) > 0
+    error_message = "identity_store_id is required (the Foundation IdC identity store ID). Set it in tfvars or via TF_VAR_identity_store_id."
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Workshop namespace + topology
+# ---------------------------------------------------------------------------
+
+variable "workshop_id" {
+  description = <<-EOT
+    Slug that namespaces this workshop's state key and resource names, e.g.
+    kiro-2025-10-10. Threaded from WORKSHOP_ID via TF_VAR_workshop_id. Distinct
+    from workshop_code (the claim access-gate secret).
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", var.workshop_id)) && !can(regex("--", var.workshop_id))
+    error_message = "workshop_id must be a slug: 1-63 lowercase alphanumeric characters and hyphens, starting and ending alphanumeric, with no consecutive hyphens."
+  }
+}
+
+variable "workshop_accounts" {
+  description = <<-EOT
+    Explicit nested map describing this workshop's member accounts, the groups
+    in each account, and the user count of each group. Keyed by 12-digit account
+    id. Replaces the removed count/prefix/strategy generators.
+
+    The account id is billing/attribution metadata, NOT an access grant: it is
+    the target an account assignment binds to only when enable_account_access is
+    true. When the flag is false (the default) these ids grant no console access
+    whatsoever. Access is governed solely by enable_account_access.
+  EOT
+  type = map(object({
+    groups = map(object({
+      user_count = number
+    }))
+  }))
+
+  validation {
+    condition     = alltrue([for acct in keys(var.workshop_accounts) : can(regex("^[0-9]{12}$", acct))])
+    error_message = "Every workshop_accounts key must be a 12-digit AWS account id."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for acct, cfg in var.workshop_accounts : [
+        for gname, g in cfg.groups : length(trimspace(gname)) > 0
+      ]
+    ]))
+    error_message = "Every group name in workshop_accounts must be non-empty."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for acct, cfg in var.workshop_accounts : [
+        for gname, g in cfg.groups : g.user_count >= 0 && g.user_count <= 500
+      ]
+    ]))
+    error_message = "Every group's user_count must be between 0 and 500 inclusive."
   }
 }
 
@@ -171,8 +153,9 @@ variable "kiro_tier" {
     error_message = "kiro_tier must be one of: PRO, PRO_PLUS, PRO_MAX, POWER."
   }
 }
+
 # ---------------------------------------------------------------------------
-# IdC region + account mapping
+# IdC region (sign-in instruction only)
 # ---------------------------------------------------------------------------
 
 variable "kiro_region" {
@@ -185,23 +168,4 @@ variable "kiro_region" {
   EOT
   type        = string
   default     = "us-east-1"
-}
-
-variable "idc_account_map" {
-  description = <<-EOT
-    Maps each IdC to its child AWS account ID (12-digit string). Supports
-    management-account-style IdC creation where a child account is associated.
-    Keyed by an IdC key; this repo provisions one IdC account instance per run,
-    so the common case is a single entry under the key "default". Every
-    provisioned user resolves to the account of the IdC they belong to.
-  EOT
-  type        = map(string)
-  default     = {}
-
-  validation {
-    condition = alltrue([
-      for v in values(var.idc_account_map) : can(regex("^[0-9]{12}$", v))
-    ])
-    error_message = "Every idc_account_map value must be a 12-digit AWS account ID."
-  }
 }

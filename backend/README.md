@@ -1,7 +1,12 @@
-# Shared remote-state backend (FUNCTION 1)
+# Phase 1 — Shared remote-state backend
 
-The S3 bucket + DynamoDB lock table that hold the other stacks' OpenTofu state.
-Run this **once per account**, before the `subscription/` stack.
+This is **Phase 1** of the root README journey: the S3 bucket + DynamoDB lock
+table that hold the other stacks' OpenTofu state. Run it **once per account**,
+before the `subscription/` stack.
+
+- **Prerequisites:** Phase 0 (toolchain + management-account AWS auth) — see the
+  root [`README.md`](../README.md).
+- **Next:** Phase 2 — Foundation ([`../foundation/README.md`](../foundation/README.md)).
 
 ## Why it exists (and why its own state)
 
@@ -58,6 +63,29 @@ mise run backend-destroy   # flips force_destroy=true, empties + deletes the buc
 
 See [`../subscription/TEARDOWN.md`](../subscription/TEARDOWN.md) ("Option B")
 for the full order.
+
+## Cost allocation
+
+Every stack stamps a `workshop_id` tag on every taggable resource via the
+provider's `default_tags`. The workshop-scoped stacks (`subscription/`,
+`claim-service/`, `governance/`) use the real workshop id, so their costs
+attribute per workshop in Cost Explorer / CUR. The shared stacks (`backend/`
+and this remote-state backend, plus `foundation/`'s IdC instance) stamp
+`workshop_id = "shared"`: a single S3 state bucket, DynamoDB lock table, and
+IdC instance back **every** workshop, so their (negligible) cost is shared
+overhead that cannot be split per workshop.
+
+**One-time manual activation (management account).** A user-defined tag does
+nothing for cost reporting until it is activated once in the Billing console —
+this is not a reliable Terraform resource/API, so it stays a manual step:
+
+> **Billing → Cost allocation tags → User-defined cost allocation tags →**
+> select **`workshop_id`** → **Activate**.
+
+After activation, AWS begins populating the tag in Cost Explorer and the CUR
+going forward (it is not retroactive). From then on you can group or filter cost
+by `workshop_id` to see each workshop's spend, with `shared` collecting the
+backend/foundation overhead.
 
 ## State note
 

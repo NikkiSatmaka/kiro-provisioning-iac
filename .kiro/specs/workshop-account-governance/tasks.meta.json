@@ -1,0 +1,399 @@
+{
+  "pbtResults": {
+    "5.5 Property test — every notification email is subscribed notify-only on every budget": {
+      "status": "passed",
+      "lastRunTimestamp": 1791260669234
+    },
+    "5.4 Property test — each budget action freezes only its own account": {
+      "status": "passed",
+      "lastRunTimestamp": 1791261806293
+    }
+  },
+  "executionHistory": {
+    "1. Scaffold the stack skeleton and wire provider + backend": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246508
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258255623
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258383910
+      }
+    ],
+    "2.1 Author all input variables with their validations": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246575
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258388176
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259204150
+      }
+    ],
+    "2.2 Confirm the negative-validation behavior": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246640
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259210094
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259432299
+      }
+    ],
+    "3. Implement `organizations.tf` — the OU and account placement": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246677
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259211263
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259433236
+      }
+    ],
+    "4.1 Author the Kiro guardrail and freeze SCPs": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246723
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259212448
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259434645
+      }
+    ],
+    "4.2 Property test — guardrail renders exactly the supplied allowlist": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246761
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259440033
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259708321
+      }
+    ],
+    "5.1 Author the budgets execution role (least privilege + confused-deputy guard)": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246811
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259213609
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259435697
+      }
+    ],
+    "5.2 Author the per-account budgets": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246876
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259440957
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259707569
+      }
+    ],
+    "5.3 Author the per-account AUTOMATIC SCP freeze actions": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246910
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259713666
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791260007669
+      }
+    ],
+    "5.4 Property test — each budget action freezes only its own account": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246957
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791260013905
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791261968020
+      }
+    ],
+    "5.5 Property test — every notification email is subscribed notify-only on every budget": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258246994
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791260015671
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791261969072
+      }
+    ],
+    "6. Checkpoint — stack config validates end to end": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258247042
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791262517126
+      },
+      {
+        "executionId": "d91ae261-6d0e-45a2-a6d6-fd6671c1c2a4",
+        "chatSessionId": "sess_fda04a96-e3d7-4d8c-ada5-b22e727b14a6",
+        "timestamp": 1791264775273
+      },
+      {
+        "executionId": "d91ae261-6d0e-45a2-a6d6-fd6671c1c2a4",
+        "chatSessionId": "sess_fda04a96-e3d7-4d8c-ada5-b22e727b14a6",
+        "timestamp": 1791264782245
+      },
+      {
+        "executionId": "d91ae261-6d0e-45a2-a6d6-fd6671c1c2a4",
+        "chatSessionId": "sess_fda04a96-e3d7-4d8c-ada5-b22e727b14a6",
+        "timestamp": 1791265057909
+      }
+    ],
+    "7. Implement `outputs.tf`": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258247090
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791260012469
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791261967105
+      }
+    ],
+    "8.1 Add `governance-plan`, `governance-apply`, and `governance-destroy` to `mise.toml`": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258247141
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791261974969
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791262153221
+      }
+    ],
+    "8.2 Confirm the guards fail closed": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258247190
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791262158155
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791262507647
+      }
+    ],
+    "9. Extend the `backend/` bootstrap for governance": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258247238
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258389135
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259205146
+      }
+    ],
+    "10.1 Write `governance/README.md`": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258247279
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791261975904
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791262152371
+      }
+    ],
+    "10.2 Write `governance/RUNBOOK.md`": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258247322
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791261977309
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791262150029
+      }
+    ],
+    "10.3 Update the root `README.md`": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258247372
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791261978067
+      },
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791262150922
+      }
+    ],
+    "11. Final checkpoint — whole-stack verification (no apply)": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791258247410
+      },
+      {
+        "executionId": "d91ae261-6d0e-45a2-a6d6-fd6671c1c2a4",
+        "chatSessionId": "sess_fda04a96-e3d7-4d8c-ada5-b22e727b14a6",
+        "timestamp": 1791265061945
+      },
+      {
+        "executionId": "d91ae261-6d0e-45a2-a6d6-fd6671c1c2a4",
+        "chatSessionId": "sess_fda04a96-e3d7-4d8c-ada5-b22e727b14a6",
+        "timestamp": 1791265415895
+      }
+    ],
+    "2. Define `variables.tf` with all inputs and validations": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259432370
+      }
+    ],
+    "4. Implement `scps.tf` — guardrail (attached) and freeze (unattached) SCPs": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791259708367
+      }
+    ],
+    "5. Implement `budgets.tf` — execution role, per-account budgets, and SCP actions": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791261969107
+      }
+    ],
+    "10. Author the documentation": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791262152408
+      }
+    ],
+    "8. Add the governance `mise` lifecycle tasks": [
+      {
+        "executionId": "6dd52754-9f4a-4a61-bbcf-b3b5b5200001",
+        "chatSessionId": "sess_acc77677-a294-49b9-9bfe-f327795ff5a9",
+        "timestamp": 1791262507725
+      }
+    ]
+  }
+}

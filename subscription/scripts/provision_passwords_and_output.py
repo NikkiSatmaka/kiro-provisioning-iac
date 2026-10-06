@@ -90,7 +90,8 @@ def _load_manifest(path: pathlib.Path) -> dict:
                  "Terraform from the identity store id; re-export the manifest "
                  "(tofu output -json provisioning_manifest > manifest.json).")
 
-    # `kiro_region` (Kiro sign-in region) and `account_id` (child AWS account)
+    # `kiro_region` (Kiro sign-in region) and `account_id` (member AWS account,
+    # billing attribution only — not an access grant)
     # are NEWER manifest fields. They are deliberately NOT in `required` above:
     # manifests exported before this change must still load. Normalize them here
     # so downstream (`_render`) can read them unconditionally.
@@ -141,7 +142,7 @@ def _render(manifest: dict, otps: dict[str, str], note: str) -> str:
     # distinct from the deployment/resources region. _load_manifest already falls
     # back to `region` for old manifests, so `.get(...) or region` is defensive.
     kiro_region = manifest.get("kiro_region") or region
-    # Document-level child AWS account ID. Empty/absent renders as a dash.
+    # Document-level member AWS account ID (billing attribution). Empty/absent renders as a dash.
     account_id = manifest.get("account_id") or "—"
     identity_store_id = manifest["identity_store_id"]
     tier = manifest.get("kiro_tier", "(set in tfvars)")
@@ -191,7 +192,7 @@ def _render(manifest: dict, otps: dict[str, str], note: str) -> str:
         # email is optional (anonymous users have none). Null/missing => dash,
         # so the table never prints a literal "None".
         email = u.get("email") or "—"
-        # Per-user child AWS account ID (R6.2, R6.3). Empty/absent renders a dash.
+        # Per-user member AWS account ID for billing attribution (R6.2, R6.3). Empty/absent renders a dash.
         user_account_id = u.get("account_id") or "—"
         grp = ", ".join(g for g in user_groups.get(uname, []) if g) or "—"
         otp = otps.get(uname, "")

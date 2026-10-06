@@ -1,5 +1,8 @@
 # Credential Claim Service
 
+This is the optional self-serve path of **Phase 4 — Distribute** (root
+[`README.md`](../README.md)).
+
 Self-serve, race-proof distribution of pre-provisioned Kiro IAM Identity Center
 credentials to workshop participants. Participants scan a QR code (or open a
 short link), enter their email and a workshop code, and receive exactly one
@@ -9,6 +12,15 @@ is handed out twice and no email claims twice.
 This is an opt-in, self-contained subtree with its own OpenTofu state. It does
 not alter or depend on the `../subscription/` provisioning flow and can be torn
 down independently without touching provisioned identities.
+
+It deploys in the AWS Organizations **management account**, alongside every
+other stack. Many workshops' claim services coexist there side by side: every
+resource name derives from `local.name = credential-claim-<workshop_id>`, so
+each workshop gets its own table, Lambda, Function URL, IAM role, and policy
+with an independent lifecycle, and its spend is attributable through the
+unconditional `workshop_id` cost tag. One Function URL serves one workshop; a
+single workshop can serve participants across multiple member accounts.
+`AWS_PROFILE` must be a management-account profile.
 
 The full requirements and design live in the specs, not here:
 
@@ -55,6 +67,11 @@ API Gateway + Route 53 + ACM, which this service deliberately avoids.)
 
 ## Prerequisites
 
+**Phase 3 provisioning must be complete first.** The seed step consumes the
+Subscription→Claim handoff files — `../../subscription/output/otps.csv` and
+`../../subscription/output/manifest.json` — so they must already exist (the
+"Notes on the steps" Seed bullet below names the same files).
+
 From the repo root, once:
 
 ```bash
@@ -65,7 +82,10 @@ cp .env.example .env  # then edit .env
 
 In `.env` set at least:
 
-- `AWS_PROFILE` / `AWS_REGION` — region defaults to `us-east-1`.
+- `AWS_PROFILE` / `AWS_REGION` — `AWS_PROFILE` must be a management-account
+  profile; region defaults to `us-east-1`. The provider also accepts an explicit
+  `aws_profile` variable (empty by default, falling back to `AWS_PROFILE` / the
+  SDK chain), mirroring the other stacks.
 - `WORKSHOP_CODE` — the shared gate secret for this workshop (required by deploy).
 
 The remote state bucket must already exist (created by the `backend/` stack —
@@ -113,6 +133,10 @@ All are run from the repo root.
   git-ignored because the rows contain participant emails (PII).
 - **Region** everywhere is derived from `AWS_REGION` (default `us-east-1`); it is
   never hardcoded in the handler, scripts, or Terraform.
+
+> **Next:** Teardown — see [`../subscription/TEARDOWN.md`](../subscription/TEARDOWN.md);
+> `mise run claim-destroy` tears down just this stack (never touches
+> `subscription/` identities).
 
 ## Testing it: local vs. deployed
 

@@ -49,7 +49,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 }
 
 resource "aws_iam_role" "claim_handler" {
-  name               = "${var.table_name}-lambda"
+  name               = "${local.name}-lambda"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 
@@ -81,7 +81,7 @@ data "aws_iam_policy_document" "claim_table_access" {
 }
 
 resource "aws_iam_role_policy" "claim_table_access" {
-  name   = "${var.table_name}-table-access"
+  name   = "${local.name}-table-access"
   role   = aws_iam_role.claim_handler.id
   policy = data.aws_iam_policy_document.claim_table_access.json
 }
@@ -90,7 +90,7 @@ resource "aws_iam_role_policy" "claim_table_access" {
 # The function
 # ---------------------------------------------------------------------------
 resource "aws_lambda_function" "claim_handler" {
-  function_name = var.table_name
+  function_name = local.name
   role          = aws_iam_role.claim_handler.arn
 
   runtime = "python3.12"

@@ -1,5 +1,17 @@
 # Design Document
 
+> **⚠️ Superseded in part — management-account consolidation.** This document
+> describes the region/account mapping against foundation's old design, in which
+> the stack *created* one `awscc_sso_instance.this` **account instance** per run
+> in a member/child account. A later locked decision makes foundation **adopt
+> (read)** the management account's existing **organization** instance via
+> `data "aws_ssoadmin_instances"` instead — it creates no instance. The
+> per-user/per-group `account_id` values this mapping produces are now
+> **billing/attribution metadata** (and the gated assignment target when
+> `enable_account_access` is true), not a console-access grant. Read "account
+> instance"/"child account" here against the authoritative current design in
+> `.agents/tasks/management-account-consolidation-plan.md`.
+
 ## Overview
 
 This design implements two coordinated changes across the kiro-provisioning-iac

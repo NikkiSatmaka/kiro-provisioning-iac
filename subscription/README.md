@@ -1,18 +1,29 @@
-# Kiro Subscription Provisioning (IAM Identity Center — account instance)
+# Kiro Subscription Provisioning (management-account organization IdC)
+
+This is **Phase 3** of the root README journey.
+
+- **Prerequisites:** Phase 2 foundation adopt done and its two IDs wired forward
+  ([`../foundation/README.md`](../foundation/README.md)) — this stack consumes
+  `idc_instance_arn` / `identity_store_id`.
+- **Next:** Phase 4 — Distribute ([`../claim-service/README.md`](../claim-service/README.md)),
+  or the direct-handout path ([`RUNBOOK.md`](./RUNBOOK.md) Step 6).
 
 Infrastructure-as-Code (**OpenTofu**) + Python tooling to provision **Kiro
-enterprise subscriptions** for a team in a single AWS account, using an **IAM
-Identity Center _account instance_** as the identity source.
+enterprise subscriptions** for a workshop's users in the AWS Organizations
+**management account**, using its **IAM Identity Center _organization
+instance_** as the identity source.
 
-The identity users this creates are intended for **Kiro login only** — they are
-not granted any AWS account access (no permission sets, no account assignments).
+The identity users this creates are, by default, intended for **Kiro login
+only** — they are granted **zero AWS console access**. No permission sets and no
+account assignments exist unless you deliberately flip `enable_account_access`
+to `true`.
 
 > ⚠️ **Nothing here runs automatically.** Every step is manual or driven by an
 > explicit entrypoint you invoke. [`RUNBOOK.md`](./RUNBOOK.md) is the
 > end-to-end run order, including the steps AWS only exposes through the console.
 
 **Scope of this doc.** This README explains the subscription stack itself — what
-it provisions, why an account instance, the AWS platform limits, and the
+it provisions, where the identities live, the AWS platform limits, and the
 reusability knobs. For the overall repo journey (toolchain setup, the shared
 state backend, and distributing the result), start at the
 [root `README.md`](../README.md). To run the subscription steps in order, use
@@ -22,13 +33,17 @@ state backend, and distributing the result), start at the
 
 ## What this provisions
 
-For a given account, region, and a requested count `N`:
+For a given set of workshop accounts and group/user counts:
 
-1. **An IAM Identity Center _account instance_** in the target (child) account.
-2. **`N` IdC users**, named `<user_prefix><NN>` (zero-padded sequence).
-3. **`M` IdC groups**, named `<group_prefix><NN>` (zero-padded sequence).
-4. **Group memberships** — users distributed across the groups (round-robin, or
-   all-in-one, configurable).
+1. **IdC users** in the management-account organization instance, named
+   `<workshop_id>-<acct_last4>-<group>-<NN>` (workshop-namespaced).
+2. **IdC groups**, with workshop-namespaced display names
+   `<workshop_id>-<group>` so many workshops coexist in the one shared directory.
+3. **Group memberships** — each user placed in its own group.
+4. **(Optional, gated) account access** — when `enable_account_access = true`, a
+   single shared permission set and one account assignment per group, binding
+   each group to its owning member account id. **Off by default**, so users get
+   zero console access.
 5. **A Kiro subscription per group** — see the big caveat below; this is the one
    step AWS does not expose as a stable, scriptable API.
 6. **Passwords** — a one-time-password (OTP) workflow per user; IdC does **not**
@@ -42,37 +57,37 @@ distribution phase, owned by the root README and `../claim-service/`.
 
 ---
 
-## Why an _account_ instance (not the org instance)
+## Where the identities live (the one organization instance)
 
-This account (`<TARGET_ACCOUNT_ID>` — the child/member account you are
-provisioning into) is a **member** of an AWS
-Organization whose **management account already has an _organization_ instance**
-of Identity Center. You asked for IdC set up **in this child account**.
+All stacks in this repo now provision under the AWS Organizations **management
+account**. Identities are created in that account's single **organization**
+Identity Center instance — the one the `foundation/` stack adopts (reads) and
+hands forward via `idc_instance_arn` / `identity_store_id`. This stack consumes
+that instance; it never creates or destroys it.
 
-AWS allows exactly that: a member account can create its own **account
-instance** of Identity Center (one per account per region), isolated to that
-single account. This is the correct choice when:
+Because **many workshops' users and groups coexist in this one shared
+directory**, names are workshop-namespaced:
 
-- You want the identities scoped to this one account only (Kiro login, nothing
-  else).
-- You do **not** want to touch the org-wide instance in the management account.
+- Usernames carry the `workshop_id` prefix (and the owning account's last four
+  digits).
+- Group **display names** are prefixed `"<workshop_id>-"` so two workshops can
+  reuse a plain group name (e.g. `team-a`) without colliding.
 
-**Preconditions and limits (verified against AWS docs):**
+The `workshop_accounts` map's account ids are **billing/attribution metadata
+only** — they identify which member account a group is attributed to and are the
+assignment target used **only** when `enable_account_access` is `true`. With the
+flag `false` (the default) they grant no console access whatsoever.
 
-- The **org management account must have _permitted member-account instance
-  creation_** — a one-time, irreversible org-level toggle. If it has not, the
-  `CreateInstance` call from this child account is denied. This repo **cannot**
-  flip that toggle for you (it lives in the management account). See
-  [`RUNBOOK.md`](./RUNBOOK.md) step 0.
-- One account instance per account per region.
-- Account instances support **fewer features** than org instances, but **Kiro
-  subscriptions are supported** on account instances.
-- An account instance **cannot be upgraded** to an org instance later — it would
-  have to be deleted and recreated.
+**Preconditions and limits:**
+
+- IAM Identity Center must be **enabled in the management account** (a one-time
+  console action; see [`RUNBOOK.md`](./RUNBOOK.md) step 0). If it is not, there
+  is no organization instance to write identities into.
+- Exactly one organization instance exists per management account.
+- Kiro subscriptions are supported on the organization instance.
 
 Sources (rephrased for compliance with licensing restrictions):
-[Account instances of IAM Identity Center](https://docs.aws.amazon.com/singlesignon/latest/userguide/account-instances-identity-center.html),
-[Permit account instance creation](https://docs.aws.amazon.com/singlesignon/latest/userguide/enable-account-instance-console.html),
+[IAM Identity Center organization vs account instances](https://docs.aws.amazon.com/singlesignon/latest/userguide/identity-center-instances.html),
 [Kiro deployment options](https://kiro.dev/docs/enterprise/deployment-options/),
 [Enable Kiro with IdC](https://repost.aws/articles/AR3YUupHzQQ2mqMzL5Y8KvbQ).
 
@@ -94,9 +109,9 @@ The fix is one console setting: **Settings → Authentication → Multi-factor
 authentication → Configure → Prompt users for MFA → "Never (disabled)"**. In
 that mode users sign in with username + password only.
 
-This MFA mode is **not exposed** by the `aws` or `awscc` Terraform providers,
-nor by a public boto3 operation (the `sso-admin` SDK has no set-MFA-mode call),
-so it cannot be set from IaC. It is a one-time console step per instance —
+This MFA mode is **not exposed** by the `aws` Terraform provider nor by a public
+boto3 operation (the `sso-admin` SDK has no set-MFA-mode call), so it cannot be
+set from IaC. It is a one-time console step per instance —
 see [`RUNBOOK.md`](./RUNBOOK.md) step 2b.
 
 Source (rephrased for compliance):
@@ -150,11 +165,11 @@ subscription/
 ├── TEARDOWN.md               ← cleanup: remote-state destroy (B) + fallback script (A)
 ├── terraform/                ← OpenTofu config (reusable via variables)
 │   ├── versions.tf           ← required providers + backend notes
-│   ├── providers.tf          ← AWS provider wired to the project profile/region
-│   ├── variables.tf          ← prefixes, counts, tier, membership strategy, …
-│   ├── locals.tf             ← name generation (prefix + zero-padded sequence)
-│   ├── identity_center.tf    ← account instance + users + groups + memberships
-│   ├── outputs.tf            ← instance ARN, identity store id, names/ids, URLs
+│   ├── providers.tf          ← AWS provider wired to the management-account profile/region
+│   ├── variables.tf          ← idc inputs, workshop_id, workshop_accounts, enable_account_access, tier
+│   ├── locals.tf             ← user/group name generation (workshop-namespaced)
+│   ├── identity_center.tf    ← users + groups + memberships (+ gated permission set / assignments)
+│   ├── outputs.tf            ← instance ARN, identity store id, names/ids, URLs, manifest
 │   ├── backend.tf            ← tracked, value-free S3 backend block (partial config)
 │   ├── backend.hcl.example   ← template for manual backend.hcl (normally auto-written by backend-bootstrap)
 │   └── terraform.tfvars.example
@@ -170,34 +185,33 @@ subscription/
     └── credentials.template.md            ← shape of the generated MD
 ```
 
-This stack stores its OpenTofu state (`subscription/terraform.tfstate`) in the
-shared S3 bucket created by the sibling `../backend/` stack. That bucket is a
-**prerequisite**, set up once — see [`../backend/README.md`](../backend/README.md)
-and [`RUNBOOK.md`](./RUNBOOK.md) step 1b. Generated credential files land in
+This stack stores its OpenTofu state
+(`workshops/<id>/subscription/terraform.tfstate`) in the shared S3 bucket
+created by the sibling `../backend/` stack. That bucket is a **prerequisite**,
+set up once — see [`../backend/README.md`](../backend/README.md) and
+[`RUNBOOK.md`](./RUNBOOK.md) step 1b. Generated credential files land in
 `subscription/output/` and are **git-ignored**.
 
 ---
 
 ## Reusability
 
-Nothing is hard-coded to one account or one count. Everything that changes
-between projects is a variable:
+Nothing is hard-coded to one workshop. Everything that changes between projects
+is a variable:
 
 | Knob | Where | Example |
 | ---- | ----- | ------- |
 | AWS region | `.env` (git-ignored; `AWS_REGION`) | `us-east-1` (default) → any Kiro-supported region |
-| AWS profile | `.env` (git-ignored; `AWS_PROFILE`) | `kiro-provisioning` |
-| User prefix + count | `variables.tf` | `kiro-user-` × 25 |
-| Group prefix + count | `variables.tf` | `kiro-team-` × 1 |
-| Sequence padding | `variables.tf` | `2` → `01`, `02`, … |
-| Membership strategy | `variables.tf` | `all_in_first` / `round_robin` |
+| AWS profile (management account) | `.env` (git-ignored; `AWS_PROFILE`) | `kiro-mgmt` |
+| Workshop namespace | `WORKSHOP_ID` / tfvars `workshop_id` | `kiro-2025-10-10` |
+| Accounts, groups, user counts | `variables.tf` `workshop_accounts` | `{ "1111…" = { groups = { team-a = { user_count = 10 } } } }` |
+| Account access gate | `variables.tf` `enable_account_access` | `false` (default) → zero console access |
 | Kiro tier | `variables.tf` + script | `PRO`, `PRO_PLUS`, `PRO_MAX`, `POWER` |
 
 Region and profile come from the git-ignored `.env` at the repo root (set up in
-the root README's Phase 0); the user/group prefixes, counts, membership
-strategy, sequence padding, and Kiro tier live in
-`terraform/terraform.tfvars` (copy `terraform.tfvars.example`). Point the stack
-at a different account/region by editing `.env` alone — no code edits required.
+the root README's Phase 0; `AWS_PROFILE` must be a management-account profile);
+the account/group/user topology, the access gate, and the Kiro tier live in
+`terraform/terraform.tfvars` (copy `terraform.tfvars.example`).
 
 ---
 

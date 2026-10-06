@@ -1,39 +1,42 @@
-# Runbook — Provision Kiro subscriptions in a child account
+# Runbook — Provision Kiro subscriptions in the management account
+
+This is **Phase 3** of the journey (root [`README.md`](../README.md)).
+**Prerequisites:** Phase 2 (foundation adopt) complete and the two IDs
+exported as `TF_VAR_idc_instance_arn` / `TF_VAR_identity_store_id`.
 
 End-to-end order of operations. Steps marked **(IaC)** or **(script)** are
-automated here; steps marked **(console)** or **(mgmt account)** are AWS
-platform limits you must do by hand. Nothing in this repo runs on its own — you
-invoke each step.
+automated here; steps marked **(console)** are AWS platform limits you must do
+by hand. Nothing in this repo runs on its own — you invoke each step.
 
-> Legend: **(mgmt account)** = AWS Organizations management account ·
-> **(this account)** = the child/member account where Kiro lives ·
-> **(IaC)** = `tofu` · **(script)** = Python · **(console)** = AWS web console.
+> Legend: **(mgmt account)** = the AWS Organizations management account, where
+> every stack in this repo now provisions · **(this account)** = the same
+> management account · **(IaC)** = `tofu` · **(script)** = Python ·
+> **(console)** = AWS web console.
 
 ---
 
-## Step 0 — (mgmt account, one-time) Permit member-account IdC instances
+## Step 0 — (mgmt account, one-time) Enable IAM Identity Center
 
-An account instance can only be created in a member account if the org
-management account has turned this on. It is a **one-time, irreversible** toggle.
+Identities are created in the management account's **organization** IdC
+instance, which the `foundation/` stack adopts. If IAM Identity Center has never
+been enabled in the management account, there is no instance to write into.
 
 1. Sign in to the **management account** (`<MGMT_ACCOUNT_ID>` — your AWS
    Organizations management account).
 2. Open **IAM Identity Center** in the console.
-3. **Settings → Management → Account instances of IAM Identity Center → Enable.**
-   Confirm. (You can later constrain this with an SCP; see the AWS docs.)
+3. **Enable** IAM Identity Center. This creates the single organization instance.
 
 Verify (from the management account):
-- The setting shows account instances are allowed.
-
-If you skip this, Step 2's `tofu apply` fails with an authorization error on
-`awscc_sso_instance`.
+- IAM Identity Center is enabled and shows an organization instance.
+- `foundation/` resolves its ARN / identity store id (see
+  [`../foundation/RUNBOOK.md`](../foundation/RUNBOOK.md)).
 
 Docs (rephrased for compliance):
-[Permit account instance creation](https://docs.aws.amazon.com/singlesignon/latest/userguide/enable-account-instance-console.html).
+[Enable IAM Identity Center](https://docs.aws.amazon.com/singlesignon/latest/userguide/get-set-up-for-idc.html).
 
-> ℹ️ One account instance per account, across **all** regions. If this account
-> already has an account instance, import it instead of creating a new one:
-> `tofu import awscc_sso_instance.this <instance_arn>`.
+> ℹ️ Exactly one organization instance exists per management account. This stack
+> consumes it via `idc_instance_arn` / `identity_store_id`; it never creates or
+> destroys it.
 
 ---
 
@@ -46,10 +49,11 @@ Assumes the toolchain + AWS auth are already set up (root README, Phase 0).
 mise run verify          # aws sts get-caller-identity
 ```
 
-Confirm the account is the intended **child** account and the region is one
-Kiro supports for IdC. Profile and region come from the git-ignored `.env`
-(default region `us-east-1`); see the root README's Phase 0 if `mise run verify`
-resolves the wrong account.
+Confirm the account is the intended **management** account and the region is one
+Kiro supports for IdC. `AWS_PROFILE` must be a management-account profile.
+Profile and region come from the git-ignored `.env` (default region
+`us-east-1`); see the root README's Phase 0 if `mise run verify` resolves the
+wrong account.
 
 ---
 
@@ -58,11 +62,11 @@ resolves the wrong account.
 **This step is mandatory. Do it before Step 2** — provisioning fails closed
 without it. It matters for *this* stack specifically: `tofu destroy` can only
 remove what is in its state, so if the subscription's state is not in S3, a
-teardown from a fresh clone later would orphan every user, group, and the
-account instance. The `../backend/` stack creates that S3 bucket + lock table
-and writes `subscription/terraform/backend.hcl` for you (the same bootstrap also
-writes `claim-service/terraform/backend.hcl`, used later if you distribute via
-the claim service).
+teardown from a fresh clone later would orphan every user and group. The
+`../backend/` stack creates that S3 bucket + lock table and writes
+`subscription/terraform/backend.hcl` for you (the same bootstrap also writes
+`claim-service/terraform/backend.hcl`, used later if you distribute via the
+claim service).
 
 ```bash
 mise run backend-bootstrap-plan      # DRY RUN: what the bucket + lock table bootstrap would create
@@ -83,13 +87,13 @@ Verify:
 
 ---
 
-## Step 2 — (IaC) Create the IdC account instance, users, groups, memberships
+## Step 2 — (IaC) Create users, groups, memberships in the org instance
 
 ```bash
-# 1. Set your counts/prefixes/tier (no task — one-time copy + edit).
+# 1. Set your accounts/groups/counts/tier (no task — one-time copy + edit).
 cp subscription/terraform/terraform.tfvars.example subscription/terraform/terraform.tfvars
 
-# 2. Dry run — tofu init + plan (1 instance + N users + M groups + memberships).
+# 2. Dry run — tofu init + plan (N users + M groups + memberships).
 mise run provision-plan      # creates nothing
 
 # 3. Apply — creates them (prompts to approve).
@@ -104,17 +108,24 @@ Prefer raw tofu? The equivalent by hand:
 ```bash
 cd subscription/terraform
 tofu init -backend-config=backend.hcl          # S3 backend from Step 1b
-tofu plan      # review: 1 instance + N users + M groups + memberships
+tofu plan      # review: N users + M groups + memberships
 tofu apply     # creates them
 ```
 
-What this creates:
-- One IAM Identity Center **account instance** in this account.
-- `user_count` users named `<user_prefix><NN>`.
-- `group_count` groups named `<group_prefix><NN>`.
-- Group memberships per `membership_strategy`.
-- **No** permission sets and **no** account assignments — these identities can
-  log into Kiro and nothing else.
+What this creates (in the management account's shared organization IdC
+instance):
+- IdC users, workshop-namespaced `<workshop_id>-<acct_last4>-<group>-<NN>`.
+- IdC groups with workshop-namespaced display names `<workshop_id>-<group>`.
+- Group memberships (each user in its own group).
+- **No** permission sets and **no** account assignments by default
+  (`enable_account_access = false`) — these identities can log into Kiro and
+  nothing else. The organization instance itself is never created or modified.
+
+> **Granting console access later (optional).** The `workshop_accounts` account
+> ids are billing attribution only. If you ever need to grant AWS console
+> access, set `enable_account_access = true` in tfvars and re-apply: that
+> creates one shared permission set and one assignment per group binding it to
+> its owning member account id. Leave it `false` for Kiro-login-only workshops.
 
 `mise run provision` already exports the manifest the scripts consume. To
 re-export it by hand:
@@ -124,7 +135,7 @@ tofu output -json provisioning_manifest > ../output/manifest.json
 ```
 
 Verify:
-- `tofu output users` / `tofu output groups` list the expected names.
+- `tofu output users` / `tofu output groups` list the expected namespaced names.
 - Console → IAM Identity Center → Users / Groups shows them.
 
 ---
@@ -136,7 +147,7 @@ them to register a device. These Kiro-login-only users are not obligated to set
 up MFA, so turn it off. Not settable from IaC (no provider resource / public
 API for the MFA mode).
 
-1. In **this account**, open **IAM Identity Center → Settings**.
+1. In the **management account**, open **IAM Identity Center → Settings**.
 2. **Authentication** tab → **Multi-factor authentication** → **Configure**.
 3. Under **Prompt users for MFA**, choose **Never (disabled)**.
 4. **Save changes.**
@@ -145,8 +156,9 @@ Verify:
 - The Authentication tab shows MFA prompt = **Disabled**.
 - A test user signs in with username + password only, no MFA prompt.
 
-> In "Disabled" mode you cannot manage MFA devices for these users, which is
-> fine here. If you later need MFA for some users, switch to "Context-aware"
+> This setting is instance-wide. Because the organization instance is shared by
+> every workshop, changing the MFA mode affects all of them — set it once,
+> deliberately. If you later need MFA for some users, switch to "Context-aware"
 > or "Always-on" instead.
 
 ---
@@ -155,8 +167,8 @@ Verify:
 
 This provisions the Kiro profile + service-linked role. Not scriptable.
 
-1. In **this account**, open the **Kiro** console (check you are in the right
-   region — the one from Step 2).
+1. In the **management account**, open the **Kiro** console (check you are in
+   the right region — the one from Step 2).
 2. Click **Onboard your team to Kiro** (or **Enable small teams**).
 3. When asked for the identity source, choose **IAM Identity Center**. You may
    be prompted to verify the IdC configuration.
@@ -188,7 +200,7 @@ active plan.
 ### 4b — (console) The reliable path
 
 1. Kiro console → **Users & Groups → Groups** tab → **Add group**.
-2. Select each `<group_prefix><NN>` group.
+2. Select each workshop-namespaced `<workshop_id>-<group>` group.
 3. In the dialog, choose the tier (**Pro / Pro+ / Pro Max / Power**) and confirm.
 
 Verify:
@@ -207,8 +219,8 @@ one-time-password (OTP) flow, then render the Markdown.
 2. Record them in a CSV (git-ignored) at `subscription/output/otps.csv`:
    ```csv
    username,otp
-   kiro-user-01,<otp>
-   kiro-user-02,<otp>
+   <workshop_id>-<acct_last4>-<group>-01,<otp>
+   <workshop_id>-<acct_last4>-<group>-02,<otp>
    ```
 3. **(task)** Render the credentials file:
    ```bash
@@ -221,8 +233,8 @@ one-time-password (OTP) flow, then render the Markdown.
    `output/otps.csv` is missing.
 
 `output/credentials.md` is git-ignored. It lists each user's username, email
-(if set; anonymous users show a dash), group(s), OTP, and the sign-in URL +
-region.
+(if set; anonymous users show a dash), member account id (billing attribution),
+group(s), OTP, and the sign-in URL + region.
 
 > On "same default password": AWS does not allow an admin-chosen shared
 > password. The closest supported option is a per-user OTP that the user must
@@ -252,6 +264,10 @@ Then, however it was distributed:
    OTP → set a new password → **Allow access**.
 2. Confirm the Kiro subscription is visible/active inside Kiro.
 
+> **Next:** Phase 4 — Distribute via the self-serve claim service
+> ([`../claim-service/README.md`](../claim-service/README.md)), or clean up later
+> with [`TEARDOWN.md`](./TEARDOWN.md).
+
 ---
 
 ## Teardown
@@ -264,7 +280,7 @@ a month later** — live in [`TEARDOWN.md`](./TEARDOWN.md). Two paths:
   + `backend.hcl`), so state lives in S3 and `tofu destroy` works from any clone.
 
   ```bash
-  mise run teardown-tofu    # tofu destroy: removes users, groups, memberships, and the account instance (prompts to confirm)
+  mise run teardown-tofu    # tofu destroy: removes this workshop's users, groups, memberships (prompts to confirm)
   ```
 
 - **Option A (fallback):** a state-free discovery script for when no state is
@@ -272,7 +288,7 @@ a month later** — live in [`TEARDOWN.md`](./TEARDOWN.md). Two paths:
 
   ```bash
   mise run teardown-plan    # dry run: discover what would be deleted
-  mise run teardown-run     # delete IdC users/groups/memberships + instance (prompts to confirm)
+  mise run teardown-run     # delete this workshop's IdC users/groups/memberships (prompts to confirm)
   ```
 
 Caveats (detailed in `TEARDOWN.md`):
@@ -280,12 +296,15 @@ Caveats (detailed in `TEARDOWN.md`):
   work from any machine. If you ever ran without it, a local backend holds state
   only on the machine that created it and deletes nothing on a fresh clone — use
   Option A (the state-free script) to recover that case.
+- **The shared organization IdC instance is NEVER deleted** by either path — all
+  stacks run in the management account against the one org instance, so removing
+  it would wipe every other workshop. Teardown removes only this workshop's
+  users / groups / memberships (and, when `enable_account_access` was true, the
+  permission set / assignments).
 - **Deactivate Kiro subscriptions first** in the Kiro console. Per Kiro docs,
   when you remove access "at end of month" the Kiro-created Identity Center
   application assignment is **not** auto-removed and needs a manual cleanup step
   in IdC.
-- Deleting the account instance is destructive and (per Step 0) the enablement
-  of account instances org-wide cannot be reversed.
 - Delete any local `output/credentials.md` and `output/otps.csv`.
 
 ---
@@ -294,13 +313,13 @@ Caveats (detailed in `TEARDOWN.md`):
 
 | Step | Automated here? | Why |
 | ---- | --------------- | --- |
-| Permit member account instances | ❌ (mgmt account console) | Org-level, irreversible toggle |
-| Create IdC account instance | ✅ (IaC, `awscc_sso_instance`) | — |
-| Create users / groups / memberships | ✅ (IaC) | — |
+| Enable IAM Identity Center (Step 0) | ❌ (mgmt account console) | One-time console enablement of the org instance |
+| Create users / groups / memberships | ✅ (IaC) | In the shared org instance; the instance itself is never created |
+| Gated account access (permission set / assignment) | ✅ (IaC, `enable_account_access`) | Off by default; zero console access |
 | Make MFA optional (prompt = Never) | ❌ (console) | No provider resource / public API for MFA mode |
 | Enable Kiro + Kiro profile | ❌ (console) | Provisions service-linked role; no stable API |
 | Assign tier to group | ⚠️ best-effort script, else console | `q:CreateAssignment` is internal/undocumented |
 | Set/share password | ❌ (console OTP) | IdC has no password API |
 | Render credentials.md | ✅ (script) | — |
-| Teardown users/groups/instance | ✅ (`tofu destroy`, or `teardown.py`) | Uses required remote state (Step 1b); state-free script is the fallback |
+| Teardown users/groups/memberships | ✅ (`tofu destroy`, or `teardown.py`) | Uses required remote state (Step 1b); state-free script is the fallback. The shared org instance is never deleted |
 | Deactivate Kiro subscription + app assignment | ❌ (console) | No stable API; not auto-removed |

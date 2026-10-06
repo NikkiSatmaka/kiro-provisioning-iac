@@ -1,5 +1,15 @@
 # Design Document
 
+> **ℹ️ Framing update — management-account consolidation.** The claim service now
+> deploys in the **AWS Organizations management account** alongside every other
+> stack, with `AWS_PROFILE` a management-account profile and an added
+> `aws_profile` variable (`profile = var.aws_profile != "" ? var.aws_profile : null`).
+> Its resource model is unchanged and already multi-workshop-safe: every name
+> derives from `local.name = credential-claim-<workshop_id>`, so many workshops'
+> claim services coexist with independent lifecycles and per-`workshop_id` cost
+> tagging. One Function URL serves one workshop; a workshop may serve multiple
+> member accounts. See `.agents/tasks/management-account-consolidation-plan.md`.
+
 ## Overview
 
 The Credential Claim Service distributes pre-provisioned Kiro IAM Identity

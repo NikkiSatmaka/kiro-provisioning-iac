@@ -55,8 +55,17 @@
 # schema.
 # =============================================================================
 
+# -----------------------------------------------------------------------------
+# The one namespaced base name every claim resource derives from. Threaded from
+# var.workshop_id so two workshops never share a table, Lambda, Function URL,
+# role, or policy (design: "One claim service per workshop", R7.3/R9.3).
+# -----------------------------------------------------------------------------
+locals {
+  name = "credential-claim-${var.workshop_id}"
+}
+
 resource "aws_dynamodb_table" "claim" {
-  name         = var.table_name
+  name         = local.name
   billing_mode = "PAY_PER_REQUEST"
 
   # Single partition key; no sort key. Item type is encoded in the PK prefix

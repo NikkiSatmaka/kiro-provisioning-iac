@@ -1,0 +1,549 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Scaffold the backend wiring: `backend.tf` and `backend.hcl.example`": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026150
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212039679
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212430048
+      }
+    ],
+    "1.2 Declare providers and required versions: `versions.tf`": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026199
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212041094
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212431251
+      }
+    ],
+    "1.3 Configure both providers and the region data source: `providers.tf`": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026253
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212437004
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212548899
+      }
+    ],
+    "1.4 Declare input variables: `variables.tf`": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026303
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212042005
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212432418
+      }
+    ],
+    "1.5 Create the single owned resource and locals: `identity_center.tf`": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026352
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212438012
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212550518
+      }
+    ],
+    "1.6 Emit the four operator-wiring outputs: `outputs.tf`": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026400
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212554838
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212683210
+      }
+    ],
+    "1.7 Write property test: AWSCC tag transform is a faithful bijection": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026459
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212556235
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212681760
+      }
+    ],
+    "1.8 Write property test: sign_in_url is the exact portal format": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026503
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212690588
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791213706637
+      }
+    ],
+    "1.9 Write property test: empty-string provider selector passthrough/fallback": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026552
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212557635
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212685203
+      }
+    ],
+    "1.10 Write text-fact + offline validation test for the stack files": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026602
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212692051
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791213707492
+      }
+    ],
+    "2. Checkpoint - Pillar 1 (foundation stack files validate)": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026654
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791213720519
+      }
+    ],
+    "3.1 Add the additive foundation backend output": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026717
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212558433
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212680821
+      }
+    ],
+    "3.2 Extend the backend-bootstrap mise task to write the foundation backend.hcl": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026766
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212692994
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791213709962
+      }
+    ],
+    "3.3 Write property test: rendered backend.hcl body is keyless and identical": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026814
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212694226
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791213708930
+      }
+    ],
+    "3.4 Write text-fact test for the bootstrap extension": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026865
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791213721415
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791214249283
+      }
+    ],
+    "4. Checkpoint - Pillar 2 (backend bootstrap extension)": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026911
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791214255254
+      }
+    ],
+    "5.1 Add the foundation-plan task": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026952
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791213721962
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791214250601
+      }
+    ],
+    "5.2 Add the foundation-apply task": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212026999
+      },
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791214256302
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892042
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214900873
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215044600
+      }
+    ],
+    "5.3 Add the foundation-destroy task with the typed-phrase guard": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027050
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892207
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215048158
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215118055
+      }
+    ],
+    "5.4 Write property test: residual-key guard flags exactly key-assigning files": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027104
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892276
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215123455
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215368456
+      }
+    ],
+    "5.5 Write property test: foundation state key is the fixed prefix-free constant": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027169
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892338
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215124301
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215364565
+      }
+    ],
+    "5.6 Write property test: teardown guard accepts exactly the fixed phrase": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027217
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892385
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215125783
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215368039
+      }
+    ],
+    "5.7 Write text-fact + example/fail-closed tests for the mise tasks": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027265
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892436
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215127109
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215365951
+      }
+    ],
+    "6. Checkpoint - Pillar 3 (mise lifecycle tasks)": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027315
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892475
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215749722
+      }
+    ],
+    "7.1 Write the foundation README and RUNBOOK": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027364
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892523
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215127936
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215364357
+      }
+    ],
+    "7.2 Link the foundation phase from the root README": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027414
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892586
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215376050
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215495443
+      }
+    ],
+    "7.3 Write scope-boundary + doc text-fact test": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027467
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892642
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215500126
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215744254
+      }
+    ],
+    "8. Final checkpoint - full foundation stack + bootstrap + tasks + docs": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791212027517
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791214892711
+      },
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215754306
+      }
+    ],
+    "1. Pillar 1 — The foundation stack files": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791213707548
+      }
+    ],
+    "3. Pillar 2 — Backend bootstrap extension": [
+      {
+        "executionId": "b46b6a45-bb26-46a5-8a65-e3e457ba9e00",
+        "chatSessionId": "sess_1026363d-810c-42e7-b0d9-27ac2820adb3",
+        "timestamp": 1791214249336
+      }
+    ],
+    "5. Pillar 3 — mise lifecycle tasks": [
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215368516
+      }
+    ],
+    "7. Pillar 4 — Documentation and scope-boundary assertion": [
+      {
+        "executionId": "2dbd393f-9872-464d-94fc-51de928d63cc",
+        "chatSessionId": "sess_5baacc97-68d6-46f9-ad68-c7a59c50c840",
+        "timestamp": 1791215744308
+      }
+    ]
+  }
+}

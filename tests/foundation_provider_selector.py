@@ -12,8 +12,8 @@ ternary::
 That is: when the variable holds the empty string, the attribute falls back to
 ``null`` (letting the provider resolve it from the environment / default
 profile); otherwise the operator-supplied value passes through verbatim. The
-exact same rule governs ``aws_region`` and ``aws_profile`` on BOTH the ``aws``
-and ``awscc`` providers.
+exact same rule governs ``aws_region`` and ``aws_profile`` on the ``aws``
+provider (the only provider this read-only stack declares).
 
 ``select_or_null`` is a *faithful* mirror of that ternary so the property test
 can exercise the passthrough/fallback rule deterministically, offline, over many
@@ -35,6 +35,6 @@ def select_or_null(s: str) -> str | None:
     Mirrors the HCL ternary ``s != "" ? s : null`` exactly: the empty string
     falls back to ``null`` (``None`` in Python); every other string passes
     through unchanged. This is the single rule applied to ``var.aws_region`` and
-    ``var.aws_profile`` on both the ``aws`` and ``awscc`` providers.
+    ``var.aws_profile`` on the ``aws`` provider.
     """
     return s if s != "" else None

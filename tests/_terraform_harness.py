@@ -180,8 +180,9 @@ def idc_account_map_valid(account_map: dict[str, str]) -> bool:
 #   * their own validation rejects empty / whitespace and accepts a real value,
 #     with an error message that names the missing variable
 #   * no awscc_sso_instance resource and no awscc provider remain in the sources
-#   * identity_center.tf wires exactly one shared permission set and one
-#     account assignment per group (for_each = local.groups)
+#   * identity_center.tf wires one shared permission set and one account
+#     assignment per group, both gated behind var.enable_account_access
+#     (for_each = var.enable_account_access ? local.groups : {})
 #
 # The full `tofu validate`/plan (one permission set + one assignment per group
 # evaluated by the toolchain) depends on locals.tf being rewritten by task 3.2;

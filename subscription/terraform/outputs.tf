@@ -1,10 +1,10 @@
 output "instance_arn" {
-  description = "ARN of the IAM Identity Center account instance."
+  description = "ARN of the IAM Identity Center organization instance (consumed, not created)."
   value       = local.instance_arn
 }
 
 output "identity_store_id" {
-  description = "Identity store ID backing the account instance. Scripts need this."
+  description = "Identity store ID backing the organization instance. Scripts need this."
   value       = local.identity_store_id
 }
 

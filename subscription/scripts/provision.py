@@ -100,8 +100,8 @@ REMOTE S3 STATE IS REQUIRED — set it up once, then re-run (fail closed).
 ================================================================================
 Why: `tofu destroy` can only delete what is in its STATE. Local state is
 git-ignored and does not travel with the repo, so teardown a month later from a
-fresh clone would orphan every user, group, and the account instance. State must
-live in S3.
+fresh clone would orphan every user and group. State must live in S3. (The
+shared organization IdC instance is adopted read-only and never in this state.)
 
 backend.tf is already tracked (value-free). The only missing piece is the
 account-specific backend.hcl. Fix (copy-paste):

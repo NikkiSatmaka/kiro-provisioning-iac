@@ -3,9 +3,13 @@
 The management-account-scoped stack that governs a single workshop's accounts:
 it creates **one OU per workshop**, attaches a **deny-by-default Kiro guardrail**
 SCP to that OU, and wires **per-account budgets** that **automatically freeze**
-only the account that overruns its limit. It runs against the Organizations
-**management account** (or a delegated Org-admin), so it is distinct from the
-member-account stacks (`foundation/`, `subscription/`, `claim-service/`).
+only the account that overruns its limit. Like every other stack it runs against
+the Organizations **management account** (or a delegated Org-admin). What is
+distinct here is not where it runs but what it *targets*: its SCPs and budgets
+act on the **member accounts** in the workshop OU. Workloads provisioned by the
+other stacks live in the management account and are therefore intentionally
+outside SCP/budget scope (SCPs never restrict the management account, and budgets
+filter by member `LinkedAccount`).
 
 > ⚠️ **Applying mutates the live Organizations management account — high blast
 > radius.** SCP attachment and budget actions affect real accounts
@@ -99,9 +103,10 @@ Two details follow from this design:
 
 This stack targets the Organizations **management account** (or a delegated
 Org-admin) — the only place that can manage OUs, SCPs, and organization-wide
-budget actions. `var.aws_profile` selects those credentials and is therefore
-**distinct from the member-account profile** the other stacks
-(`foundation/`, `subscription/`, `claim-service/`) use.
+budget actions. `var.aws_profile` selects those credentials. Every stack in this
+repo now uses a management-account profile, so this is the same account the other
+stacks (`foundation/`, `subscription/`, `claim-service/`) run under; the SCPs and
+budgets this stack manages still *target* the member accounts in the workshop OU.
 
 Region and credential resolution mirror the sibling stacks: an explicit
 `-var` / tfvars value wins; when `var.aws_region` / `var.aws_profile` are empty

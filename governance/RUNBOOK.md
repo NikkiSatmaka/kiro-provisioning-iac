@@ -8,15 +8,15 @@ steps marked **(mgmt account)** or **(console)** are AWS platform limits you do
 by hand. Nothing in this repo runs on its own — you invoke each step.
 
 > Legend: **(mgmt account)** = AWS Organizations management account (or a
-> delegated Organizations administrator) · **(this account)** = the
-> child/member account where Kiro lives · **(IaC)** = `tofu` ·
-> **(console)** = AWS web console.
+> delegated Organizations administrator), where every stack in this repo runs ·
+> **(member accounts)** = the organization member accounts this stack's SCPs and
+> budgets *target* · **(IaC)** = `tofu` · **(console)** = AWS web console.
 
-Unlike the other stacks, this one runs with **management-account or delegated
-Organizations-admin credentials**, selected through `var.aws_profile` — distinct
-from the member-account profile `foundation/`, `subscription/`, and
-`claim-service/` use. It never creates or invites accounts: `var.account_ids`
-must already be members of the organization. Account creation is out of scope.
+Like the other stacks, this one runs with **management-account or delegated
+Organizations-admin credentials**, selected through `var.aws_profile`. What is
+distinct is its *targets*: the SCPs and budgets act on the **member accounts** in
+`var.account_ids` (which must already be members of the organization — this stack
+never creates or invites accounts; account creation is out of scope).
 
 > ⚠️ **High blast radius.** `tofu apply` here mutates the **live AWS
 > Organizations management account** — it moves accounts, attaches SCPs, and
@@ -58,11 +58,11 @@ and
 
 ---
 
-## Step 1 — (this account/mgmt) Confirm credentials & region
+## Step 1 — (mgmt account) Confirm credentials & region
 
 This stack targets the **Organizations management account** (or a delegated
-Org-admin). Point `var.aws_profile` at those credentials — they are **not** the
-member-account profile the other stacks use.
+Org-admin). Point `var.aws_profile` at those credentials — the same
+management-account profile every stack in this repo now uses.
 
 ```bash
 # Confirm you are authenticated as the management/Org-admin principal.
@@ -117,7 +117,7 @@ workshop's governance key for you.
 #   TF_VAR_parent_id          the parent OU / root the workshop OU hangs under
 #   TF_VAR_account_ids        pre-existing, in-org 12-digit account ids
 #   TF_VAR_notification_emails REQUIRED, non-empty (a breach must never be silent)
-#   TF_VAR_aws_profile        management/Org-admin creds (distinct from member profile)
+#   TF_VAR_aws_profile        management/Org-admin creds (same mgmt account every stack uses)
 
 mise run governance-plan     # DRY RUN: tofu init + plan, mutates nothing
 mise run governance-apply    # apply — prompts to approve (no -auto-approve), then echoes outputs

@@ -4,31 +4,30 @@ Feature: foundation-idc-service, Task 1.10
 Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.1, 2.2,
            2.3, 2.4, 2.5, 3.1, 3.4, 4.2, 4.4, 5.1, 5.2
 
-The Foundation IdC service creates and owns the single account-level IdC
-instance (``awscc_sso_instance "this"``) every workshop's subscription stack
-consumes. Creating the instance itself needs AWS and is out of scope for an
-offline suite; what IS checkable offline is the stack's *shape* — the schema and
-wiring facts the design pins — plus that the whole config parses and its pure
-derivations evaluate correctly.
+The Foundation IdC service ADOPTS (reads) the management account's existing
+organization IdC instance (``data "aws_ssoadmin_instances" "this"``) every
+workshop's subscription stack consumes. It creates and owns nothing. What IS
+checkable offline is the stack's *shape* — the schema and wiring facts the
+design pins — plus that the whole config parses and its pure derivations
+evaluate correctly.
 
 Two layers, so the suite is useful with or without a toolchain:
 
 * Static text-fact assertions read the ``foundation/terraform/*.tf`` sources
-  directly and ALWAYS run. They cover: exactly one ``awscc_sso_instance "this"``
-  and none of the users/groups/memberships/permission-sets/account-assignments
-  resources (R1.1-R1.6); the recovered ``hashicorp/awscc`` + ``hashicorp/aws``
-  required-provider constraints (R5.1, R5.2); the ``instance_name`` default
-  ``kiro-login`` bound to the resource's ``name`` (R1.7, R1.8); the four outputs
-  bound to the right locals/derivation (R2.1-R2.4, R3.1); a value-free
-  ``backend "s3" {}`` and a keyless ``backend.hcl.example`` (R4.2, R4.4); and no
+  directly and ALWAYS run. They cover: exactly one
+  ``data "aws_ssoadmin_instances" "this"`` and none of the
+  users/groups/memberships/permission-sets/account-assignments resources
+  (R1.1-R1.6); the ``hashicorp/aws`` required-provider constraint and the
+  absence of ``hashicorp/awscc`` (R5.1, R5.2); the four outputs bound to the
+  right locals/derivation (R2.1-R2.4, R3.1); a value-free ``backend "s3" {}``
+  and a keyless ``backend.hcl.example`` (R4.2, R4.4); and no
   ``data "terraform_remote_state"`` anywhere (R3.4).
 * The ``tofu``-backed assertions run against a throwaway, offline-initialized
   copy of the stack (the S3 backend block dropped so ``tofu init -backend=false``
   stays local). ``tofu validate`` proves the config is valid; ``tofu console``
-  evaluates the ``sign_in_url`` interpolation, the AWSCC tag transform on a
-  sample map, and the region/profile ``!= "" ? x : null`` ternary on ``""`` vs a
-  value — pure functions, no backend/provider. These skip cleanly when no
-  ``tofu`` binary is on PATH.
+  evaluates the ``sign_in_url`` interpolation and the region/profile
+  ``!= "" ? x : null`` ternary on ``""`` vs a value — pure functions, no
+  backend/provider. These skip cleanly when no ``tofu`` binary is on PATH.
 """
 
 from __future__ import annotations
@@ -169,21 +168,26 @@ def _tofu_console_eval(expression: str) -> str:
 # Static text-fact assertions (always run)
 # ===========================================================================
 
-# --- The single owned resource (R1.1) --------------------------------------
+# --- The single adopted (read-only) data source (R1.1) ---------------------
 
-def test_exactly_one_awscc_sso_instance_this():
-    """Exactly one ``awscc_sso_instance "this"`` is declared across the stack (R1.1)."""
+def test_exactly_one_ssoadmin_instances_data_source():
+    """Exactly one ``data "aws_ssoadmin_instances" "this"`` is declared (R1.1)."""
     source = _all_tf_source()
     instances = re.findall(
-        r'resource\s+"awscc_sso_instance"\s+"this"', source
+        r'data\s+"aws_ssoadmin_instances"\s+"this"', source
     )
     assert len(instances) == 1, (
-        f"expected exactly one awscc_sso_instance \"this\", found {len(instances)}"
+        f"expected exactly one aws_ssoadmin_instances \"this\" data source, "
+        f"found {len(instances)}"
     )
-    # And no awscc_sso_instance under any other resource name, either.
-    any_instance = re.findall(r'resource\s+"awscc_sso_instance"\s+"[^"]+"', source)
-    assert len(any_instance) == 1, (
-        f"expected a single awscc_sso_instance resource, found {len(any_instance)}"
+
+
+def test_no_awscc_sso_instance_resource():
+    """The stack never CREATES an instance — no awscc_sso_instance remains (R1.1)."""
+    source = _all_tf_source()
+    assert "awscc_sso_instance" not in source, (
+        "foundation stack must not declare awscc_sso_instance (it adopts the "
+        "org instance read-only)"
     )
 
 
@@ -199,24 +203,17 @@ def test_no_identity_center_membership_resources(resource_type):
     )
 
 
-# --- Required providers: recovered awscc + aws constraints (R5.1, R5.2) -----
+# --- Required providers: aws only, no awscc (R5.1, R5.2) --------------------
 
-def test_required_providers_declare_awscc_with_recovered_constraint():
-    """``required_providers`` includes ``hashicorp/awscc >= 1.0.0`` (R5.1).
+def test_required_providers_do_not_declare_awscc():
+    """``required_providers`` no longer declares ``hashicorp/awscc`` (R5.1).
 
-    awscc is the only provider that can CREATE an IdC instance; the constraint
-    is the one recovered verbatim from history.
+    The stack reads the org instance via a data source, so no instance-creating
+    provider is needed.
     """
     text = VERSIONS_TF.read_text()
-    m = re.search(
-        r"awscc\s*=\s*{[^}]*?source\s*=\s*\"hashicorp/awscc\"[^}]*?"
-        r"version\s*=\s*\"([^\"]+)\"",
-        text,
-        re.DOTALL,
-    )
-    assert m, "no hashicorp/awscc required-provider entry found in versions.tf"
-    assert m.group(1) == ">= 1.0.0", (
-        f"awscc version constraint is {m.group(1)!r}, expected '>= 1.0.0'"
+    assert "awscc" not in text, (
+        "versions.tf must not declare hashicorp/awscc (foundation is read-only)"
     )
 
 
@@ -235,36 +232,15 @@ def test_required_providers_declare_aws_with_recovered_constraint():
     )
 
 
-# --- instance_name default + binding to the resource (R1.7, R1.8) -----------
+# --- No instance_name variable; read-only adopt has nothing to name ---------
 
-def test_instance_name_defaults_to_kiro_login():
-    """``instance_name`` defaults to ``kiro-login`` (R1.8)."""
+def test_no_instance_name_variable():
+    """The ``instance_name`` variable is removed — no instance is created (R1.8)."""
     text = VARIABLES_TF.read_text()
-    block_start = text.index('variable "instance_name"')
-    block = text[block_start:]
-    assert re.search(r'default\s*=\s*"kiro-login"', block), (
-        "instance_name must default to \"kiro-login\""
+    assert 'variable "instance_name"' not in text, (
+        "variables.tf must not declare instance_name (foundation creates no "
+        "instance to name)"
     )
-
-
-def test_resource_sets_name_from_instance_name_variable():
-    """The IdC resource sets ``name = var.instance_name`` (R1.7)."""
-    text = IDENTITY_CENTER_TF.read_text()
-    resource = text[text.index('resource "awscc_sso_instance"') :]
-    assert re.search(r"name\s*=\s*var\.instance_name", resource), (
-        "awscc_sso_instance.this must set name = var.instance_name"
-    )
-
-
-def test_resource_applies_default_tags_as_list_of_objects():
-    """Tags reach the instance via the AWSCC list-of-objects shape (R1.9)."""
-    text = IDENTITY_CENTER_TF.read_text()
-    resource = text[text.index('resource "awscc_sso_instance"') :]
-    assert re.search(
-        r"tags\s*=\s*\[for\s+k,\s*v\s+in\s+var\.default_tags\s*:\s*"
-        r"{\s*key\s*=\s*k,\s*value\s*=\s*v\s*}\]",
-        resource,
-    ), "awscc_sso_instance.this must set tags to the list-of-objects transform"
 
 
 # --- The four outputs bound to the right locals/derivation (R2.1-R2.4, R3.1) -
@@ -294,15 +270,17 @@ def test_outputs_declare_the_four_values_bound_correctly():
     )
 
 
-def test_locals_bind_arn_and_id_to_the_created_resource():
-    """The ARN / identity-store-id locals come from the created resource, and
-    are exposed only as outputs (R3.1)."""
+def test_locals_bind_arn_and_id_to_the_data_source():
+    """The ARN / identity-store-id locals come from the adopted data source,
+    and are exposed only as outputs (R3.1)."""
     text = IDENTITY_CENTER_TF.read_text()
     assert re.search(
-        r"instance_arn\s*=\s*awscc_sso_instance\.this\.instance_arn", text
+        r"instance_arn\s*=\s*tolist\(data\.aws_ssoadmin_instances\.this\.arns\)\[0\]",
+        text,
     )
     assert re.search(
-        r"identity_store_id\s*=\s*awscc_sso_instance\.this\.identity_store_id",
+        r"identity_store_id\s*=\s*tolist\("
+        r"data\.aws_ssoadmin_instances\.this\.identity_store_ids\)\[0\]",
         text,
     )
     assert re.search(r"resolved_region\s*=\s*data\.aws_region\.current\.region", text)
@@ -362,20 +340,6 @@ def test_console_sign_in_url_interpolation():
     )
     # tofu console echoes a string result with surrounding quotes.
     assert result == '"https://d-0123456789.awsapps.com/start"'
-
-
-@requires_tofu
-def test_console_tag_transform_on_sample_map():
-    """The AWSCC tag transform turns a map into the list-of-objects shape."""
-    result = _tofu_console_raw(
-        '[for k, v in {"Project" = "kiro", "ManagedBy" = "opentofu"} : '
-        "{ key = k, value = v }]"
-    )
-    # The list length equals the map size and every entry maps to a {key,value}
-    # object; order follows the map's lexical key order in tofu.
-    assert '"key" = "Project"' in result and '"value" = "kiro"' in result
-    assert '"key" = "ManagedBy"' in result and '"value" = "opentofu"' in result
-    assert result.count('"key"') == 2 and result.count('"value"') == 2
 
 
 @requires_tofu

@@ -21,7 +21,7 @@ path, dropped or mangled the id, or added stray characters fails here.
 Harness note: ``foundation_sign_in_url`` lives under ``tests/`` and is
 importable via the shared conftest ``sys.path`` shim (``tests/`` is on the
 path), mirroring the sibling property tests (e.g.
-``test_foundation_tag_transform_property.py``).
+``test_foundation_provider_selector_property.py``).
 """
 
 from __future__ import annotations
@@ -31,8 +31,9 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 # The identity store id is a Terraform string surfaced from
-# ``awscc_sso_instance.this.identity_store_id`` (format d-xxxxxxxxxx in
-# practice). The interpolation makes no assumption about its shape, so draw
+# ``tolist(data.aws_ssoadmin_instances.this.identity_store_ids)[0]`` (format
+# d-xxxxxxxxxx in practice). The interpolation makes no assumption about its
+# shape, so draw
 # arbitrary strings — including the empty string, whitespace, unicode, and
 # strings carrying "https://", ".awsapps.com", "/start", "/", and "." — to prove
 # the derivation treats the id as an opaque, verbatim substring.

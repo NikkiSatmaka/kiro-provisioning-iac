@@ -1,22 +1,17 @@
 terraform {
-  # OpenTofu is pinned in the project mise.toml. Creating the IdC account
-  # instance needs the hashicorp/awscc provider (Cloud Control); the region
-  # output resolves through hashicorp/aws >= 5.56.0.
+  # OpenTofu is pinned in the project mise.toml. This stack no longer *creates*
+  # an Identity Center instance; it READS the management account's existing
+  # organization instance via the `data "aws_ssoadmin_instances"` data source,
+  # which resolves through hashicorp/aws >= 5.56.0. Only the aws provider is
+  # needed — no Cloud Control provider.
   required_version = ">= 1.6"
 
   required_providers {
-    # Resolves the concrete region for the `region` output. hashicorp/aws has
-    # NO resource to *create* an Identity Center instance.
+    # Reads the organization IdC instance (data "aws_ssoadmin_instances") and
+    # resolves the concrete region for the `region` output.
     aws = {
       source  = "hashicorp/aws"
       version = ">= 5.56.0"
-    }
-    # Cloud Control provider: the only way to CREATE an IdC *instance*
-    # (awscc_sso_instance maps to the AWS::SSO::Instance CloudFormation type,
-    # which creates an account instance in a standalone or member account).
-    awscc = {
-      source  = "hashicorp/awscc"
-      version = ">= 1.0.0"
     }
   }
 

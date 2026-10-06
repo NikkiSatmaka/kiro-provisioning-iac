@@ -171,9 +171,9 @@ add, 0 to change, 0 to destroy**.
 
 ## Teardown — nothing to destroy here
 
-Foundation **does not own a destroyable resource**. The organization IdC
-instance belongs to the management account, not to this stack's state, so there
-is nothing for a `destroy` to remove. **Disabling IAM Identity Center is a
+Foundation **does not own a destroyable resource** and **never deletes** the
+organization IdC instance. That instance belongs to the management account, not
+to this stack's state, so there is nothing for a `destroy` to remove. **Disabling IAM Identity Center is a
 console action in the management account**, never a per-workshop task, and must
 only be done deliberately when no workshop depends on the directory.
 

@@ -23,7 +23,7 @@ other stacks fails here.
 Harness note: ``foundation_backend_body`` lives under ``tests/`` and is
 importable via the shared conftest ``sys.path`` shim (``tests/`` is on the
 path), mirroring the sibling property tests (e.g.
-``test_foundation_tag_transform_property.py``).
+``test_foundation_provider_selector_property.py``).
 """
 
 from __future__ import annotations

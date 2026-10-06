@@ -125,8 +125,13 @@ def test_single_account_assignment_resource_fanned_out_over_groups():
     assert len(assignments) == 1
 
     block = text[text.index('resource "aws_ssoadmin_account_assignment"') :]
-    # The assignment keys off the groups map, so there is one per group.
-    assert re.search(r"for_each\s*=\s*local\.groups", block)
+    # The assignment keys off the groups map (gated by enable_account_access),
+    # so when access is enabled there is exactly one assignment per group and
+    # when it is off the for_each is empty — still one-per-group by construction.
+    assert re.search(
+        r"for_each\s*=\s*var\.enable_account_access\s*\?\s*local\.groups\s*:\s*\{\}",
+        block,
+    )
 
 
 def test_permission_set_and_assignment_bind_to_the_foundation_instance():
@@ -138,8 +143,11 @@ def test_permission_set_and_assignment_bind_to_the_foundation_instance():
 
     assign = text[text.index('resource "aws_ssoadmin_account_assignment"') :]
     assert re.search(r"instance_arn\s*=\s*var\.idc_instance_arn", assign)
+    # The permission set is count-gated behind enable_account_access, so the
+    # assignment references the first (and only) instance via [0].
     assert re.search(
-        r"permission_set_arn\s*=\s*aws_ssoadmin_permission_set\.this\.arn", assign
+        r"permission_set_arn\s*=\s*aws_ssoadmin_permission_set\.this\[0\]\.arn",
+        assign,
     )
 
 

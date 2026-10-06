@@ -13,8 +13,8 @@ ternary ``s != "" ? s : null``) yields:
 - the string verbatim for every non-empty value (passthrough).
 
 This is the single rule governing ``var.aws_region`` and ``var.aws_profile`` on
-BOTH the ``aws`` and ``awscc`` providers, so the same mirror stands in for all
-four selector sites.
+the ``aws`` provider (the only provider this read-only stack declares), so the
+same mirror stands in for both selector sites.
 
 The property drives the mirror against an *independent* reference oracle written
 from the rule directly — ``None`` iff the input is empty — rather than

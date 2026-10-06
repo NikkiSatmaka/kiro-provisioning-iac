@@ -20,14 +20,14 @@ guarantee rests on:
   (R3.3, R3.4).
 
 It also pins the documentation facts the RUNBOOK/README must carry so the
-end-to-end create-then-wire workflow and its guardrails stay documented:
+end-to-end read-then-wire workflow and its guardrails stay documented:
 
-* The create-then-wire order and the once-and-reused statement (R10.1-R10.4).
-* The ``tofu import awscc_sso_instance.this`` recovery and the
-  one-account-instance-per-account statement (R8.2, R8.3).
-* The management-account enablement precondition — required, one-time, and
-  irreversible (R9.1, R9.3).
-* The destructive/irreversible teardown note (R7.6).
+* The read-then-wire order and the once-and-reused statement (R10.1-R10.4).
+* The idempotent-read (no import needed) and one-organization-instance-per-
+  management-account statement (R8.2, R8.3).
+* The management-account IdC-enablement precondition (R9.1, R9.3).
+* The "nothing to tear down" note — foundation owns no destroyable resource and
+  never deletes the shared org instance (R7.6).
 
 Every assertion reads the committed sources directly, so the suite always runs
 with no toolchain. Documentation phrases are matched case-insensitively on the
@@ -156,49 +156,47 @@ def test_docs_state_applied_once_and_reused_across_workshops():
     assert "once" in docs and "reused across every workshop" in docs
 
 
-# --- Idempotency + import + one-instance-per-account (R8.2, R8.3) ----------
+# --- Idempotent read + one-org-instance-per-mgmt-account (R8.2, R8.3) ------
 
-def test_docs_describe_importing_an_existing_instance():
-    """The docs direct the operator to import a pre-existing instance with
-    ``tofu import awscc_sso_instance.this`` (R8.2)."""
+def test_docs_describe_reading_the_existing_instance_is_a_safe_noop():
+    """The docs state that re-running the read-only stack is a safe no-op and
+    there is nothing to import (R8.2)."""
     docs = _docs_text()
-    assert "tofu import awscc_sso_instance.this" in docs
+    assert "no-op" in docs
+    assert "nothing to import" in docs
 
 
-def test_docs_state_one_account_instance_per_account():
-    """The docs state AWS permits one account instance per account across all
-    regions (R8.3)."""
+def test_docs_state_one_organization_instance_per_management_account():
+    """The docs state exactly one organization instance exists per management
+    account (R8.3)."""
     docs = _docs_text()
-    assert "one" in docs
-    assert "account instance per account" in docs
-    assert "all regions" in docs or "across all regions" in docs
+    assert "one organization instance" in docs
+    assert "per management account" in docs
 
 
-# --- Management-account enablement precondition (R9.1, R9.3) ---------------
+# --- Management-account IdC enablement precondition (R9.1, R9.3) -----------
 
 def test_docs_state_management_account_enablement_precondition():
-    """The docs state that creating an account instance requires the AWS
-    Organizations management account to have enabled member-account IdC
-    instances (R9.1)."""
+    """The docs state that reading the org instance requires IAM Identity Center
+    to be enabled in the management account (R9.1)."""
     docs = _docs_text()
     assert "management account" in docs
-    assert "member-account" in docs or "member account" in docs
+    assert "enable iam identity center" in docs or "enable" in docs
 
 
-def test_docs_state_management_account_enablement_is_one_time_irreversible():
-    """The docs state the management-account enablement is a one-time,
-    irreversible toggle (R9.3)."""
+def test_docs_state_enabling_idc_is_a_one_time_console_action():
+    """The docs state enabling IdC in the management account is a one-time
+    console action (R9.3)."""
     docs = _docs_text()
     assert "one-time" in docs
-    assert "irreversible" in docs
+    assert "console" in docs
 
 
-# --- Destructive teardown note (R7.6) --------------------------------------
+# --- Nothing-to-tear-down note (R7.6) --------------------------------------
 
-def test_docs_state_teardown_is_destructive_and_enablement_irreversible():
-    """The docs state that deleting the instance is destructive and the
-    management-account enablement cannot be reversed (R7.6)."""
+def test_docs_state_foundation_owns_nothing_to_tear_down():
+    """The docs state foundation owns no destroyable resource and never deletes
+    the shared org instance (R7.6)."""
     docs = _docs_text()
-    assert "destructive" in docs
-    # The enablement cannot be reversed / is irreversible.
-    assert "cannot be reversed" in docs or "irreversible" in docs
+    assert "nothing to destroy" in docs or "owns nothing" in docs
+    assert "never deleted" in docs or "never delete" in docs

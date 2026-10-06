@@ -246,6 +246,8 @@ Kiro-subscription deactivation that must happen first):**
 | [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) | End-to-end run order, including the console-only steps |
 | [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) | Cleanup: remote-state `tofu destroy` (primary) + state-free script (fallback) |
 | [`claim-service/README.md`](./claim-service/README.md) | Optional self-serve distribution: deploy a Lambda Function URL, seed the pool from `subscription/output/`, let participants claim with a workshop code |
+| [`governance/README.md`](./governance/README.md) | Concepts: one OU per workshop, the Kiro guardrail SCP, the unattached freeze SCP, and the per-account budgets that auto-freeze a breaching account; management-account creds |
+| [`governance/RUNBOOK.md`](./governance/RUNBOOK.md) | Run order: the Step 0 all-features/SCP precondition, backend bootstrap, plan/apply, automatic freeze behavior, the manual un-freeze detach, and typed-phrase teardown |
 
 ### Repo layout
 
@@ -275,13 +277,17 @@ state:
 │   ├── scripts/              ← provision.py, teardown.py, OTP + credentials renderer
 │   ├── config/               ← non-secret run settings template
 │   └── output/               ← generated manifest + credentials (git-ignored)
-└── claim-service/            ← self-serve credential claim (opt-in; reuses the shared backend)
-    ├── README.md             ← run order + how participants reach the URL
-    ├── lambda/               ← the claim handler (Function URL: GET page, POST claim)
-    ├── frontend/             ← self-contained claim page served inline
-    ├── terraform/            ← DynamoDB + Lambda + Function URL + IAM
-    ├── scripts/              ← seed_claim_pool.py, export_audit.py
-    └── tests/                ← pytest + Hypothesis + moto suite
+├── claim-service/            ← self-serve credential claim (opt-in; reuses the shared backend)
+│   ├── README.md             ← run order + how participants reach the URL
+│   ├── lambda/               ← the claim handler (Function URL: GET page, POST claim)
+│   ├── frontend/             ← self-contained claim page served inline
+│   ├── terraform/            ← DynamoDB + Lambda + Function URL + IAM
+│   ├── scripts/              ← seed_claim_pool.py, export_audit.py
+│   └── tests/                ← pytest + Hypothesis + moto suite
+└── governance/               ← per-workshop OU + guardrails + budget freeze (management account; reuses the shared backend)
+    ├── README.md             ← concepts + the management-account creds + high-blast-radius note
+    ├── RUNBOOK.md            ← Step 0 precondition, run order, auto-freeze + manual un-freeze, teardown
+    └── terraform/            ← OU + Kiro guardrail SCP + unattached freeze SCP + per-account budgets
 ```
 
 **Shared backend relationship.** `backend/` runs first and creates the S3 bucket
@@ -290,8 +296,9 @@ create the bucket it stores state in — run it once per account). `subscription
 then consumes that bucket as its remote backend with the state key
 `subscription/terraform.tfstate`. Any future stack reuses the same bucket under
 its own distinct key — e.g. `claim-service/` uses
-`claim-service/terraform.tfstate`, so its `tofu destroy` can never touch the
-identities in `subscription/`'s state.
+`claim-service/terraform.tfstate`, and `governance/` uses the per-workshop key
+`workshops/<id>/governance/terraform.tfstate` — so each stack's `tofu destroy`
+can never touch the identities in `subscription/`'s state.
 
 ### Configuration knobs
 

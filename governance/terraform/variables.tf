@@ -48,9 +48,10 @@ variable "aws_region" {
 variable "aws_profile" {
   description = <<-EOT
     AWS CLI/SDK profile to use. This stack targets the Organizations MANAGEMENT
-    account (or a delegated Org-admin), so this is distinct from the
-    member-account profile the other stacks use. Empty string falls back to the
-    default SDK credential chain / AWS_PROFILE env var.
+    account (or a delegated Org-admin) — the same management-account profile
+    every stack in this repo now uses; its SCPs/budgets still TARGET the member
+    accounts. Empty string falls back to the default SDK credential chain /
+    AWS_PROFILE env var.
   EOT
   type        = string
   default     = ""

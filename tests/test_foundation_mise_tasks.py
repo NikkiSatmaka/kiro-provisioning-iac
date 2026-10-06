@@ -4,26 +4,29 @@ Feature: foundation-idc-service, Task 5.7
 Validates: Requirements 4.6, 4.7, 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.4, 7.7
 
 Pillar 3 adds the three ``mise`` lifecycle tasks for the foundation stack:
-``foundation-plan`` / ``foundation-apply`` / ``foundation-destroy``. Each runs
-in ``foundation/terraform``, guards ``backend.hcl`` (existence + residual
-``key =``), and supplies the foundation state key at init time via
-``-backend-config="key=foundation/terraform.tfstate"``. ``foundation-destroy``
-sits behind a typed-phrase guard that must read exactly ``destroy-foundation``
-before anything proceeds.
+``foundation-plan`` / ``foundation-apply`` / ``foundation-destroy``.
+``foundation-plan`` and ``foundation-apply`` run in ``foundation/terraform``,
+guard ``backend.hcl`` (existence + residual ``key =``), and supply the
+foundation state key at init time via
+``-backend-config="key=foundation/terraform.tfstate"``.
+``foundation-destroy`` is a **documented no-op**: the stack adopts the
+organization IdC instance read-only and owns nothing to destroy, so the task
+runs no tofu, inits no backend, and deletes nothing (disabling IdC is a
+management-account console action, never a repo task).
 
 This suite pins that contract at two levels:
 
-* **Text facts** (parse ``mise.toml`` with ``tomllib``) — the three tasks exist,
-  run in the foundation stack dir, carry the init-time foundation key, and run
-  the right ``tofu`` verb (``plan`` / ``apply`` / ``destroy``). It also pins the
-  per-workshop isolation: NO ``provision*`` / ``teardown*`` / ``claim-*`` task
-  references ``foundation/terraform.tfstate`` or ``awscc_sso_instance`` (R7.1,
-  R7.7).
+* **Text facts** (parse ``mise.toml`` with ``tomllib``) — the plan/apply tasks
+  exist, run in the foundation stack dir, carry the init-time foundation key,
+  and run the right ``tofu`` verb (``plan`` / ``apply``); foundation-destroy is
+  a no-op that runs no tofu. It also pins the per-workshop isolation: NO
+  ``provision*`` / ``teardown*`` / ``claim-*`` task references
+  ``foundation/terraform.tfstate`` or ``awscc_sso_instance`` (R7.1, R7.7).
 * **Example / fail-closed shell runs** — the guard bodies are executed with
   ``sh`` in a throwaway dir with a ``tofu`` stub on PATH that records every call.
   A missing ``backend.hcl`` exits non-zero naming the file (R4.6); a residual
-  ``key =`` line exits non-zero (R4.7); a non-matching phrase piped to
-  ``foundation-destroy`` exits non-zero and NEVER reaches ``tofu destroy`` (R7.4).
+  ``key =`` line exits non-zero (R4.7); foundation-destroy exits zero and NEVER
+  reaches tofu (R7.4).
 
 Everything runs offline: the ``tofu`` stub makes real init/plan/apply/destroy
 calls unreachable, so the only thing under test is the guard logic that fails
@@ -52,11 +55,17 @@ INIT_KEY_ARG = f'-backend-config="key={FOUNDATION_KEY}"'
 
 FOUNDATION_TASKS = ("foundation-plan", "foundation-apply", "foundation-destroy")
 
-# tofu verb each foundation task runs after a clean init.
+# The mutating-against-the-backend tasks. foundation-destroy is deliberately
+# NOT here: foundation adopts the org IdC instance read-only and owns nothing to
+# destroy, so foundation-destroy is a documented no-op that runs no tofu, inits
+# no backend, and guards nothing. These are the tasks that DO init the backend
+# and run a tofu verb.
+FOUNDATION_TOFU_TASKS = ("foundation-plan", "foundation-apply")
+
+# tofu verb each backend-initializing foundation task runs after a clean init.
 TASK_VERB = {
     "foundation-plan": "tofu plan",
     "foundation-apply": "tofu apply",
-    "foundation-destroy": "tofu destroy",
 }
 
 
@@ -93,7 +102,7 @@ def test_foundation_task_exists_in_foundation_dir(name):
     )
 
 
-@pytest.mark.parametrize("name", FOUNDATION_TASKS)
+@pytest.mark.parametrize("name", FOUNDATION_TOFU_TASKS)
 def test_foundation_task_supplies_init_time_key(name):
     """Each foundation task passes the foundation key at ``tofu init`` (R6.4).
 
@@ -110,7 +119,7 @@ def test_foundation_task_supplies_init_time_key(name):
     )
 
 
-@pytest.mark.parametrize("name", FOUNDATION_TASKS)
+@pytest.mark.parametrize("name", FOUNDATION_TOFU_TASKS)
 def test_foundation_task_runs_expected_verb(name):
     """Each foundation task runs its expected ``tofu`` verb (R6.1-6.3).
 
@@ -125,7 +134,7 @@ def test_foundation_task_runs_expected_verb(name):
 # --- R4.6/R4.7: both guards present in every foundation task ----------------
 
 
-@pytest.mark.parametrize("name", FOUNDATION_TASKS)
+@pytest.mark.parametrize("name", FOUNDATION_TOFU_TASKS)
 def test_foundation_task_guards_backend_hcl(name):
     """Each foundation task guards backend.hcl existence + residual key (R4.6, R4.7).
 
@@ -151,7 +160,7 @@ def test_foundation_task_guards_backend_hcl(name):
 # --- R6.5: init failure is fail-closed --------------------------------------
 
 
-@pytest.mark.parametrize("name", FOUNDATION_TASKS)
+@pytest.mark.parametrize("name", FOUNDATION_TOFU_TASKS)
 def test_foundation_task_fails_closed_on_init(name):
     """A non-zero ``tofu init`` stops the task before plan/apply/destroy (R6.5).
 
@@ -170,26 +179,25 @@ def test_foundation_task_fails_closed_on_init(name):
 # --- R7.2/R7.4: the typed-phrase guard on destroy ---------------------------
 
 
-def test_foundation_destroy_has_typed_phrase_guard():
-    """``foundation-destroy`` requires typing ``destroy-foundation`` (R7.2, R7.4).
+def test_foundation_destroy_is_a_documented_no_op():
+    """``foundation-destroy`` is a documented no-op that runs no tofu (R7.2, R7.4).
 
-    The guard reads a line and compares it to the fixed phrase; a mismatch exits
-    non-zero and deletes nothing. The guard must run BEFORE the backend guards
-    and init, so no mutation can precede it.
+    Foundation adopts the organization IdC instance read-only and owns nothing
+    to destroy, so the task must NOT run ``tofu destroy`` (or any tofu verb),
+    must NOT init a backend, and must say it deletes nothing.
     """
     run = _task_run("foundation-destroy")
-    assert "read -r CONFIRM" in run, (
-        "foundation-destroy does not read a confirmation phrase (R7.2)"
+    assert "tofu destroy" not in run, (
+        "foundation-destroy must not run `tofu destroy` (it owns nothing)"
     )
-    assert '"$CONFIRM" != "destroy-foundation"' in run, (
-        "foundation-destroy does not compare against the exact phrase "
-        "'destroy-foundation' (R7.2, R7.4)"
+    assert "tofu init" not in run, (
+        "foundation-destroy must not init a backend (it is a no-op)"
     )
-    # The phrase guard must precede the backend guards and init.
-    guard_at = run.index("read -r CONFIRM")
-    init_at = run.index("tofu init")
-    assert guard_at < init_at, (
-        "foundation-destroy runs init before the typed-phrase guard"
+    assert "tofu apply" not in run and "tofu plan" not in run, (
+        "foundation-destroy must run no tofu verb"
+    )
+    assert "no-op" in run, (
+        "foundation-destroy must document that it is a no-op that deletes nothing"
     )
 
 
@@ -290,19 +298,17 @@ def _run_guard(body: str, *, backend_hcl: str | None, stdin: str = "") -> tuple:
         return proc.returncode, proc.stdout, proc.stderr, calls
 
 
-@pytest.mark.parametrize("name", FOUNDATION_TASKS)
+@pytest.mark.parametrize("name", FOUNDATION_TOFU_TASKS)
 def test_missing_backend_hcl_exits_nonzero_naming_file(name):
-    """A foundation task with no backend.hcl exits non-zero naming it (R4.6).
+    """A foundation tofu task with no backend.hcl exits non-zero naming it (R4.6).
 
     The existence guard stops the task before init; the error names the missing
-    file so the operator knows what to bootstrap.
+    file so the operator knows what to bootstrap. foundation-destroy is excluded:
+    it is a no-op that inits no backend.
     """
     body = _task_run(name)
-    # foundation-destroy's phrase guard runs first, so feed it the right phrase
-    # to reach the backend.hcl guard.
-    stdin = "destroy-foundation\n" if name == "foundation-destroy" else ""
 
-    rc, _out, err, calls = _run_guard(body, backend_hcl=None, stdin=stdin)
+    rc, _out, err, calls = _run_guard(body, backend_hcl=None, stdin="")
 
     assert rc != 0, f"{name} did not fail on a missing backend.hcl"
     assert "backend.hcl" in err, (
@@ -313,15 +319,16 @@ def test_missing_backend_hcl_exits_nonzero_naming_file(name):
     )
 
 
-@pytest.mark.parametrize("name", FOUNDATION_TASKS)
+@pytest.mark.parametrize("name", FOUNDATION_TOFU_TASKS)
 def test_residual_key_in_backend_hcl_exits_nonzero(name):
     """A backend.hcl with a residual ``key =`` line exits non-zero (R4.7).
 
     The residual-key guard stops the task before init; a stray key would
-    otherwise conflict with the init-time foundation key.
+    otherwise conflict with the init-time foundation key. foundation-destroy is
+    excluded: it is a no-op that inits no backend.
     """
     body = _task_run(name)
-    stdin = "destroy-foundation\n" if name == "foundation-destroy" else ""
+    stdin = ""
 
     backend_hcl = (
         'bucket         = "kiro-tofu-state-000000000000"\n'
@@ -342,17 +349,18 @@ def test_residual_key_in_backend_hcl_exits_nonzero(name):
     )
 
 
-def test_destroy_nonmatching_phrase_exits_and_never_reaches_tofu():
-    """A non-matching phrase to foundation-destroy fails closed (R7.4).
+def test_destroy_is_a_no_op_that_never_reaches_tofu():
+    """foundation-destroy runs cleanly and never invokes tofu (R7.4).
 
-    Piping anything other than ``destroy-foundation`` must exit non-zero, delete
-    nothing, and never reach ``tofu destroy`` — the typed-phrase guard is the
-    first gate, ahead of the backend guards and init.
+    Foundation adopts the org IdC instance read-only, so the task owns nothing
+    to destroy: running it must exit zero and never log a single tofu call,
+    whether or not a backend.hcl is present. The absence of any logged tofu call
+    is the assertion that it deletes nothing.
     """
     body = _task_run("foundation-destroy")
 
-    # A valid, keyless backend.hcl is present, so ONLY the phrase guard can stop
-    # the run. If it did not, init + destroy would be logged by the stub.
+    # Even with a valid, keyless backend.hcl present, no tofu runs: the task is
+    # a plain no-op that prints an explanation and exits.
     backend_hcl = (
         'bucket         = "kiro-tofu-state-000000000000"\n'
         'region         = "us-east-1"\n'
@@ -360,53 +368,9 @@ def test_destroy_nonmatching_phrase_exits_and_never_reaches_tofu():
         "encrypt        = true\n"
     )
 
-    rc, _out, err, calls = _run_guard(
-        body, backend_hcl=backend_hcl, stdin="nope-not-the-phrase\n"
-    )
+    rc, _out, _err, calls = _run_guard(body, backend_hcl=backend_hcl, stdin="")
 
-    assert rc != 0, "foundation-destroy proceeded on a non-matching phrase"
-    assert "destroy-foundation" in err, (
-        f"foundation-destroy error does not name the required phrase: {err!r}"
-    )
+    assert rc == 0, "foundation-destroy (a no-op) should exit cleanly"
     assert calls == [], (
-        f"foundation-destroy reached tofu on a non-matching phrase: {calls}"
-    )
-    # Belt and braces: tofu destroy specifically never ran.
-    assert not any("destroy" in c for c in calls), (
-        f"foundation-destroy reached `tofu destroy` on a non-matching phrase: {calls}"
-    )
-
-
-def test_destroy_matching_phrase_reaches_init_and_destroy():
-    """A matching phrase + valid backend.hcl falls through to init + destroy.
-
-    This is the positive counterpart to the fail-closed case: the exact phrase
-    passes the guard, the valid keyless backend.hcl passes the backend guards,
-    and the task reaches ``tofu init`` and ``tofu destroy`` (both captured by the
-    stub). tofu's OWN approval prompt (R7.5) is out of scope here — the stub
-    stands in for the real binary.
-    """
-    body = _task_run("foundation-destroy")
-
-    backend_hcl = (
-        'bucket         = "kiro-tofu-state-000000000000"\n'
-        'region         = "us-east-1"\n'
-        'dynamodb_table = "kiro-tofu-locks"\n'
-        "encrypt        = true\n"
-    )
-
-    rc, _out, err, calls = _run_guard(
-        body, backend_hcl=backend_hcl, stdin="destroy-foundation\n"
-    )
-
-    assert rc == 0, f"foundation-destroy failed past the guards: {err!r}"
-    assert any("init" in c for c in calls), (
-        f"foundation-destroy did not reach `tofu init`: {calls}"
-    )
-    assert any("destroy" in c for c in calls), (
-        f"foundation-destroy did not reach `tofu destroy`: {calls}"
-    )
-    # The init call carries the foundation key.
-    assert any(FOUNDATION_KEY in c for c in calls), (
-        f"foundation-destroy init did not supply the foundation key: {calls}"
+        f"foundation-destroy is a no-op but reached tofu: {calls}"
     )

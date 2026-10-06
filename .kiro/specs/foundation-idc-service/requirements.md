@@ -1,5 +1,18 @@
 # Requirements Document
 
+> **⚠️ Superseded in part — management-account consolidation.** Requirements
+> here that mandate *creating/owning* an account-level IdC instance (the
+> `awscc_sso_instance` resource, the `instance_name` variable, the AWSCC tag
+> shape, the member-account enablement toggle, importing/destroying the
+> instance) no longer hold. A later locked decision makes `foundation/` run in
+> the **management account** and **adopt (read)** the existing **organization**
+> instance via `data "aws_ssoadmin_instances"`: it creates and owns nothing, so
+> there is nothing to import or destroy and no `awscc`/`instance_name`. The
+> enablement precondition is now simply "IAM Identity Center is enabled in the
+> management account." The consumed outputs and the decoupling-via-variables
+> boundary are unchanged. The authoritative current design is
+> `.agents/tasks/management-account-consolidation-plan.md`.
+
 ## Introduction
 
 This feature adds a dedicated, standalone OpenTofu/Terraform stack — the

@@ -1,5 +1,14 @@
 # Implementation Plan: foundation-idc-service
 
+> **⚠️ Superseded in part — management-account consolidation.** Tasks here that
+> build the `awscc_sso_instance` create path (the `instance_name` variable, the
+> AWSCC tag transform, the typed-phrase `foundation-destroy`, importing an
+> existing instance) were later reversed by a locked decision: `foundation/`
+> now **adopts (reads)** the management account's **organization** instance via
+> `data "aws_ssoadmin_instances"` and owns nothing to create, import, or
+> destroy. See `.agents/tasks/management-account-consolidation-plan.md` for the
+> authoritative current design.
+
 ## Overview
 
 This plan builds the **Foundation IdC service** — a new standalone

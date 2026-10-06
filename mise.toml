@@ -267,9 +267,9 @@ dir = "subscription/scripts"
 run = "python teardown.py"
 
 [tasks.teardown-run]
-description = "Option A fallback: delete IdC users/groups/memberships + instance (prompts to confirm)"
+description = "Option A fallback: delete this workshop's IdC users/groups/memberships (prompts to confirm; never deletes the shared org instance)"
 dir = "subscription/scripts"
-run = "python teardown.py --delete --delete-instance"
+run = "python teardown.py --delete"
 
 [tasks.teardown-tofu]
 description = "Option B primary: tofu destroy a workshop's subscription state (requires WORKSHOP_ID; prompts to confirm)"
@@ -420,9 +420,14 @@ dir = "claim-service/terraform"
 run = "tofu output -raw claim_url"
 
 # --- 3. Seed the pool --------------------------------------------------------
-# Reads the subscription/ outputs (otps.csv + manifest.json) and writes one
-# CRED# item per credential. --apply is required to write; without it the
-# script is a dry run. The table name defaults to the stack's var.table_name.
+# Reads the subscription/ outputs (otps.csv + manifest.json) and reports one
+# CRED# item per credential. --apply is required to write; without it (as here)
+# the script is a dry run that classifies rows and writes nothing. The table
+# name is derived from WORKSHOP_ID as credential-claim-<WORKSHOP_ID> — the SAME
+# namespaced name the stack's local.name uses and that `claim-seed` writes to —
+# so the dry-run report names the exact table a later --apply would target
+# (replacing the old static `credential-claim-service` name). WORKSHOP_ID is
+# required so the dry run names the real table; set it in the git-ignored .env.
 
 [tasks.claim-seed-plan]
 description = "DRY RUN: classify otps.csv rows and report what would be seeded (writes nothing)"
@@ -432,7 +437,7 @@ set -eu
 python seed_claim_pool.py \
   --otp-csv ../../subscription/output/otps.csv \
   --manifest ../../subscription/output/manifest.json \
-  --table credential-claim-service
+  --workshop-id "${WORKSHOP_ID:-}"
 """
 
 [tasks.claim-seed]
@@ -534,14 +539,16 @@ tofu destroy
 # =============================================================================
 # === foundation/ stack ===
 # =============================================================================
-# Creates and owns the account-level IdC instance — the single, long-lived,
-# shared resource every workshop's subscription stack consumes. Applied ONCE and
-# reused across every workshop (NOT per workshop). Excluded from every
-# per-workshop provision/teardown task. backend.hcl must exist first (written by
+# ADOPTS (reads) the management account's organization IdC instance — the
+# single, long-lived, shared resource every workshop's subscription stack
+# consumes. Read ONCE and reused across every workshop (NOT per workshop); it
+# creates and owns nothing. Runs in the management account; AWS_PROFILE must be
+# a management-account profile. Excluded from every per-workshop
+# provision/teardown task. backend.hcl must exist first (written by
 # `mise run backend-bootstrap`, same shared bucket as the other stacks).
 
 [tasks.foundation-plan]
-description = "DRY RUN: tofu init + plan for the Foundation IdC instance (creates nothing)"
+description = "DRY RUN: tofu init + plan to read the org IdC instance (a pure read; creates nothing)"
 dir = "foundation/terraform"
 run = """
 set -eu
@@ -564,7 +571,7 @@ tofu plan
 """
 
 [tasks.foundation-apply]
-description = "Apply: create (or re-converge) the Foundation IdC instance (prompts to approve)"
+description = "Apply: resolve the org IdC instance IDs and print the wire-forward exports (reads the instance; creates nothing)"
 dir = "foundation/terraform"
 run = """
 set -eu
@@ -589,36 +596,22 @@ echo "Sign-in URL: $(tofu output -raw sign_in_url)  (region: $(tofu output -raw 
 """
 
 [tasks.foundation-destroy]
-description = "DESTRUCTIVE: delete the shared Foundation IdC instance. Requires typing 'destroy-foundation'; then prompts tofu's own approval."
+description = "NO-OP: foundation adopts the org IdC instance read-only and owns nothing to destroy. Disabling IdC is a mgmt-account console action, never a task."
 dir = "foundation/terraform"
 run = """
 set -eu
-# --- Typed-phrase guard (R7.2-R7.5) --------------------------------------------
-# The IdC instance is shared across every workshop; deleting it is deliberate.
-# Require the operator to type the fixed phrase before anything proceeds. A
-# mismatch exits non-zero and deletes nothing; a match proceeds to tofu's OWN
-# apply/destroy approval prompt (a second, independent gate).
-printf 'This DELETES the shared Foundation IdC instance.\\n'
-printf 'Type exactly "destroy-foundation" to proceed: '
-read -r CONFIRM
-if [ "$CONFIRM" != "destroy-foundation" ]; then
-  echo "ERROR: confirmation phrase did not match 'destroy-foundation'; deleting nothing." >&2
-  exit 1
-fi
-
-if [ ! -f backend.hcl ]; then
-  echo "ERROR: foundation/terraform/backend.hcl not found (see foundation-plan)." >&2
-  exit 1
-fi
-if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
-  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
-  exit 1
-fi
-tofu init -reconfigure -input=false -backend-config=backend.hcl \
-  -backend-config="key=foundation/terraform.tfstate" \
-  || { echo "ERROR: backend init failed; not destroying." >&2; exit 1; }
-# tofu destroy still prompts for its own approval before deleting (R7.5).
-tofu destroy
+# The foundation stack ADOPTS (reads) the management account's organization IdC
+# instance via `data "aws_ssoadmin_instances"`; it never creates or owns it, so
+# there is nothing for a destroy to remove. This task is a deliberate, documented
+# no-op that deletes NOTHING. It exists only to make that explicit and to catch
+# muscle memory from the old create-and-own design.
+#
+# The shared organization instance belongs to every workshop. Disabling IAM
+# Identity Center is a deliberate console action in the management account, done
+# only when no workshop depends on the directory — never a repo task. See
+# foundation/RUNBOOK.md ("Teardown — nothing to destroy here").
+echo "foundation-destroy is a no-op: foundation reads the org IdC instance and owns nothing to destroy."
+echo "Disabling IAM Identity Center is a management-account console action; this task deletes nothing."
 """
 
 # =============================================================================

@@ -1,5 +1,23 @@
 # Design Document
 
+> **⚠️ Superseded in part — management-account consolidation.** This document
+> predates the move of every stack into the **AWS Organizations management
+> account**. Read these updates against it:
+> - **foundation** no longer *creates* `awscc_sso_instance.this`; it **adopts
+>   (reads)** the management account's **organization** instance via
+>   `data "aws_ssoadmin_instances"`. Mentions of a created `awscc_sso_instance`
+>   or a removed `awscc` provider describe foundation's old member-account
+>   design, now fully read-only.
+> - **subscription** runs in the management account and writes identities into
+>   the shared **organization** IdC directory. Group display names are
+>   **workshop-namespaced** (`<workshop_id>-<group>`) so many workshops coexist.
+> - **account access is gated**: a new `enable_account_access` bool (default
+>   **false**) creates ZERO permission sets and ZERO account assignments, so
+>   workshop users get zero console access by default. The `workshop_accounts`
+>   account ids are **billing/attribution metadata only** — not an access grant.
+> The authoritative current design is
+> `.agents/tasks/management-account-consolidation-plan.md`.
+
 ## Overview
 
 This design turns the kiro-provisioning-iac repository from a single-run

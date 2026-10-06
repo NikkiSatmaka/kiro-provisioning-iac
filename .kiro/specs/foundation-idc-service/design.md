@@ -1,5 +1,21 @@
 # Design Document
 
+> **⚠️ Superseded in part — management-account consolidation.** This document
+> describes the ORIGINAL design in which `foundation/` *created and owned* an
+> account-level IdC instance via the `awscc_sso_instance` resource (with an
+> `instance_name` variable and the AWSCC list-of-objects tag shape) in a
+> member/child account. That design was changed by a later locked decision:
+> `foundation/` now runs in the **AWS Organizations management account** and
+> **adopts (reads)** the management account's existing **organization** IdC
+> instance via `data "aws_ssoadmin_instances"`. It creates and owns nothing —
+> no `awscc` provider, no `instance_name` variable, and no destroyable instance
+> (`foundation-destroy` is a documented no-op). Where this document says
+> "account instance", "create/own the instance", "awscc", "instance_name", or
+> "member-account enablement toggle", read the current behavior from
+> `.agents/tasks/management-account-consolidation-plan.md`, which is
+> authoritative. The outputs (`instance_arn`, `identity_store_id`, `region`,
+> `sign_in_url`) and the decoupling-via-variables boundary are unchanged.
+
 ## Overview
 
 This design adds the **Foundation IdC service** — a new, standalone

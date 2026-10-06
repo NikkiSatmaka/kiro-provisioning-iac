@@ -1,5 +1,13 @@
 # Implementation Plan: multi-workshop-provisioning
 
+> **⚠️ Superseded in part — management-account consolidation.** All stacks now
+> run in the **management account**. Foundation adopts the **organization** IdC
+> instance read-only (no `awscc_sso_instance`); subscription namespaces group
+> display names by `workshop_id` and gates account access behind
+> `enable_account_access` (default false → zero console access). See
+> `.agents/tasks/management-account-consolidation-plan.md` for the authoritative
+> current design.
+
 ## Overview
 
 This plan turns the single-run provisioner into a per-workshop module, extending

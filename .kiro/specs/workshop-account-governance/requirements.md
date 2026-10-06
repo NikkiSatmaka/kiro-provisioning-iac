@@ -1,5 +1,12 @@
 # Requirements Document
 
+> **ℹ️ Framing update — management-account consolidation.** Governance MECHANICS
+> are unchanged (SCPs/budgets still TARGET the member accounts). Only the framing
+> changed: every stack now runs in the **management account**, so governance is
+> no longer "distinct from the member-account stacks" — all provisioning stacks
+> are management-account stacks. See
+> `.agents/tasks/management-account-consolidation-plan.md`.
+
 ## Introduction
 
 This feature adds a new, standalone, **management-account-scoped** OpenTofu/Terraform
@@ -21,9 +28,10 @@ organization, the Governance stack, per workshop:
 
 Account recovery (un-freeze) is a **documented manual** console/CLI detach in the
 runbook; the stack provides no recovery automation. The stack runs with
-management-account or delegated Organizations-admin credentials, which differ from
-the member-account profile the other stacks use. It reuses the shared S3 state
-backend under a workshop-namespaced key.
+management-account or delegated Organizations-admin credentials — the same
+management-account profile every stack now uses; its SCPs and budgets still
+TARGET the member accounts. It reuses the shared S3 state backend under a
+workshop-namespaced key.
 
 **Scope:** This spec adds ONLY the `governance/` stack (`governance/terraform/`),
 its `mise` tasks, its `backend/` bootstrap wiring, and its README/runbook. It makes
@@ -330,8 +338,9 @@ is understandable.
    "all features" mode with the `SERVICE_CONTROL_POLICY` policy type enabled on the
    organization root as a Step 0 the stack cannot perform.
 2. THE Governance_stack documentation SHALL state that the stack must run with
-   Management_account or delegated Organizations-admin credentials, which differ from
-   the member-account profile used by the other stacks.
+   Management_account or delegated Organizations-admin credentials — the same
+   management-account profile every stack in this repo now uses; its SCPs and
+   budgets still TARGET the member accounts.
 3. THE Governance_stack SHALL parameterize the credential profile through
    `var.aws_profile`.
 4. IF the all-features or SCP-type precondition is not met, THEN the apply SHALL fail

@@ -1,5 +1,16 @@
 # Requirements Document
 
+> **⚠️ Superseded in part — management-account consolidation.** A later locked
+> decision moves all stacks into the **management account**. Where this document
+> assumes a member/child account, an `awscc_sso_instance`, or that account
+> assignments always exist: foundation now **adopts (reads)** the organization
+> IdC instance (no creation); subscription writes into that shared organization
+> directory with **workshop-namespaced** group display names; and account access
+> is gated behind `enable_account_access` (default **false** → zero permission
+> sets, zero assignments, zero console access). The `workshop_accounts` account
+> ids are billing/attribution metadata only. See
+> `.agents/tasks/management-account-consolidation-plan.md` (authoritative).
+
 ## Introduction
 
 This feature turns the Kiro provisioning IaC repository into a per-workshop

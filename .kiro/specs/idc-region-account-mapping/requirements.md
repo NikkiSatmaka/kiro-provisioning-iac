@@ -1,5 +1,13 @@
 # Requirements Document
 
+> **⚠️ Superseded in part — management-account consolidation.** Foundation no
+> longer creates an `awscc_sso_instance` **account instance**; it **adopts
+> (reads)** the management account's **organization** instance. The `account_id`
+> values this mapping carries are **billing/attribution metadata** (and the
+> gated assignment target when `enable_account_access` is true), not an access
+> grant. See `.agents/tasks/management-account-consolidation-plan.md`
+> (authoritative).
+
 ## Introduction
 
 This feature makes two related changes to the Kiro provisioning IaC repository.

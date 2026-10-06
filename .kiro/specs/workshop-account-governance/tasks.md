@@ -114,7 +114,7 @@ with the operator's explicit go-ahead. No task below runs `apply` or `destroy`.
 
 - [x] 10. Author the documentation
   - [x] 10.1 Write `governance/README.md`
-    - Concepts (one OU per workshop; the deny-by-default Kiro guardrail with `var.kiro_allowed_actions` noted as a **tunable** starting point; the automatic per-account budget freeze); management-account / delegated Org-admin creds via `var.aws_profile` (distinct from member-account profile); the all-features + `SERVICE_CONTROL_POLICY`-type Step 0 the stack cannot perform; account creation out of scope; high-blast-radius apply note
+    - Concepts (one OU per workshop; the deny-by-default Kiro guardrail with `var.kiro_allowed_actions` noted as a **tunable** starting point; the automatic per-account budget freeze); management-account / delegated Org-admin creds via `var.aws_profile` (the same management-account profile every stack now uses; SCPs/budgets still target the member accounts); the all-features + `SERVICE_CONTROL_POLICY`-type Step 0 the stack cannot perform; account creation out of scope; high-blast-radius apply note
     - _Requirements: 4.5, 14.1, 14.2, 16.2_
   - [x] 10.2 Write `governance/RUNBOOK.md`
     - Legend; Step 0 precondition + the auth/policy-type error it surfaces; backend bootstrap; plan/apply with the chosen account-placement mechanism + `moveAccount` fallback; automatic freeze behavior; the **manual** un-freeze detach with no automation; typed-phrase (`destroy-governance`) teardown with the empty-OU / detach note; verification-only note

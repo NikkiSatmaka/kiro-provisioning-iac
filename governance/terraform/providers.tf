@@ -1,7 +1,8 @@
 # Region/credentials come from the environment so the same config is reusable.
 # IMPORTANT: this stack targets the ORGANIZATIONS MANAGEMENT account (or a
-# delegated Org-admin). var.aws_profile selects those creds — distinct from the
-# member-account profile the other stacks use.
+# delegated Org-admin). var.aws_profile selects those creds — the same
+# management-account profile every stack in this repo now uses; its SCPs and
+# budgets still TARGET the member accounts.
 #
 # Region precedence: an explicit -var/tfvars wins; when aws_region is empty (the
 # default) the provider inherits AWS_REGION from the environment (mise sources it

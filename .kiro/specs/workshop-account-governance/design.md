@@ -1,5 +1,16 @@
 # Design Document
 
+> **ℹ️ Framing update — management-account consolidation.** The governance stack
+> MECHANICS here are unchanged: its SCPs and budgets still **target the member
+> accounts** in the workshop OU (SCPs never restrict the management account;
+> budgets filter by member `LinkedAccount`). What changed is the surrounding
+> framing: every other stack (`foundation/`, `subscription/`, `claim-service/`)
+> now also runs in the **management account**, so this stack is no longer
+> "distinct from the member-account stacks" — all provisioning stacks are
+> management-account stacks, and only the SCP/budget *targets* are member
+> accounts. Management-account workloads are intentionally outside SCP/budget
+> scope. See `.agents/tasks/management-account-consolidation-plan.md`.
+
 ## Overview
 
 The **Governance stack** is a new, standalone, **management-account-scoped**
@@ -158,8 +169,9 @@ terraform {
 ```hcl
 # Region/credentials come from the environment so the same config is reusable.
 # IMPORTANT: this stack targets the ORGANIZATIONS MANAGEMENT account (or a
-# delegated Org-admin). var.aws_profile selects those creds — distinct from the
-# member-account profile the other stacks use.
+# delegated Org-admin). var.aws_profile selects those creds — the same
+# management-account profile every stack in this repo now uses; what is distinct
+# is the TARGET of this stack's SCPs/budgets, which remain the member accounts.
 
 provider "aws" {
   region  = var.aws_region != "" ? var.aws_region : null
@@ -626,8 +638,8 @@ Concepts: one OU per workshop; the Kiro guardrail SCP (deny-by-default
 allowlist, `var.kiro_allowed_actions` documented as a **tunable** starting
 point, Requirement 4.5); the automatic per-account budget freeze; the
 management-account / delegated Org-admin credential requirement selected via
-`var.aws_profile` (distinct from the member-account profile the other stacks
-use). **Preconditions:** Organizations in all-features mode with the
+`var.aws_profile` (the same management-account profile every stack now uses;
+its SCPs/budgets still *target* the member accounts). **Preconditions:** Organizations in all-features mode with the
 `SERVICE_CONTROL_POLICY` policy type enabled on the root — a **Step 0 the stack
 cannot perform** (Requirement 14.1). Account creation is explicitly out of
 scope. States that applying mutates the live management account with high blast

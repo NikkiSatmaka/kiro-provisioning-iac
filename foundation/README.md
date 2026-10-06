@@ -1,31 +1,31 @@
-# Foundation IdC service (the account-level Identity Center instance)
+# Foundation IdC service (adopts the organization Identity Center instance)
 
-The one stack that **creates and owns** the account-level IAM Identity Center
-(IdC) instance every workshop's `subscription/` stack consumes. Apply it
-**once per account**, after the `backend/` bootstrap and before the
-`subscription/` stack.
+The one stack that **adopts (reads)** the management account's existing
+**organization** IAM Identity Center (IdC) instance that every workshop's
+`subscription/` stack consumes. Run it **once per management account**, after
+the `backend/` bootstrap and before the `subscription/` stack. It creates
+nothing and owns nothing — it is a pure read.
 
 > ⚠️ **Nothing here runs automatically.** Every step is manual or driven by an
 > explicit `mise run` task you invoke. [`RUNBOOK.md`](./RUNBOOK.md) is the
-> end-to-end create-then-wire order, including the one-time management-account
+> end-to-end read-then-wire order, including the one-time management-account
 > step AWS only exposes through the console.
 
 **Scope of this doc.** This README explains the concepts behind the foundation
-stack — the single owned resource, the decoupling boundary, and the shared
+stack — the single adopted resource, the decoupling boundary, and the shared
 backend. For the step-by-step run order, use [`RUNBOOK.md`](./RUNBOOK.md). For
 the overall repo journey (toolchain setup, the shared state backend, and
 distributing the result), start at the [root `README.md`](../README.md).
 
 ## Why it exists
 
-The `multi-workshop-provisioning` work changed the `subscription/` stack to
-**consume** the IdC instance through two operator-supplied inputs
-(`var.idc_instance_arn`, `var.identity_store_id`) instead of creating it. That
-left the creation of the account instance without a home. This stack is that
-home: a single, long-lived place that owns the shared instance so the
-subscription stack is free to consume it.
+The `subscription/` stack **consumes** the IdC instance through two
+operator-supplied inputs (`var.idc_instance_arn`, `var.identity_store_id`)
+instead of creating it. This stack resolves those two IDs from the management
+account's existing **organization** instance so the subscription stack is free
+to consume them without each operator hunting the ARN down by hand.
 
-The IdC instance is a shared foundation resource. It is applied **once and
+The org IdC instance is a shared foundation resource. It is read **once and
 reused across every workshop** — never per workshop. The foundation stack sits
 outside the per-workshop provision/teardown loop entirely:
 
@@ -34,7 +34,7 @@ backend/        (run once; local state; S3 bucket + lock table)
     │
     ▼
 foundation/     (run once; state key foundation/terraform.tfstate)
-    creates ONE awscc_sso_instance "this"
+    reads ONE org IdC instance (data "aws_ssoadmin_instances")
     emits   instance_arn / identity_store_id / region / sign_in_url
     │  operator exports the two IDs (NOT remote state)
     ▼
@@ -44,21 +44,23 @@ subscription/   (per workshop; consumes var.idc_instance_arn + var.identity_stor
 claim-service/  (per workshop; optional self-serve distribution)
 ```
 
-## The single owned resource
+## The single adopted resource
 
-This stack creates **exactly one** account-level IdC instance via
-`awscc_sso_instance "this"` and **nothing else** from the Identity Center
-surface — no users, groups, memberships, permission sets, or account
-assignments. Those all stay in the `subscription/` stack.
+This stack **reads exactly one** organization-level IdC instance via
+`data "aws_ssoadmin_instances" "this"` and touches **nothing else** from the
+Identity Center surface — no users, groups, memberships, permission sets, or
+account assignments. Those all stay in the `subscription/` stack. It never
+creates or destroys the instance.
 
-The `awscc` (AWS Cloud Control) provider is the only provider that can CREATE an
-IdC instance (`awscc_sso_instance` maps to the `AWS::SSO::Instance`
-CloudFormation type). The `hashicorp/aws` provider is present only to resolve
-the concrete region for the `region` output via `data.aws_region.current`.
+The `hashicorp/aws` provider is the only provider this stack needs; the
+`data "aws_ssoadmin_instances"` data source returns the org instance ARN and
+identity store id, and `data.aws_region.current` resolves the concrete region
+for the `region` output.
 
-AWS permits **one account instance per account across all regions**. If the
-account already has one (created outside this stack's state), import it rather
-than creating a second — see [`RUNBOOK.md`](./RUNBOOK.md).
+Exactly **one organization instance exists per management account**. Enabling
+IdC in the management account is a one-time console action (Step 0 in the
+RUNBOOK). If IdC has never been enabled, the data source returns no instance and
+plan fails — that is the missing Step 0, not something this stack repairs.
 
 ## Decoupling via variables (not remote state)
 
@@ -115,24 +117,27 @@ writes each stack's `backend.hcl`.
 ```
 foundation/
 ├── README.md                 ← you are here (concepts)
-├── RUNBOOK.md                ← create-then-wire run order + the mgmt-account step
+├── RUNBOOK.md                ← read-then-wire run order + the mgmt-account step
 └── terraform/
-    ├── versions.tf           ← required providers (hashicorp/awscc + hashicorp/aws)
-    ├── providers.tf          ← aws + awscc wired to the project profile/region
-    ├── variables.tf          ← aws_region, aws_profile, default_tags, instance_name
-    ├── identity_center.tf    ← the single awscc_sso_instance "this"
+    ├── versions.tf           ← required providers (hashicorp/aws only)
+    ├── providers.tf          ← aws provider wired to the management-account profile/region
+    ├── variables.tf          ← aws_region, aws_profile, default_tags
+    ├── identity_center.tf    ← data "aws_ssoadmin_instances" "this" (read-only adopt)
     ├── outputs.tf            ← instance_arn, identity_store_id, region, sign_in_url
     ├── backend.tf            ← tracked, value-free S3 backend block (partial config)
     └── backend.hcl.example   ← template for manual backend.hcl (normally auto-written)
 ```
 
+This stack targets the AWS Organizations **management account**; `AWS_PROFILE`
+must be a management-account profile.
+
 ## Running it
 
 The step-by-step order — the management-account prerequisite, the
-backend-bootstrap → foundation-apply → wire-forward sequence, idempotency and
-import, and the guarded teardown — lives in [`RUNBOOK.md`](./RUNBOOK.md).
+backend-bootstrap → foundation-apply → wire-forward sequence, idempotency, and
+why there is nothing to tear down — lives in [`RUNBOOK.md`](./RUNBOOK.md).
 
 ```bash
-mise run foundation-plan     # DRY RUN: tofu init + plan, creates nothing
-mise run foundation-apply    # apply AND print the TF_VAR_* export lines to wire forward
+mise run foundation-plan     # DRY RUN: tofu init + plan, a pure read (0 to add)
+mise run foundation-apply    # resolve the IDs AND print the TF_VAR_* export lines to wire forward
 ```

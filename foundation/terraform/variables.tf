@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = <<-EOT
-    Region to create the IAM Identity Center account instance in. Must be a
-    region Kiro supports for IdC.
+    Region the IAM Identity Center ORGANIZATION instance lives in / is read
+    from. Must match the region where IdC was enabled in the management account.
 
     Leave empty (the default) to inherit AWS_REGION from the environment — mise
     sources it from the git-ignored .env file, so change the region there
@@ -13,13 +13,13 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS CLI/SDK profile to use. Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
+  description = "AWS CLI/SDK profile to use (MUST be a management-account profile). Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
   type        = string
   default     = ""
 }
 
 variable "default_tags" {
-  description = "Tags applied to every taggable resource, including the IdC instance (via the AWSCC list-of-objects tag shape)."
+  description = "Tags applied to every taggable resource created by this stack via the aws provider default_tags."
   type        = map(string)
   default = {
     Project   = "kiro-subscriptions"
@@ -29,14 +29,4 @@ variable "default_tags" {
     # key present on every line item so there are no untagged items.
     workshop_id = "shared"
   }
-}
-
-variable "instance_name" {
-  description = <<-EOT
-    Optional name applied to the IdC account instance (helps identify it in the
-    console). Supply via tfvars or TF_VAR_instance_name to override. Defaults to
-    "kiro-login" when not supplied.
-  EOT
-  type        = string
-  default     = "kiro-login"
 }

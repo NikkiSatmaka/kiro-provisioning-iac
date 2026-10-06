@@ -1,30 +1,24 @@
 # ===========================================================================
-# IAM Identity Center — ACCOUNT instance owned by the Foundation IdC service
+# IAM Identity Center — ORGANIZATION instance adopted (read-only)
 # ===========================================================================
 #
-# awscc_sso_instance creates an *account* instance of Identity Center in the
-# account/region the provider targets (maps to AWS::SSO::Instance). This is the
-# single, long-lived, shared instance every workshop's subscription stack
-# consumes via var.idc_instance_arn / var.identity_store_id.
+# This stack READS the management account's existing IAM Identity Center
+# ORGANIZATION instance. It never creates or destroys it. Enabling IdC in the
+# management account is the one-time console Step 0 (see RUNBOOK). The single,
+# long-lived org instance is what every workshop's subscription stack consumes
+# via var.idc_instance_arn / var.identity_store_id.
 #
-# PRECONDITION (cannot be enforced from here): the org management account must
-# have permitted member-account instance creation. If it has not, apply fails
-# with an authorization error on this resource. See RUNBOOK step 0.
-#
-# One account instance per account (across all regions). Import an existing one:
-#   tofu import awscc_sso_instance.this <instance_arn>
+# If IdC has never been enabled in the management account, the data source
+# returns no instance and plan fails — that is the missing Step 0, not an error
+# to work around here.
 
-resource "awscc_sso_instance" "this" {
-  # name is optional; helps identify the instance in the console. Defaults to
-  # "kiro-login" (var.instance_name).
-  name = var.instance_name
-
-  # AWSCC uses a list-of-objects tag shape (no provider default_tags support).
-  tags = [for k, v in var.default_tags : { key = k, value = v }]
-}
+data "aws_ssoadmin_instances" "this" {}
 
 locals {
-  identity_store_id = awscc_sso_instance.this.identity_store_id
-  instance_arn      = awscc_sso_instance.this.instance_arn
+  # Exactly one organization instance exists per management account. The data
+  # source attributes are already lists; tolist(...) is a safe no-op and [0]
+  # selects the single org instance.
+  instance_arn      = tolist(data.aws_ssoadmin_instances.this.arns)[0]
+  identity_store_id = tolist(data.aws_ssoadmin_instances.this.identity_store_ids)[0]
   resolved_region   = data.aws_region.current.region
 }

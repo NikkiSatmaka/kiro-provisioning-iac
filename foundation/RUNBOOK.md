@@ -1,47 +1,45 @@
-# Runbook — Create the Foundation IdC instance and wire it forward
+# Runbook — Adopt the organization IdC instance and wire it forward
 
-End-to-end order of operations for the shared, account-level IAM Identity Center
-(IdC) instance. Steps marked **(IaC)** are automated here; steps marked
-**(mgmt account)** or **(console)** are AWS platform limits you must do by hand.
-Nothing in this repo runs on its own — you invoke each step.
+End-to-end order of operations for reading the shared, organization-level IAM
+Identity Center (IdC) instance and wiring its IDs forward. Steps marked **(IaC)**
+are automated here; steps marked **(mgmt account)** or **(console)** are AWS
+platform actions you must do by hand. Nothing in this repo runs on its own — you
+invoke each step.
 
-> Legend: **(mgmt account)** = AWS Organizations management account ·
-> **(this account)** = the child/member account where Kiro lives ·
-> **(IaC)** = `tofu` · **(console)** = AWS web console.
+> Legend: **(mgmt account)** = the AWS Organizations management account, which is
+> where every stack in this repo now provisions · **(this account)** = the same
+> management account · **(IaC)** = `tofu` · **(console)** = AWS web console.
 
-This stack is applied **once and reused across every workshop** — not per
-workshop. It sits between Phase 1 (the `backend/` bootstrap) and Phase 2 (the
-per-workshop `subscription/` stack). Run it a single time, up front; every
-workshop then consumes its outputs.
+This stack reads the org instance **once and reuses the result across every
+workshop** — not per workshop. It sits between Phase 1 (the `backend/` bootstrap)
+and Phase 2 (the per-workshop `subscription/` stack). Run it a single time, up
+front; every workshop then consumes its outputs.
 
 ---
 
-## Step 0 — (mgmt account, one-time) Permit member-account IdC instances
+## Step 0 — (mgmt account, one-time) Enable IAM Identity Center
 
-An account instance can only be created in a member account if the AWS
-Organizations **management account** has enabled member-account IdC instances.
-This is a **one-time, irreversible** toggle.
+This repo adopts the management account's existing **organization** IdC
+instance; it does not create one. If IdC has never been enabled in the
+management account, there is no instance to read and plan fails.
 
 1. Sign in to the **management account** (your AWS Organizations management
    account).
 2. Open **IAM Identity Center** in the console.
-3. **Settings → Management → Account instances of IAM Identity Center → Enable.**
-   Confirm. (You can later constrain this with an SCP; see the AWS docs.)
+3. **Enable** IAM Identity Center. This creates the single organization
+   instance for the account.
 
 Verify (from the management account):
-- The setting shows account instances are allowed.
+- IAM Identity Center is enabled and shows an organization instance.
 
-If you skip this, Step 2's `tofu apply` **fails with an authorization error on
-the `awscc_sso_instance` resource**. That authorization error *is* the missing
-management-account enablement — nothing in this repo can flip the toggle for
-you, because it lives in the management account.
+If you skip this, Step 2's `tofu plan`/`apply` **finds no instance** and the
+`data "aws_ssoadmin_instances"` lookup returns an empty list. That empty result
+*is* the missing enablement — enable IdC in the management account, then re-run.
 
 Docs (rephrased for compliance):
-[Permit account instance creation](https://docs.aws.amazon.com/singlesignon/latest/userguide/enable-account-instance-console.html).
+[Enable IAM Identity Center](https://docs.aws.amazon.com/singlesignon/latest/userguide/get-set-up-for-idc.html).
 
-> ℹ️ One account instance per account, across **all** regions. If this account
-> already has an account instance, import it instead of creating a new one (see
-> Step 3).
+> ℹ️ Exactly one organization instance exists per management account.
 
 ---
 
@@ -54,10 +52,11 @@ Assumes the toolchain + AWS auth are already set up (root README, Phase 0).
 mise run verify          # aws sts get-caller-identity
 ```
 
-Confirm the account is the intended **child** account and the region is one
+Confirm the account is the intended **management** account and the region is one
 Kiro supports for IdC. Profile and region come from the git-ignored `.env`
 (default region `us-east-1`); change the region there (`cp .env.example .env`)
-rather than editing committed files.
+rather than editing committed files. `AWS_PROFILE` must be a management-account
+profile.
 
 ---
 
@@ -90,18 +89,15 @@ Verify:
 
 ---
 
-## Step 2 — (IaC) Create the Foundation IdC instance
+## Step 2 — (IaC) Read the organization IdC instance
 
-The create-then-wire order is: **backend-bootstrap → foundation-apply → capture
+The read-then-wire order is: **backend-bootstrap → foundation-apply → capture
 the two IDs → export them for the subscription stack.** You did the bootstrap in
-Step 1b; this step is the apply.
+Step 1b; this step resolves the IDs.
 
 ```bash
-# Optional: pin a name via tfvars or env (defaults to "kiro-login").
-# export TF_VAR_instance_name="kiro-login"
-
-mise run foundation-plan      # DRY RUN: tofu init + plan (1 instance), creates nothing
-mise run foundation-apply     # apply — creates the instance (prompts to approve)
+mise run foundation-plan      # DRY RUN: tofu init + plan, a pure read (0 to add)
+mise run foundation-apply     # resolve the IDs (creates nothing)
 ```
 
 Both tasks run `tofu init -backend-config=backend.hcl` with the foundation key
@@ -114,18 +110,19 @@ Prefer raw tofu? The equivalent by hand:
 cd foundation/terraform
 tofu init -reconfigure -input=false -backend-config=backend.hcl \
   -backend-config="key=foundation/terraform.tfstate"
-tofu plan       # review: 1 awscc_sso_instance "this"
-tofu apply      # creates it
+tofu plan       # review: a pure read, 0 to add
+tofu apply      # resolves the data source; creates nothing
 ```
 
-What this creates:
-- **One** IAM Identity Center **account instance** in this account.
+What this reads:
+- The **one** IAM Identity Center **organization instance** in the management
+  account.
 - **No** users, groups, memberships, permission sets, or account assignments —
-  those are the `subscription/` stack's job.
+  those are the `subscription/` stack's job. This stack creates nothing.
 
-> If `tofu apply` fails with an **authorization error on `awscc_sso_instance`**,
-> the management-account enablement from Step 0 is missing. Fix Step 0, then
-> re-apply.
+> If `tofu plan` reports no instance (the `data "aws_ssoadmin_instances"` lookup
+> is empty), the IdC enablement from Step 0 is missing. Enable IdC in the
+> management account, then re-run.
 
 ---
 
@@ -157,61 +154,38 @@ identity_store_id = "d-xxxxxxxxxx"
 
 The two stacks are wired **by you, through variables** — never a remote-state
 reference. From here, follow [`../subscription/RUNBOOK.md`](../subscription/RUNBOOK.md)
-for the per-workshop steps. Because the foundation instance is applied once and
-reused across every workshop, you do this wiring once per account and reuse the
-same two IDs for every subsequent workshop.
+for the per-workshop steps. Because the foundation instance is read once and
+reused across every workshop, you do this wiring once per management account and
+reuse the same two IDs for every subsequent workshop.
 
 ---
 
-## Idempotency and importing an existing instance
+## Idempotency — re-running is a safe no-op read
 
-Re-applying this stack after a successful apply makes **no changes** to the
-existing IdC instance absent a configuration change — a re-apply is safe.
-
-AWS permits **one IdC account instance per account across all regions**. If an
-account instance already exists (for example, created before this stack owned
-it) and is not yet in this stack's state, do **not** apply a second one — import
-the existing one into state first:
-
-```bash
-cd foundation/terraform
-tofu import awscc_sso_instance.this <instance_arn>
-```
-
-Then `mise run foundation-plan` should report no changes, confirming the stack
-now owns the existing instance.
+This stack only **reads** the org instance, so re-running it never changes
+anything in AWS. There is nothing to import: the data source resolves the single
+organization instance on every run. `mise run foundation-plan` reports **0 to
+add, 0 to change, 0 to destroy**.
 
 ---
 
-## Teardown
+## Teardown — nothing to destroy here
 
-Destroying the foundation instance is a **deliberate, guarded** action — it is
-the shared resource every workshop depends on, so a routine per-workshop
-teardown must never remove it by accident. The foundation stack is excluded from
-every `provision*`, `teardown*`, and `claim-*` task; **the subscription teardown
-tasks never delete the Foundation IdC instance.** Only the dedicated task below
-can reach it.
+Foundation **does not own a destroyable resource**. The organization IdC
+instance belongs to the management account, not to this stack's state, so there
+is nothing for a `destroy` to remove. **Disabling IAM Identity Center is a
+console action in the management account**, never a per-workshop task, and must
+only be done deliberately when no workshop depends on the directory.
 
-```bash
-mise run foundation-destroy
-```
+Because this stack owns nothing:
 
-That task puts two gates in front of the delete:
-
-1. It prompts you to type exactly `destroy-foundation`. Any other string
-   (including empty or whitespace) exits non-zero and **deletes nothing**.
-2. On a match, it still requires `tofu`'s **own** apply/destroy approval prompt
-   before anything is deleted.
-
-Caveats:
-- **Deleting the IdC account instance is destructive and irreversible.** Every
-  workshop consuming it loses its identity source.
-- The management-account enablement of account instances (Step 0) is a
-  **one-time, irreversible toggle** and **cannot be reversed** — destroying the
-  instance does not undo it.
-- Tear down the per-workshop `subscription/` (and `claim-service/`) stacks
-  first; destroy this shared foundation last, and only when no workshop needs
-  it.
+- `foundation-destroy` is a documented no-op (see `mise.toml`). It deletes
+  nothing and exists only to make that explicit.
+- The subscription teardown tasks never touch the shared org instance — they
+  remove only users / groups / memberships (and, when enabled, the flag-gated
+  permission set / assignments).
+- Tear down the per-workshop `subscription/` (and `claim-service/`) stacks when
+  a workshop is done; the shared org instance stays put for the next workshop.
 
 ---
 
@@ -219,9 +193,8 @@ Caveats:
 
 | Step | Automated here? | Why |
 | ---- | --------------- | --- |
-| Permit member-account instances (Step 0) | ❌ (mgmt account console) | Org-level, one-time, irreversible toggle |
+| Enable IAM Identity Center (Step 0) | ❌ (mgmt account console) | Org-level, one-time console action |
 | Shared backend bucket + `backend.hcl` (Step 1b) | ✅ (IaC, `backend-bootstrap`) | — |
-| Create the IdC account instance (Step 2) | ✅ (IaC, `awscc_sso_instance`) | — |
+| Read the org IdC instance (Step 2) | ✅ (IaC, `data "aws_ssoadmin_instances"`) | Pure read; creates nothing |
 | Wire outputs into the subscription stack (Step 3) | ⚠️ operator exports `TF_VAR_*` | Explicit variables, not remote state |
-| Import a pre-existing instance | ✅ (`tofu import awscc_sso_instance.this`) | One account instance per account, all regions |
-| Destroy the foundation instance | ✅ (`foundation-destroy`, typed-phrase guarded) | Destructive; excluded from per-workshop teardown |
+| Destroy the foundation instance | ❌ (nothing owned) | Org instance is not managed here; `foundation-destroy` is a no-op |

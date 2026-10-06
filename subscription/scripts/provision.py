@@ -52,7 +52,9 @@ USAGE
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -160,6 +162,49 @@ def _require_backend() -> None:
         sys.exit(2)
 
 
+# Slug guard: 1-63 lowercase alphanumeric + hyphens, begin/end alphanumeric
+# (consecutive hyphens are rejected separately). Mirrors the WORKSHOP_ID guard
+# in the mise `provision` task and the authoritative TF variable validation.
+_WID_SLUG = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
+
+
+def _subscription_state_key() -> str:
+    """Resolve this workshop's remote-state key, failing closed on a bad id.
+
+    The backend is per-workshop: state lives at
+    `workshops/<WORKSHOP_ID>/subscription/terraform.tfstate`. `backend.hcl`
+    carries only the shared bucket/region/lock table and intentionally omits
+    `key`; the key is supplied at init time from WORKSHOP_ID. This mirrors the
+    mise `provision` (apply) task so the plan path keys state identically.
+    """
+    wid = "".join((os.environ.get("WORKSHOP_ID") or "").split())
+    if not wid:
+        print("ERROR: WORKSHOP_ID is required (unset or whitespace-only).")
+        print("Set it in the git-ignored .env (see .env.example), e.g.:")
+        print("  WORKSHOP_ID=kiro-2025-10-10")
+        sys.exit(2)
+    if not _WID_SLUG.match(wid) or "--" in wid:
+        print(f"ERROR: WORKSHOP_ID '{wid}' is not a valid slug.")
+        print("Expected: 1-63 lowercase alphanumeric characters and hyphens, "
+              "starting and ending alphanumeric, with no consecutive hyphens.")
+        sys.exit(2)
+
+    # A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+    if BACKEND_HCL.exists() and re.search(
+        r"^\s*key\s*=", BACKEND_HCL.read_text(), re.MULTILINE
+    ):
+        print(f"ERROR: remove the 'key' line from {BACKEND_HCL.name}; "
+              "it is supplied at init time.")
+        sys.exit(2)
+
+    # Thread the workshop namespace to OpenTofu (the root module requires the
+    # workshop_id variable). The mise `provision` task exports this for apply;
+    # set it here so the plan path is self-sufficient too.
+    os.environ["TF_VAR_workshop_id"] = wid
+
+    return f"workshops/{wid}/subscription/terraform.tfstate"
+
+
 def _run(cmd: list[str], cwd: pathlib.Path) -> int:
     print(f"\n$ {' '.join(cmd)}   (cwd={cwd})")
     return subprocess.run(cmd, cwd=str(cwd)).returncode
@@ -220,7 +265,14 @@ def main(argv: list[str]) -> int:
           "`mise run backend-bootstrap` (writes backend.hcl; RUNBOOK step 1b); "
           "init uses backend.hcl.")
 
-    if _run([tofu, "init", "-input=false", "-backend-config=backend.hcl"],
+    # Reconfigure the backend to THIS workshop's key before plan/apply, exactly
+    # as the mise `provision` task does. backend.hcl supplies the shared
+    # bucket/region/lock table; the per-workshop key is threaded here so the
+    # recorded backend never drifts from WORKSHOP_ID.
+    sub_key = _subscription_state_key()
+    if _run([tofu, "init", "-input=false", "-reconfigure",
+             "-backend-config=backend.hcl",
+             f"-backend-config=key={sub_key}"],
             TERRAFORM_DIR) != 0:
         return 1
 

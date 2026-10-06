@@ -22,7 +22,7 @@ variable "default_tags" {
   description = "Tags applied to every taggable resource created by this stack via the aws provider default_tags."
   type        = map(string)
   default = {
-    Project   = "kiro-subscriptions"
+    Project   = "kiro-provisioning-iac"
     ManagedBy = "opentofu"
     Purpose   = "kiro-login-only"
     # Shared infra, not attributable per workshop; keeps the cost-allocation tag

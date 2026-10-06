@@ -17,9 +17,10 @@
 # identity_store_id = "d-xxxxxxxxxx"
 
 # ---- Workshop namespace -----------------------------------------------------
-# Namespaces this workshop's state key, usernames, and group display names so
-# many workshops coexist in the one management-account org IdC directory.
-workshop_id = "kiro-2025-10-10"
+# workshop_id is NOT set here: it comes from the environment (WORKSHOP_ID in
+# .env via TF_VAR_workshop_id, exported by the provision/teardown mise tasks),
+# which is the single source of truth and overrides any tfvars value — so it is
+# intentionally not assigned here.
 
 # ---- Account-access gate ----------------------------------------------------
 # false (default) => create NO permission sets and NO account assignments:
@@ -50,7 +51,7 @@ kiro_tier = "PRO"
 # workshop_id is merged into default_tags UNCONDITIONALLY by the provider, so it
 # does not need to be listed here.
 default_tags = {
-  Project   = "kiro-subscriptions"
+  Project   = "kiro-provisioning-iac"
   ManagedBy = "opentofu"
   Purpose   = "kiro-login-only"
 }

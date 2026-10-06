@@ -1,0 +1,39 @@
+# Copy to terraform.tfvars and edit per workshop. terraform.tfvars is git-ignored.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# The two required inputs (workshop_id and workshop_code) are supplied by the
+# ENVIRONMENT, not by this file — see the sections below. Everything you can set
+# here is an optional override.
+
+# ---- Workshop namespace (env-supplied) --------------------------------------
+# workshop_id is NOT set here: it comes from the environment (WORKSHOP_ID in
+# .env via TF_VAR_workshop_id, exported by the claim-deploy / claim-destroy mise
+# tasks). It namespaces every claim resource name and the state key.
+
+# ---- Workshop access-gate secret (env-supplied, NEVER in this file) ---------
+# workshop_code is the SHARED GATE SECRET participants submit with a claim. It
+# is sensitive and must NEVER be written into a tracked file. Supply it ONLY via
+# the environment as TF_VAR_workshop_code: set WORKSHOP_CODE in your git-ignored
+# .env, and the claim-deploy / claim-destroy mise tasks export it for you. There
+# is deliberately no fill-in value here.
+
+# ---- Abuse gate / behavior (optional) ---------------------------------------
+# allowed_origin = ""   # CORS origin to pin; empty keeps the form same-origin
+# retry_bound    = 5    # max pick-and-claim retries after a lost race
+# per_ip_cap     = 20   # max POST attempts per source IP before 429
+
+# ---- Provider / environment (optional) --------------------------------------
+# Region/profile usually come from the environment (mise sources them from the
+# git-ignored .env). Leave aws_region empty to inherit AWS_REGION.
+# aws_region  = "us-east-1"
+# aws_profile = "kiro-mgmt"
+
+# ---- Tags (optional) --------------------------------------------------------
+# workshop_id is merged into default_tags UNCONDITIONALLY by the provider, so it
+# does not need to be listed here.
+# default_tags = {
+#   Project   = "kiro-provisioning-iac"
+#   Service   = "claim-service"
+#   ManagedBy = "opentofu"
+# }

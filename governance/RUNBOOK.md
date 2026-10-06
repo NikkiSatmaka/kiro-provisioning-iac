@@ -242,7 +242,46 @@ raise the budget) before un-freezing, or the next breach re-attaches it.
 
 ---
 
-## Teardown — (IaC) typed-phrase guarded
+## Teardown — (IaC) two steps, each typed-phrase guarded
+
+Teardown is **two tasks, in order**. Because account placements carry
+`prevent_destroy = true`, a destroy **will not touch (or close) a pre-existing
+account** — and OpenTofu refuses to remove an OU that still holds accounts or a
+policy that is still attached. So you must empty the OU and drop the placed
+accounts from state **first**, then destroy.
+
+### Step A — move the placed accounts out of the OU
+
+```bash
+mise run governance-move-accounts-out
+```
+
+This clears both teardown blockers **without touching the real accounts**:
+
+1. It prompts you to type exactly **`move-accounts-out`**. Any other string
+   (including empty or whitespace) exits non-zero and **moves nothing**.
+2. On a match (and after the shared `WORKSHOP_ID` guard + backend reconfigure),
+   it enumerates **only** the accounts this stack adopted
+   (`aws_organizations_account.placed[...]` in state — never any account outside
+   `var.account_ids`), and for each one:
+   - resolves the account's real current parent via
+     `aws organizations list-parents` (the move source);
+   - moves it back to `var.parent_id` (the parent the workshop OU hangs under)
+     with `aws organizations move-account`, skipping any account already there;
+   - runs `tofu state rm` on the placement — which only drops Terraform's
+     tracking and **never calls AWS**. This is what clears the
+     `prevent_destroy` guard so Step B can proceed.
+
+> ⚠️ Moving the accounts back to `var.parent_id` (typically the org root) takes
+> them out from under the workshop OU, so they **lose the Kiro guardrail (and
+> any still-attached freeze) SCP**. Detach any freeze SCP still attached to a
+> moved account by hand first (see the manual un-freeze above).
+
+The `moveAccount` fallback still applies if you prefer to do it entirely by hand:
+`aws organizations move-account` (destination = root or another parent), or the
+console "Move AWS account" action, then `tofu state rm` each placement yourself.
+
+### Step B — destroy the stack
 
 ```bash
 mise run governance-destroy
@@ -254,18 +293,6 @@ That task puts two gates in front of the delete, mirroring `foundation-destroy`:
    (including empty or whitespace) exits non-zero and **destroys nothing**.
 2. On a match, it still requires `tofu`'s **own** apply/destroy approval prompt
    before anything is deleted.
-
-Because account placements carry `prevent_destroy = true`, a destroy **will not
-touch (or close) a pre-existing account** — and OpenTofu refuses to remove an OU
-that still holds accounts or a policy that is still attached. So before the OU
-and SCPs can be removed:
-
-- **Empty the OU:** move each account out with
-  `aws organizations move-account` (destination = root or another parent), or
-  the console "Move AWS account" action.
-- **Detach the SCPs:** the guardrail detaches as part of destroy once the OU is
-  empty; detach any freeze SCP still attached to a (now-moved) account first
-  (see the manual un-freeze above).
 
 Only then does `governance-destroy` remove the OU, the two SCPs, the budgets
 execution role, and the per-account budgets + actions. The accounts themselves
@@ -299,4 +326,5 @@ mise run governance-plan     # sample-tfvars plan; creates/closes nothing
 | Adopt pre-existing accounts into the OU | ⚠️ `tofu import` then plan (or `move-account` fallback) | No standalone move-into-OU resource in hashicorp/aws v6.67.0 |
 | Automatic freeze on budget breach | ✅ (IaC, `AUTOMATIC` SCP budget action) | Attaches freeze SCP to the single breaching account |
 | Un-freeze a frozen account | ❌ (console / `aws organizations detach-policy`) | No recovery automation by design |
-| Destroy the governance stack | ✅ (`governance-destroy`, typed-phrase `destroy-governance`) | Empty the OU + detach SCPs first; never closes accounts |
+| Empty the OU before teardown | ✅ (`governance-move-accounts-out`, typed-phrase `move-accounts-out`) | Moves placed accounts back to `parent_id` + `state rm`; never closes accounts |
+| Destroy the governance stack | ✅ (`governance-destroy`, typed-phrase `destroy-governance`) | Run `governance-move-accounts-out` first; never closes accounts |

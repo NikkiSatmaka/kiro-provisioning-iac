@@ -714,8 +714,119 @@ echo "  freeze SCP id:     $(tofu output -raw freeze_scp_id)"
 echo "  budgets role arn:  $(tofu output -raw budgets_execution_role_arn)"
 """
 
+[tasks.governance-move-accounts-out]
+description = "PREREQUISITE for governance-destroy: move the placed accounts out of the workshop OU (back to parent_id) and drop them from state so prevent_destroy no longer blocks teardown. Requires WORKSHOP_ID; prompts to confirm."
+dir = "governance/terraform"
+run = """
+set -eu
+# The placed accounts carry prevent_destroy=true and live UNDER the workshop OU,
+# so `governance-destroy` would (a) error on the guarded accounts and (b) fail
+# to delete a non-empty OU. This task clears both blockers WITHOUT touching the
+# real accounts: it MOVES each account out of the workshop OU back to the OU's
+# parent (var.parent_id), then REMOVES it from state (`tofu state rm` only drops
+# Terraform's tracking — it never calls AWS). Run this, then `governance-destroy`.
+
+# --- Confirmation guard --------------------------------------------------------
+# This mutates the LIVE Organizations management account (it moves member
+# accounts between OUs). Require an explicit typed phrase before anything runs.
+printf 'This MOVES the placed member accounts out of the workshop OU in the LIVE\\n'
+printf 'Organizations management account, then drops them from Terraform state.\\n'
+printf 'Type exactly "move-accounts-out" to proceed: '
+read -r CONFIRM
+if [ "$CONFIRM" != "move-accounts-out" ]; then
+  echo "ERROR: confirmation phrase did not match 'move-accounts-out'; moving nothing." >&2
+  exit 1
+fi
+
+# --- WORKSHOP_ID guard (R6.1, R6.7, R8.4) --------------------------------------
+WID="$(printf '%s' "${WORKSHOP_ID:-}" | tr -d '[:space:]')"
+if [ -z "$WID" ]; then
+  echo "ERROR: WORKSHOP_ID is required (unset or whitespace-only)." >&2
+  echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
+  echo "  WORKSHOP_ID=kiro-2025-10-10" >&2
+  exit 1
+fi
+if ! printf '%s' "$WID" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$' \
+   || printf '%s' "$WID" | grep -q -- '--'; then
+  echo "ERROR: WORKSHOP_ID '$WID' is not a valid slug." >&2
+  echo "Expected: 1-63 lowercase alphanumeric characters and hyphens, starting" >&2
+  echo "and ending alphanumeric, with no consecutive hyphens." >&2
+  exit 1
+fi
+if [ ! -f backend.hcl ]; then
+  echo "ERROR: governance/terraform/backend.hcl not found (see governance-plan)." >&2
+  exit 1
+fi
+# A residual 'key' in backend.hcl conflicts with the init-time key (R5.9).
+if grep -Eq '^[[:space:]]*key[[:space:]]*=' backend.hcl; then
+  echo "ERROR: remove the 'key' line from backend.hcl; it is supplied at init time." >&2
+  exit 1
+fi
+export TF_VAR_workshop_id="$WID"
+# Reconfigure to THIS workshop's governance key BEFORE reading state (R6.2);
+# fail closed (R6.3).
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=workshops/${WID}/governance/terraform.tfstate" \
+  || { echo "ERROR: backend init failed; moving nothing." >&2; exit 1; }
+
+# Resolve the workshop OU id (where the accounts currently live) and the parent
+# the OU hangs under (var.parent_id — the destination for the moves) from state.
+OU_ID="$(tofu output -raw workshop_ou_id)"
+# parent_id is an INPUT, not an output; read it from the applied variable via a
+# plan-free `tofu console` so the destination is authoritative, not re-typed.
+DEST_PARENT="$(printf 'var.parent_id\\n' | tofu console 2>/dev/null | tr -d '\"[:space:]')"
+if [ -z "$OU_ID" ] || [ -z "$DEST_PARENT" ]; then
+  echo "ERROR: could not resolve workshop OU id and/or parent_id from state/vars." >&2
+  echo "       OU_ID='$OU_ID' DEST_PARENT='$DEST_PARENT'" >&2
+  echo "       Has this workshop's governance stack been applied?" >&2
+  exit 1
+fi
+echo "Workshop OU: $OU_ID  ->  destination parent: $DEST_PARENT"
+
+# Enumerate the placed accounts straight from state so we only ever touch the
+# accounts THIS stack adopted (never any account outside var.account_ids).
+PLACED="$(tofu state list 2>/dev/null | grep '^aws_organizations_account.placed\\[' || true)"
+if [ -z "$PLACED" ]; then
+  echo "No aws_organizations_account.placed resources in state; nothing to move."
+  exit 0
+fi
+
+printf '%s\\n' "$PLACED" | while IFS= read -r ADDR; do
+  # Extract the 12-digit account id from the state address key.
+  ACCT="$(printf '%s' "$ADDR" | sed -E 's/.*\\["([0-9]{12})"\\].*/\\1/')"
+  if ! printf '%s' "$ACCT" | grep -Eq '^[0-9]{12}$'; then
+    echo "WARNING: could not parse account id from '$ADDR'; skipping." >&2
+    continue
+  fi
+  # The real current parent is the source for the move (robust even if an
+  # account was moved out-of-band). If it is already at the destination, the
+  # move is skipped; otherwise move it, then drop it from state.
+  SRC_PARENT="$(aws organizations list-parents --child-id "$ACCT" \
+    --query 'Parents[0].Id' --output text 2>/dev/null || echo '')"
+  if [ -z "$SRC_PARENT" ] || [ "$SRC_PARENT" = "None" ]; then
+    echo "WARNING: could not resolve current parent of $ACCT; skipping move." >&2
+  elif [ "$SRC_PARENT" = "$DEST_PARENT" ]; then
+    echo "$ACCT already under $DEST_PARENT; no move needed."
+  else
+    echo "Moving $ACCT: $SRC_PARENT -> $DEST_PARENT"
+    aws organizations move-account \
+      --account-id "$ACCT" \
+      --source-parent-id "$SRC_PARENT" \
+      --destination-parent-id "$DEST_PARENT"
+  fi
+  # Drop from state regardless (state rm never calls AWS); this is what clears
+  # the prevent_destroy guard so governance-destroy can proceed.
+  echo "Removing $ADDR from state (does not touch the real account)."
+  tofu state rm "$ADDR"
+done
+
+echo ""
+echo "Done. The placed accounts are out of the workshop OU and no longer in state."
+echo "You can now run: mise run governance-destroy"
+"""
+
 [tasks.governance-destroy]
-description = "DESTRUCTIVE: delete a workshop's OU, SCPs, budgets role, and budgets. Requires typing 'destroy-governance'; then prompts tofu's own approval."
+description = "DESTRUCTIVE: delete a workshop's OU, SCPs, budgets role, and budgets. Run governance-move-accounts-out FIRST. Requires typing 'destroy-governance'; then prompts tofu's own approval."
 dir = "governance/terraform"
 run = """
 set -eu

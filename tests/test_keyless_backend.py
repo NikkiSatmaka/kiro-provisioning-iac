@@ -60,6 +60,44 @@ BACKEND_HCLS = (
 BACKEND_OUTPUTS_TF = REPO_ROOT / "backend" / "terraform" / "outputs.tf"
 MISE_TOML = REPO_ROOT / "mise.toml"
 
+# The shared helper library the long task bodies source. The keyed init-time arg
+# and the residual-key grep were extracted here from the per-workshop mutating
+# tasks (tofu_init_keyed / reject_residual_key), so the text facts R5.6/R5.9 now
+# live in this library rather than inline. The tests below assert against the
+# COMPOSITION of lib + task block — the same treatment as the foundation pinned
+# test — so they keep validating the identical contract against the new
+# structure without weakening any assertion.
+LIB_PATH = REPO_ROOT / "scripts" / "mise-tasks.sh"
+
+# The relative source line every long task body uses to pull in the helpers.
+# Task dirs are uniformly two levels deep, so this resolves to LIB_PATH.
+LIB_SOURCE_LINE = ". ../../scripts/mise-tasks.sh"
+
+
+def _task_block(task: str) -> str:
+    """Return the raw ``[tasks.<task>]`` text block from mise.toml."""
+    toml = MISE_TOML.read_text()
+    start = toml.index(f"[tasks.{task}]")
+    # The next task header (or EOF) bounds this task's block.
+    nxt = toml.find("\n[tasks.", start + 1)
+    return toml[start : nxt if nxt != -1 else len(toml)]
+
+
+def _task_block_resolved(task: str) -> str:
+    """Return a task block with the sourced helper library text inlined.
+
+    The keyed ``tofu init`` and the residual-key grep now live in
+    ``scripts/mise-tasks.sh``; replacing the ``. ../../scripts/mise-tasks.sh``
+    source line with the full library text yields the composition a shell
+    actually runs, so the text-fact assertions still pin the real behavior.
+    """
+    block = _task_block(task)
+    assert LIB_SOURCE_LINE in block, (
+        f"task {task} does not source the shared helper library "
+        f"({LIB_SOURCE_LINE!r}); the refactor expects it to"
+    )
+    return block.replace(LIB_SOURCE_LINE, LIB_PATH.read_text())
+
 # Matches a ``key = ...`` setting at the start of a line (ignoring leading
 # whitespace), i.e. an HCL ``key`` argument — not a commented ``# ... key ...``
 # mention. This is the exact shape the mise residual-key guard greps for.
@@ -189,34 +227,44 @@ def test_mutating_task_supplies_init_time_key(task):
 
     The per-workshop state path is NOT in backend.hcl; it is supplied at init
     via ``-backend-config="key=workshops/${...}/<stack>/terraform.tfstate"``.
-    Reading the task body straight out of mise.toml pins that the mechanism is
-    wired for every mutating operation.
-    """
-    toml = MISE_TOML.read_text()
-    start = toml.index(f"[tasks.{task}]")
-    # The next task header (or EOF) bounds this task's block.
-    nxt = toml.find("\n[tasks.", start + 1)
-    block = toml[start : nxt if nxt != -1 else len(toml)]
 
-    assert "tofu init -reconfigure" in block, (
+    The keyed ``tofu init`` now lives in the ``tofu_init_keyed`` helper, which
+    each mutating task calls with its per-workshop state key as the first
+    positional arg. Assert the mechanism against the lib+task composition: the
+    helper runs ``tofu init -reconfigure`` and emits the keyed
+    ``-backend-config="key=..."`` argument, and the task passes a
+    ``workshops/<id>/<stack>/terraform.tfstate`` key — resolving a ``$SUB_KEY``
+    style var back to its assignment — so both prove the SAME contract.
+    """
+    block = _task_block(task)
+    resolved_block = _task_block_resolved(task)
+
+    # The keyed init (and its -backend-config="key=..." arg) is emitted by the
+    # sourced helper; assert it against the resolved lib+task composition.
+    assert "tofu init -reconfigure" in resolved_block, (
         f"task {task} does not run `tofu init -reconfigure` before mutating"
     )
+    assert '-backend-config="key=' in resolved_block, (
+        f"task {task} does not pass -backend-config=\"key=...\" at init"
+    )
 
-    # The init-time key is passed via -backend-config="key=...". Two equivalent
-    # forms appear across the tasks: the workshop-scoped path inline, or via a
-    # shell var (e.g. SUB_KEY) that is itself assigned that path. Resolve a
-    # ``key=<var>`` reference back to the var's assignment so both forms prove
-    # the SAME contract: key = workshops/<id>/<stack>/terraform.tfstate.
     scoped_literal = r"workshops/\$\{?WID\}?/[a-z-]+/terraform\.tfstate"
 
-    m = re.search(r'-backend-config="key=([^"]+)"', block)
-    assert m, f"task {task} does not pass -backend-config=\"key=...\" at init"
+    # The task supplies the state key as the first positional arg to
+    # tofu_init_keyed. Two equivalent forms appear across the tasks: the
+    # workshop-scoped path inline, or via a shell var (e.g. SUB_KEY) assigned
+    # that path. Resolve a var reference back to its assignment so both forms
+    # prove the SAME contract: key = workshops/<id>/<stack>/terraform.tfstate.
+    m = re.search(r'tofu_init_keyed\s+"([^"]+)"', block)
+    assert m, (
+        f"task {task} does not call tofu_init_keyed with a state key"
+    )
     key_expr = m.group(1)
 
     if re.fullmatch(scoped_literal, key_expr):
         resolved = key_expr
     else:
-        # key=${SUB_KEY} (or $SUB_KEY) — resolve to the var's assignment.
+        # "$SUB_KEY" / "${SUB_KEY}" — resolve to the var's assignment.
         var = re.fullmatch(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?", key_expr)
         assert var, (
             f"task {task} supplies an unexpected init-time key form: {key_expr!r}"
@@ -243,17 +291,25 @@ def test_mutating_task_rejects_residual_key_in_backend_hcl(task):
     If a stray ``key`` survives in backend.hcl it would conflict with the
     init-time key, so every mutating task fails closed before init. We assert
     the guard greps for the same ``^\\s*key\\s*=`` shape and errors out.
-    """
-    toml = MISE_TOML.read_text()
-    start = toml.index(f"[tasks.{task}]")
-    nxt = toml.find("\n[tasks.", start + 1)
-    block = toml[start : nxt if nxt != -1 else len(toml)]
 
-    assert "key[[:space:]]*=" in block, (
+    The residual-key guard now lives in the ``reject_residual_key`` helper, so
+    assert against the resolved lib+task composition (see the module header).
+    The task is also confirmed to CALL the guard, so the mechanism is wired.
+    """
+    block = _task_block(task)
+    resolved_block = _task_block_resolved(task)
+
+    # The task must invoke the extracted guard...
+    assert "reject_residual_key" in block, (
+        f"task {task} does not call reject_residual_key to fail closed on a "
+        "residual key in backend.hcl"
+    )
+    # ...and the guard (now in the sourced lib) greps the same shape and errors.
+    assert "key[[:space:]]*=" in resolved_block, (
         f"task {task} does not grep backend.hcl for a residual `key =`"
     )
     # The guard must error before init rather than warn-and-continue.
-    assert re.search(r"remove the 'key' line from backend.hcl", block), (
+    assert re.search(r"remove the 'key' line from backend.hcl", resolved_block), (
         f"task {task} does not error on a residual key in backend.hcl"
     )
 

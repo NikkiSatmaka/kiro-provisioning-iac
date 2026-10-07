@@ -116,7 +116,7 @@ account-specific backend.hcl. Fix (copy-paste):
   #   cp subscription/terraform/backend.hcl.example subscription/terraform/backend.hcl
 
   # Then re-run provisioning (mise handles `tofu init -backend-config=backend.hcl`):
-  mise run provision-plan             # or: mise run provision
+  mise run subscription-plan             # or: mise run subscription-apply
 ================================================================================
 """
 

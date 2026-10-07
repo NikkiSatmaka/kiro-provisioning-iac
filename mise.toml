@@ -146,11 +146,11 @@ tofu destroy -var force_destroy=true
 # AUTOMATABLE steps; the entrypoint prints the console-only steps (MFA optional,
 # enable Kiro, assign tier, one-time passwords) as a checklist. Nothing mutates
 # the account by default:
-#   - provision-plan is a safe DRY RUN (tofu init + plan, reports only).
-#   - provision applies (tofu apply) and still prompts for approval.
+#   - subscription-plan is a safe DRY RUN (tofu init + plan, reports only).
+#   - subscription-apply applies (tofu apply) and still prompts for approval.
 # Run them yourself when ready; they are not automatic.
 
-[tasks.provision-plan]
+[tasks.subscription-plan]
 description = "DRY RUN: tofu init + plan for the IdC provisioning (no changes)"
 dir = "subscription/scripts"
 run = """
@@ -162,7 +162,7 @@ export TF_VAR_kiro_region="$KIRO_REGION"
 python provision.py
 """
 
-[tasks.provision]
+[tasks.subscription-apply]
 description = "Apply: create a workshop's IdC users + groups + memberships + assignments, then render credentials (requires WORKSHOP_ID; prompts to approve)"
 dir = "subscription/terraform"
 run = """
@@ -206,7 +206,7 @@ echo "wrote ../output/manifest.json"
 ( cd ../scripts && python provision.py --render-only )
 """
 
-[tasks.provision-render]
+[tasks.subscription-render]
 description = "Re-render output/credentials.md from an existing manifest (pass --otp-csv as needed)"
 dir = "subscription/scripts"
 run = "python provision.py --render-only"
@@ -215,7 +215,7 @@ run = "python provision.py --render-only"
 # one-time passwords collected from the console (header: username,otp). The
 # sign-in URL always comes from the manifest (derived from the identity store id
 # by `tofu output`), so there is nothing to paste by hand.
-[tasks.credentials]
+[tasks.subscription-credentials]
 description = "Render output/credentials.md from output/otps.csv (sign-in URL comes from the manifest)"
 dir = "subscription/scripts"
 run = """
@@ -228,7 +228,7 @@ if [ ! -f ../output/otps.csv ]; then
   echo "  username,otp" >&2
   echo "  kiro-user-01,Ab12..." >&2
   echo "" >&2
-  echo "then re-run: mise run credentials" >&2
+  echo "then re-run: mise run subscription-credentials" >&2
   exit 1
 fi
 python provision.py --render-only --otp-csv ../output/otps.csv
@@ -236,21 +236,21 @@ python provision.py --render-only --otp-csv ../output/otps.csv
 
 # Teardown entrypoints — see subscription/TEARDOWN.md. Nothing here mutates the
 # account by default:
-#   - teardown-plan is a safe DRY RUN (Option A discovery, reports only).
-#   - teardown-tofu runs `tofu destroy` (Option B) and still prompts for yes.
+#   - subscription-teardown-plan is a safe DRY RUN (Option A discovery, reports only).
+#   - subscription-destroy runs `tofu destroy` (Option B) and still prompts for yes.
 # Run them yourself when you are ready to clean up; they are not automatic.
 
-[tasks.teardown-plan]
+[tasks.subscription-teardown-plan]
 description = "DRY RUN: discover what teardown would delete (Option A, no changes)"
 dir = "subscription/scripts"
 run = "python teardown.py"
 
-[tasks.teardown-run]
+[tasks.subscription-teardown-run]
 description = "Option A fallback: delete this workshop's IdC users/groups/memberships (prompts to confirm; never deletes the shared org instance)"
 dir = "subscription/scripts"
 run = "python teardown.py --delete"
 
-[tasks.teardown-tofu]
+[tasks.subscription-destroy]
 description = "Option B primary: tofu destroy a workshop's subscription state (requires WORKSHOP_ID; prompts to confirm)"
 dir = "subscription/terraform"
 run = """

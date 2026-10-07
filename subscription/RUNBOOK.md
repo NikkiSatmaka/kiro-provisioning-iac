@@ -81,7 +81,7 @@ stack keeps its own local state, the derived bucket name, and the manual
 Verify:
 - `subscription/terraform/backend.hcl` exists (git-ignored; `backend.tf` is
   tracked and already present).
-- `mise run provision-plan` runs `tofu init -backend-config=backend.hcl` and
+- `mise run subscription-plan` runs `tofu init -backend-config=backend.hcl` and
   reports the S3 backend is initialized (it fails closed if `backend.hcl` is
   missing).
 
@@ -94,10 +94,10 @@ Verify:
 cp subscription/terraform/terraform.tfvars.example subscription/terraform/terraform.tfvars
 
 # 2. Dry run — tofu init + plan (N users + M groups + memberships).
-mise run provision-plan      # creates nothing
+mise run subscription-plan      # creates nothing
 
 # 3. Apply — creates them (prompts to approve).
-mise run provision
+mise run subscription-apply
 ```
 
 Both tasks run `tofu init -backend-config=backend.hcl` for you (S3 backend from
@@ -127,7 +127,7 @@ instance):
 > creates one shared permission set and one assignment per group binding it to
 > its owning member account id. Leave it `false` for Kiro-login-only workshops.
 
-`mise run provision` already exports the manifest the scripts consume. To
+`mise run subscription-apply` already exports the manifest the scripts consume. To
 re-export it by hand:
 ```bash
 cd subscription/terraform
@@ -175,7 +175,7 @@ This provisions the Kiro profile + service-linked role. Not scriptable.
 4. Click **Enable**. A Kiro profile is created.
 
 You do **not** need to copy the sign-in URL from this screen. Step 5's
-`mise run credentials` always takes it from the manifest, which Terraform
+`mise run subscription-credentials` always takes it from the manifest, which Terraform
 derives from the identity store id (`https://<identity-store-id>.awsapps.com/start`).
 
 ---
@@ -224,7 +224,7 @@ one-time-password (OTP) flow, then render the Markdown.
    ```
 3. **(task)** Render the credentials file:
    ```bash
-   mise run credentials
+   mise run subscription-credentials
    ```
    This reads `output/otps.csv` and writes `output/credentials.md`. The
    **sign-in URL is always taken from the manifest** — `tofu output` derives it
@@ -280,15 +280,15 @@ a month later** — live in [`TEARDOWN.md`](./TEARDOWN.md). Two paths:
   + `backend.hcl`), so state lives in S3 and `tofu destroy` works from any clone.
 
   ```bash
-  mise run teardown-tofu    # tofu destroy: removes this workshop's users, groups, memberships (prompts to confirm)
+  mise run subscription-destroy    # tofu destroy: removes this workshop's users, groups, memberships (prompts to confirm)
   ```
 
 - **Option A (fallback):** a state-free discovery script for when no state is
   available (fresh clone, local state gone).
 
   ```bash
-  mise run teardown-plan    # dry run: discover what would be deleted
-  mise run teardown-run     # delete this workshop's IdC users/groups/memberships (prompts to confirm)
+  mise run subscription-teardown-plan    # dry run: discover what would be deleted
+  mise run subscription-teardown-run     # delete this workshop's IdC users/groups/memberships (prompts to confirm)
   ```
 
 Caveats (detailed in `TEARDOWN.md`):

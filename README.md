@@ -150,7 +150,7 @@ run order and the management-account prerequisite. **Next:** Phase 3.
 Each workshop is namespaced by a `WORKSHOP_ID` — a short slug (1-63 lowercase
 alphanumerics and hyphens, e.g. `kiro-2025-10-10`) that keys this workshop's
 remote state and resources so independent workshops never collide. Set it in
-the git-ignored `.env` (see `.env.example`); `mise run provision` fails closed
+the git-ignored `.env` (see `.env.example`); `mise run subscription-apply` fails closed
 if it is unset.
 
 ```bash
@@ -161,8 +161,8 @@ cp subscription/terraform/terraform.tfvars.example subscription/terraform/terraf
 # 2. Name this workshop in .env (git-ignored), e.g. WORKSHOP_ID=kiro-2025-10-10
 
 # 3. Dry run, then apply (prompts) — apply requires WORKSHOP_ID
-mise run provision-plan   # tofu init + plan, no changes
-mise run provision        # create users + groups + memberships in the org IdC instance
+mise run subscription-plan   # tofu init + plan, no changes
+mise run subscription-apply        # create users + groups + memberships in the org IdC instance
 ```
 
 `tofu apply` only covers what AWS exposes as an API. Provisioning then needs
@@ -219,7 +219,7 @@ When the engagement ends, remove everything. The remote state from Phase 1 is
 what lets `tofu destroy` work from any machine.
 
 Teardown targets a single workshop, so set that workshop's `WORKSHOP_ID` in
-`.env` first — the namespaced tasks below (`claim-destroy`, `teardown-tofu`)
+`.env` first — the namespaced tasks below (`claim-destroy`, `subscription-destroy`)
 fail closed if it is unset.
 
 ```bash
@@ -229,9 +229,9 @@ fail closed if it is unset.
 mise run claim-destroy    # requires WORKSHOP_ID; remove the table, Lambda, Function URL (prompts)
 
 # Then the subscription:
-mise run teardown-plan    # DRY RUN: discover what teardown would delete (no changes)
-mise run teardown-tofu    # requires WORKSHOP_ID; tofu destroy (standard path; uses the required remote state)
-mise run teardown-run     # state-free fallback: delete this workshop's users/groups/memberships (confirms; never the shared org instance)
+mise run subscription-teardown-plan    # DRY RUN: discover what teardown would delete (no changes)
+mise run subscription-destroy    # requires WORKSHOP_ID; tofu destroy (standard path; uses the required remote state)
+mise run subscription-teardown-run     # state-free fallback: delete this workshop's users/groups/memberships (confirms; never the shared org instance)
 ```
 
 → **Details (including teardown from a different machine a month later, and the

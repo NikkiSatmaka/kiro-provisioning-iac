@@ -93,10 +93,10 @@ cp terraform/backend.hcl.example terraform/backend.hcl   # edit region
 cd terraform
 tofu init -backend-config=backend.hcl   # one-time on a fresh clone (no task)
 cd ../..
-mise run teardown-tofu                  # tofu destroy: this workshop's users, groups, memberships
+mise run subscription-destroy                  # tofu destroy: this workshop's users, groups, memberships
 ```
 
-`mise run teardown-tofu` runs `tofu destroy`, which reads the real state from S3
+`mise run subscription-destroy` runs `tofu destroy`, which reads the real state from S3
 and deletes this workshop's IdC users, groups, and memberships (plus the
 permission set / assignments if `enable_account_access` was true). It never
 touches the shared organization instance, which is not in this stack's state.
@@ -124,8 +124,8 @@ Use this when `tofu destroy` can't help: no remote backend was set up, and the
 local state is gone (fresh clone). It needs **no state** — it finds everything
 live from the account by naming convention.
 
-The common cases have mise tasks — `mise run teardown-plan` (dry run) and
-`mise run teardown-run` (delete this workshop's users/groups/memberships). Drop
+The common cases have mise tasks — `mise run subscription-teardown-plan` (dry run) and
+`mise run subscription-teardown-run` (delete this workshop's users/groups/memberships). Drop
 to the raw script only for the variants no task covers (custom prefixes):
 
 ```bash
@@ -133,10 +133,10 @@ cd subscription/scripts
 # (project venv has boto3; from repo root `mise run setup` if needed)
 
 # 1. DRY RUN (default, safe) — see exactly what it would delete:
-python teardown.py                           # or: mise run teardown-plan
+python teardown.py                           # or: mise run subscription-teardown-plan
 
 # 2. Delete users, groups, memberships (the shared org instance is always kept):
-python teardown.py --delete                  # or: mise run teardown-run
+python teardown.py --delete                  # or: mise run subscription-teardown-run
 ```
 
 Behavior:
@@ -182,15 +182,15 @@ path:
 ## Runner entrypoints (mise)
 
 Convenience tasks wrap the commands above. None mutate the account without a
-prompt; `teardown-plan` is a safe dry run.
+prompt; `subscription-teardown-plan` is a safe dry run.
 
 ```bash
-mise run teardown-plan    # Option A DRY RUN — report only, no changes
-mise run teardown-run     # Option A — delete this workshop's users/groups/memberships (confirms)
-mise run teardown-tofu    # Option B — tofu destroy (confirms)
+mise run subscription-teardown-plan    # Option A DRY RUN — report only, no changes
+mise run subscription-teardown-run     # Option A — delete this workshop's users/groups/memberships (confirms)
+mise run subscription-destroy    # Option B — tofu destroy (confirms)
 ```
 
-Start with `mise run teardown-plan` to see exactly what would be removed.
+Start with `mise run subscription-teardown-plan` to see exactly what would be removed.
 
 ---
 

@@ -1,0 +1,107 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Rename the seven subscription tasks and self-references in `mise.toml`": [
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791346915091
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791346923256
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347039931
+      }
+    ],
+    "2. Update operator documentation references": [
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791346915147
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347044958
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347177362
+      }
+    ],
+    "3. Update the `BACKEND_SETUP_HELP` tokens in `subscription/scripts/provision.py`": [
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791346915216
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347046095
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347178697
+      }
+    ],
+    "4. Update the planning doc `.agents/tasks/remote-state-plan.md`": [
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791346915291
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347047500
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347180096
+      }
+    ],
+    "5. Update the `MUTATING_TASKS` tuple in `tests/test_keyless_backend.py`": [
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791346915360
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347048633
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347181195
+      }
+    ],
+    "6. Verify zero surviving references, parse the registry, and run the suite": [
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791346915430
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791347185110
+      },
+      {
+        "executionId": "8955ffed-afee-4986-85c6-09d5111295bc",
+        "chatSessionId": "sess_14607a53-555c-4d8a-be48-2785f75145d6",
+        "timestamp": 1791348090996
+      }
+    ]
+  }
+}

@@ -105,7 +105,7 @@ KEY_LINE = re.compile(r"^\s*key\s*=", re.MULTILINE)
 
 # The mutating mise tasks that must supply the init-time key per workshop (R5.6)
 # and guard against a residual key in backend.hcl (R5.9).
-MUTATING_TASKS = ("provision", "teardown-tofu", "claim-deploy", "claim-destroy")
+MUTATING_TASKS = ("subscription-apply", "subscription-destroy", "claim-deploy", "claim-destroy")
 
 
 def _tofu_available() -> bool:

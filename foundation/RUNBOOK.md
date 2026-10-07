@@ -219,19 +219,19 @@ The IdC read never changes anything in AWS: the data source resolves the single
 organization instance on every run. The shared budgets role and the two SCP
 policies are ordinary managed resources, so once applied a re-run is a no-op for
 them too (the plan converges to **0 to change** unless you edited
-`var.kiro_allowed_actions` or a role/policy definition). There is nothing to
-import for the created resources — a first apply creates them; subsequent runs
-reconcile.
+`var.kiro_allowed_actions` or a role/policy definition). For the created
+resources there is nothing to import — a first apply creates them; subsequent
+runs reconcile.
 
 ---
 
 ## Teardown — the shared primitives are long-lived; destroy only at decommission
 
-Foundation **never deletes** the organization IdC instance — that instance
-belongs to the management account, not to this stack's state. **Disabling IAM
-Identity Center is a console action in the management account**, never a repo
-task, and must only be done deliberately when no workshop depends on the
-directory.
+Foundation **owns nothing to destroy** in the organization IdC instance: that
+instance belongs to the management account, not to this stack's state, so it is
+**never deleted** by any foundation task. **Disabling IAM Identity Center is a
+console action in the management account**, never a repo task, and must only be
+done deliberately when no workshop depends on the directory.
 
 The shared budgets role and the two SCP policies this stack now owns are
 **long-lived, shared primitives**. A per-workshop `governance-destroy` **never**

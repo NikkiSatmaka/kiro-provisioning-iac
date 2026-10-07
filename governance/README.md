@@ -6,10 +6,12 @@ Phase 0→4 provisioning flow — run it when you want to put a workshop's **mem
 accounts** under an OU + guardrail SCP + auto-freeze budgets.
 
 - **Prerequisites:** Phase 0 (toolchain + management-account auth), Phase 1
-  (shared backend), and Phase 2 (`foundation/`) done — foundation creates the
-  shared budgets role and the two SCP policies this stack consumes (see
-  [`../foundation/README.md`](../foundation/README.md)) — and the member
-  accounts already exist in the organization.
+  (shared backend), and the management-only `governance-shared/` stack applied —
+  `governance-shared/` creates the shared budgets role and the two SCP policies
+  this stack consumes (see
+  [`../governance-shared/README.md`](../governance-shared/README.md)) — and the
+  member accounts already exist in the organization. (The `foundation/` IdC
+  adoption is a prerequisite for the subscription flow, not for governance.)
 - **Next:** teardown is the guarded `mise run governance-destroy` (see
   [`RUNBOOK.md`](./RUNBOOK.md)).
 
@@ -18,9 +20,9 @@ it creates **one OU per workshop**, **attaches** the shared deny-by-default Kiro
 guardrail SCP to that OU, and wires **per-account budgets** that **automatically
 freeze** only the account that overruns its limit. It does **not** create the
 guardrail SCP, the freeze SCP, or the budgets execution role — those are
-once-per-management-account shared primitives owned by `foundation/` and passed
-in by id/ARN (see "Consuming the shared primitives" below). Like every other
-stack it runs against the Organizations **management account** (or a delegated
+once-per-management-account shared primitives owned by `governance-shared/` and
+passed in by id/ARN (see "Consuming the shared primitives" below). Like every
+other stack it runs against the Organizations **management account** (or a delegated
 Org-admin). What is distinct here is not where it runs but what it *targets*:
 its SCP attachment and budgets act on the **member accounts** in the workshop OU.
 Workloads provisioned by the other stacks live in the management account and are
@@ -40,29 +42,29 @@ requirement. For the step-by-step run order (preconditions, bootstrap,
 plan/apply, un-freeze, teardown), use [`RUNBOOK.md`](./RUNBOOK.md). For the
 overall repo journey, start at the [root `README.md`](../README.md).
 
-## Consuming the shared primitives (from `foundation/`)
+## Consuming the shared primitives (from `governance-shared/`)
 
 Three resources that used to be created here are now **once-per-management-account
-singletons owned by `foundation/`** and consumed by this stack as inputs — the
-same explicit variable handoff the subscription stack uses for the IdC IDs:
+singletons owned by `governance-shared/`** and consumed by this stack as inputs —
+the same explicit variable handoff the subscription stack uses for the IdC IDs:
 
-| Foundation output            | Governance input                   | Used for                                   |
+| governance-shared output     | Governance input                   | Used for                                   |
 | ---------------------------- | ---------------------------------- | ------------------------------------------ |
 | `budgets_execution_role_arn` | `var.budgets_execution_role_arn`   | the role each budget's freeze action assumes |
 | `kiro_guardrail_scp_id`      | `var.kiro_guardrail_scp_id`        | the policy id attached to this workshop's OU |
 | `freeze_scp_id`              | `var.freeze_scp_id`                | the policy id Budgets attaches on breach     |
 
-Run `foundation-apply` once per management account and export the three
+Run `governance-shared-apply` once per management account and export the three
 `TF_VAR_*` values (it prints them) before `governance-apply`. The guardrail
-allowlist (`var.kiro_allowed_actions`) is defined **once, in foundation** — it is
-now a single org-standard policy shared by every workshop, not a per-workshop
-knob.
+allowlist (`var.kiro_allowed_actions`) is defined **once, in `governance-shared/`** —
+it is now a single org-standard policy shared by every workshop, not a
+per-workshop knob.
 
 ## What it governs
 
 Everything the stack *owns* is keyed to one workshop, identified by
 `var.workshop_id`; the SCP policy objects and budgets role it references are
-shared (owned by `foundation/`):
+shared (owned by `governance-shared/`):
 
 ```
 parent OU / org root (var.parent_id)
@@ -75,7 +77,7 @@ workshop-<workshop_id>  OU                    ← exactly one per run (the ONLY 
             └── AUTOMATIC freeze action → attaches the SHARED freeze SCP to the
                 single breaching account on breach, assuming the SHARED role
 
-shared, from foundation/:  guardrail SCP · freeze SCP (deny-all) · budgets role
+shared, from governance-shared/:  guardrail SCP · freeze SCP (deny-all) · budgets role
 ```
 
 ## One OU per workshop
@@ -104,16 +106,16 @@ command are in [`RUNBOOK.md`](./RUNBOOK.md).
 ## The Kiro guardrail SCP attachment (deny-by-default)
 
 The guardrail SCP itself — allowlist semantics, a single `Allow` of
-`var.kiro_allowed_actions` on `*` — is **created in `foundation/`** as a single
-org-standard policy. This stack **attaches** that shared policy (by
+`var.kiro_allowed_actions` on `*` — is **created in `governance-shared/`** as a
+single org-standard policy. This stack **attaches** that shared policy (by
 `var.kiro_guardrail_scp_id`) to the workshop OU. Because an SCP is a boundary,
 everything not in the allowlist is implicitly denied, so every account in the OU
 is bounded to exactly the listed actions.
 
-The allowlist contents are **tuned once, in foundation**
+The allowlist contents are **tuned once, in `governance-shared/`**
 (`var.kiro_allowed_actions` there) — a single org-standard policy, no longer a
 per-workshop knob. If a workshop genuinely needs a different boundary, that is a
-foundation-level decision affecting every workshop; adjust it deliberately.
+governance-shared-level decision affecting every workshop; adjust it deliberately.
 
 ## The automatic per-account budget freeze
 
@@ -130,14 +132,14 @@ Every notify tier must sit strictly below the freeze level (validated).
 Alongside each budget sits an **AUTOMATIC** budget action (no human in the
 loop). On breach of `var.freeze_threshold_percent`, AWS Budgets assumes the
 **shared least-privilege execution role** (`var.budgets_execution_role_arn`,
-from foundation) and attaches the **shared deny-all freeze SCP**
-(`var.freeze_scp_id`, from foundation) to the **single breaching account only —
-never the OU**. So one account's overrun freezes that account and leaves the
-rest of the workshop running.
+from governance-shared) and attaches the **shared deny-all freeze SCP**
+(`var.freeze_scp_id`, from governance-shared) to the **single breaching account
+only — never the OU**. So one account's overrun freezes that account and leaves
+the rest of the workshop running.
 
 Two details follow from this design:
 
-- The freeze SCP lives in `foundation/`, **created but intentionally left
+- The freeze SCP lives in `governance-shared/`, **created but intentionally left
   unattached**. It exists only so Budgets can attach it to a breaching account;
   neither stack declares a static attachment resource for it. Because it is a
   shared singleton, a per-workshop `governance-destroy` never deletes it.
@@ -159,20 +161,21 @@ Region and credential resolution mirror the sibling stacks: an explicit
 (the defaults) the provider inherits `AWS_REGION` / `AWS_PROFILE` from the
 environment (mise sources these from the git-ignored `.env` file).
 
-## Step 0 — a precondition satisfied by `foundation/`
+## Step 0 — a precondition satisfied by `governance-shared/`
 
 Before any SCP can be created or attached, the organization's **root** must have
 **all-features mode** and the **`SERVICE_CONTROL_POLICY` policy type** enabled —
 both **management-account, one-time, console-only** actions OpenTofu cannot
 perform.
 
-Because `foundation/` is now the stack that **creates** the SCP policies, this
-precondition is handled there (see
-[`../foundation/RUNBOOK.md`](../foundation/RUNBOOK.md) Step 0b) and must be done
-before `foundation-apply`. By the time you run `governance/`, the policy type is
-already live, so this stack's guardrail *attachment* just works. If the policy
-type is somehow missing, the attachment fails with an Organizations
-authorization / policy-type error; [`RUNBOOK.md`](./RUNBOOK.md) names that error.
+Because `governance-shared/` is the stack that **creates** the SCP policies,
+this precondition is handled there (see
+[`../governance-shared/RUNBOOK.md`](../governance-shared/RUNBOOK.md)) and must be
+done before `governance-shared-apply`. By the time you run `governance/`, the
+policy type is already live, so this stack's guardrail *attachment* just works.
+If the policy type is somehow missing, the attachment fails with an
+Organizations authorization / policy-type error; [`RUNBOOK.md`](./RUNBOOK.md)
+names that error.
 
 ## Inputs
 
@@ -181,9 +184,9 @@ authorization / policy-type error; [`RUNBOOK.md`](./RUNBOOK.md) names that error
 | `workshop_id`                  | Workshop slug; names the OU (`workshop-<id>`) and keys the state.             |
 | `parent_id`                    | Parent OU / org-root id the workshop OU hangs under.                          |
 | `account_ids`                  | Pre-existing, in-org 12-digit account ids moved into the OU out-of-band (keys the per-account budgets; never created). |
-| `budgets_execution_role_arn`   | **From `foundation/`.** ARN of the shared role each freeze action assumes.    |
-| `kiro_guardrail_scp_id`        | **From `foundation/`.** Id of the shared guardrail SCP attached to the OU.     |
-| `freeze_scp_id`                | **From `foundation/`.** Id of the shared freeze SCP Budgets attaches on breach.|
+| `budgets_execution_role_arn`   | **From `governance-shared/`.** ARN of the shared role each freeze action assumes.    |
+| `kiro_guardrail_scp_id`        | **From `governance-shared/`.** Id of the shared guardrail SCP attached to the OU.     |
+| `freeze_scp_id`                | **From `governance-shared/`.** Id of the shared freeze SCP Budgets attaches on breach.|
 | `freeze_threshold_percent`     | Percent of the limit at which the freeze fires AND an alert is sent (default `90`). |
 | `notification_emails`          | **Required**, non-empty notify-only recipients; a breach must never be silent. |
 | `notify_threshold_percents`    | Notify-only alert tiers below the freeze level (default `[50, 75]`); each must be `> 0` and `<` the freeze threshold. |
@@ -194,15 +197,15 @@ authorization / policy-type error; [`RUNBOOK.md`](./RUNBOOK.md) names that error
 | `default_tags`                 | Tags applied to every taggable resource via the provider.                      |
 
 The allowlist (`kiro_allowed_actions`) is no longer a governance input — it is
-defined once in `foundation/`.
+defined once in `governance-shared/`.
 
 ## Outputs
 
 `workshop_ou_id`, `workshop_ou_arn`, `workshop_ou_name`, and
 `per_account_budgets` (a map keyed by account id → `{ budget_name, action_id }`).
 These are the per-workshop resources this stack **owns**. The guardrail/freeze
-SCP ids and the budgets role ARN are now **inputs** (from `foundation/`), not
-outputs this stack owns; it may echo them for convenience but does not create
+SCP ids and the budgets role ARN are now **inputs** (from `governance-shared/`),
+not outputs this stack owns; it may echo them for convenience but does not create
 them. These outputs surface what an operator needs to verify the applied plan
 shape and to drive the manual un-freeze path in [`RUNBOOK.md`](./RUNBOOK.md).
 
@@ -219,6 +222,7 @@ workshops/<id>/governance/terraform.tfstate       ← this stack
 workshops/<id>/subscription/terraform.tfstate
 workshops/<id>/claim-service/terraform.tfstate
 foundation/terraform.tfstate                       ← no workshop prefix
+governance-shared/terraform.tfstate                ← no workshop prefix (the shared SCPs + role)
 ```
 
 See [`../backend/README.md`](../backend/README.md) for how the bootstrap renders
@@ -229,14 +233,14 @@ and writes each stack's `backend.hcl`.
 ```
 governance/
 ├── README.md                 ← you are here (concepts)
-├── RUNBOOK.md                ← Step 0 precondition (in foundation) + run / un-freeze / teardown order
+├── RUNBOOK.md                ← Step 0 precondition (in governance-shared) + run / un-freeze / teardown order
 └── terraform/
     ├── versions.tf           ← required providers (hashicorp/aws; no awscc)
     ├── providers.tf          ← aws wired to the MANAGEMENT-account profile/region
     ├── variables.tf          ← workshop_id, parent_id, account_ids, the three shared ids, budgets, aws_profile …
     ├── organizations.tf      ← the single workshop OU (accounts are moved in out-of-band)
-    ├── scps.tf               ← guardrail SCP ATTACHMENT to the OU (policy object is in foundation/)
-    ├── budgets.tf            ← per-account budgets + AUTOMATIC freeze actions (role + freeze SCP from foundation/)
+    ├── scps.tf               ← guardrail SCP ATTACHMENT to the OU (policy object is in governance-shared/)
+    ├── budgets.tf            ← per-account budgets + AUTOMATIC freeze actions (role + freeze SCP from governance-shared/)
     ├── outputs.tf            ← OU + per-account budget identifiers
     ├── backend.tf            ← tracked, value-free S3 backend block (partial config)
     └── backend.hcl.example   ← template for the manual backend.hcl (normally auto-written)

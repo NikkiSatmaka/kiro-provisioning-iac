@@ -4,8 +4,10 @@
 
 variable "aws_region" {
   description = <<-EOT
-    Region of the management-account IAM Identity Center organization instance
-    this stack writes identities into. Must be a region Kiro supports for IdC.
+    Region of the IAM Identity Center instance this stack writes identities into
+    (the management account's ORGANIZATION instance in organization mode, or the
+    child account's ACCOUNT instance in account mode). Must be a region Kiro
+    supports for IdC.
 
     Leave empty (the default) to inherit AWS_REGION from the environment —
     mise sources it from the git-ignored .env file, so change the region there
@@ -17,9 +19,41 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS CLI/SDK profile to use (MUST be a management-account profile). Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
+  description = "AWS CLI/SDK profile to use. In organization mode (default) this MUST be a management-account profile; in account mode it MUST be the child/member account's profile. Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
   type        = string
   default     = ""
+}
+
+# ---------------------------------------------------------------------------
+# Identity Center instance mode (organization vs account)
+# ---------------------------------------------------------------------------
+
+variable "instance_mode" {
+  description = <<-EOT
+    Which kind of IAM Identity Center instance this stack writes into:
+
+      - "organization" (default): the AWS Organizations MANAGEMENT account's
+        single ORGANIZATION instance. This is today's behavior — per-group
+        account assignments are available (enable_account_access may be true).
+
+      - "account": a CHILD/member account's OWN IdC ACCOUNT INSTANCE. Only
+        users, groups, and memberships are created; account assignments are
+        NOT available on an account instance, so enable_account_access MUST be
+        false in this mode (a precondition enforces this — see
+        identity_center.tf). Point AWS_PROFILE and the idc_instance_arn /
+        identity_store_id inputs at the CHILD account's instance.
+
+    The workshop_accounts tfvars shape is identical in both modes; in account
+    mode the account-id key is naming/namespacing metadata only (never an
+    assignment target, since assignments are unavailable).
+  EOT
+  type        = string
+  default     = "organization"
+
+  validation {
+    condition     = contains(["organization", "account"], var.instance_mode)
+    error_message = "instance_mode must be either \"organization\" or \"account\"."
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -33,6 +67,11 @@ variable "enable_account_access" {
     When true, create a shared permission set and one account assignment
     per group binding it to that group's owning account id. Flip to true
     only when deliberately granting console access.
+
+    Only valid in organization mode. In account mode (var.instance_mode =
+    "account") this MUST stay false: IdC account instances do not support
+    permission sets or account assignments, and a precondition fails the plan
+    on the invalid combination (see identity_center.tf).
   EOT
   type        = bool
   default     = false
@@ -55,7 +94,9 @@ variable "default_tags" {
 variable "idc_instance_arn" {
   description = <<-EOT
     ARN of the long-lived Foundation IdC instance to consume
-    (arn:aws:sso:::instance/ssoins-xxxxxxxxxxxx). Supplied via tfvars or
+    (arn:aws:sso:::instance/ssoins-xxxxxxxxxxxx). In organization mode this is
+    the management account's ORGANIZATION instance; in account mode it is the
+    child account's OWN account instance. Supplied via tfvars or
     TF_VAR_idc_instance_arn. This module NEVER creates or destroys the instance.
   EOT
   type        = string

@@ -103,7 +103,9 @@ REMOTE S3 STATE IS REQUIRED — set it up once, then re-run (fail closed).
 Why: `tofu destroy` can only delete what is in its STATE. Local state is
 git-ignored and does not travel with the repo, so teardown a month later from a
 fresh clone would orphan every user and group. State must live in S3. (The
-shared organization IdC instance is adopted read-only and never in this state.)
+adopted IdC instance — the organization instance in organization mode, or the
+child account's account instance in account mode — is read-only and never in
+this state.)
 
 backend.tf is already tracked (value-free). The only missing piece is the
 account-specific backend.hcl. Fix (copy-paste):
@@ -258,9 +260,10 @@ def main(argv: list[str]) -> int:
     print(f"Terraform dir: {TERRAFORM_DIR}")
     print(f"Mode:          {'APPLY' if args.apply else 'DRY RUN (plan only)'}")
     print()
-    print("Reminder: Step 0 (enable IAM Identity Center in the management "
-          "account) must already be done, or there is no org instance to write "
-          "identities into and `apply` will fail.")
+    print("Reminder: Step 0 (enable IAM Identity Center in the target account "
+          "— the management account in organization mode, or the child account "
+          "in account mode) must already be done, or there is no IdC instance "
+          "to write identities into and `apply` will fail.")
     print("Reminder: remote S3 state is required and set up once via "
           "`mise run backend-bootstrap` (writes backend.hcl; RUNBOOK step 1b); "
           "init uses backend.hcl.")

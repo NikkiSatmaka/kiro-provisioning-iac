@@ -1,11 +1,23 @@
 # kiro-provisioning-iac
 
 Reusable Infrastructure-as-Code (**OpenTofu**) and Python tooling to provision
-**Kiro enterprise subscriptions** for a team in the AWS Organizations
-**management account**, using its **IAM Identity Center _organization
-instance_** as the identity source. Every stack here provisions in the
-management account; `AWS_PROFILE` must be a management-account profile. Only the
-`governance/` SCP/budget *targets* are member accounts.
+**Kiro enterprise subscriptions** for a team, using **IAM Identity Center** as
+the identity source. The identity stacks (`foundation/`, `subscription/`) are
+**dual-mode**:
+
+- **organization mode** (default) — the AWS Organizations **management
+  account**, using its **IAM Identity Center _organization instance_**
+  (today's behavior; `AWS_PROFILE` is a management-account profile). Account
+  assignments are available.
+- **account mode** — a **child/member account**, using that account's **own
+  IdC account instance** (`AWS_PROFILE` is the child account's profile). Only
+  users/groups/memberships are created; account assignments are unavailable, so
+  `enable_account_access` must stay `false`. Set via the subscription stack's
+  `instance_mode` variable — see
+  [`subscription/README.md`](./subscription/README.md#dual-mode-organization-vs-account-instance).
+
+The `governance/` and `governance-shared/` stacks are **management-account
+only** (not dual-mode); `governance/` SCP/budget *targets* are member accounts.
 
 The identities this creates are meant for **Kiro login only** — by default they
 get no AWS console access (no permission sets, no account assignments, gated
@@ -26,24 +38,29 @@ one links to the detailed doc for that step. New here? Just go top to bottom.
 | ----- | ----------- | ------------ |
 | **0. Set up** | Install the toolchain, point it at your AWS account, authenticate | this README ↓ |
 | **1. Backend** | Create the shared S3 remote-state bucket (one-time, required) | [`backend/README.md`](./backend/README.md) · [RUNBOOK Step 1b](./subscription/RUNBOOK.md#step-1b--iac-one-time-set-up-the-remote-s3-state-backend-required) |
-| **2. Foundation** | Adopt (read) the management account's org IdC instance (one-time, reused by every workshop) | [`foundation/README.md`](./foundation/README.md) · [`foundation/RUNBOOK.md`](./foundation/RUNBOOK.md) |
+| **2. Foundation** | Adopt (read) whichever IdC instance the credentialed account exposes — org instance (management) or account instance (child) — one-time, reused by every workshop | [`foundation/README.md`](./foundation/README.md) · [`foundation/RUNBOOK.md`](./foundation/RUNBOOK.md) |
 | **3. Provision** | Create the users, groups, memberships; the console-only Kiro steps; render credentials | [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) |
 | **4. Distribute** | Hand out credentials directly, **or** deploy the self-serve claim service | [`claim-service/README.md`](./claim-service/README.md) |
 | **Teardown** | Remove everything when the workshop/engagement ends | [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) |
-| **Optional — Governance** | Put a workshop's member accounts under an OU with a Kiro guardrail SCP + auto-freeze budgets (runs in the management account; targets member accounts) | [`governance/README.md`](./governance/README.md) · [`governance/RUNBOOK.md`](./governance/RUNBOOK.md) |
+| **Optional — Governance (shared)** | One-time: create the management-account singleton SCP policies + budgets execution role every workshop's governance consumes | [`governance-shared/README.md`](./governance-shared/README.md) · [`governance-shared/RUNBOOK.md`](./governance-shared/RUNBOOK.md) |
+| **Optional — Governance** | Put a workshop's member accounts under an OU with the shared Kiro guardrail SCP + auto-freeze budgets (management account only; targets member accounts) | [`governance/README.md`](./governance/README.md) · [`governance/RUNBOOK.md`](./governance/RUNBOOK.md) |
 
-The phases chain: **2 reads the shared org IdC instance and emits its ARN +
+The phases chain: **2 adopts the IdC instance and emits its ARN +
 identity store id, which 3 consumes; 3 produces `subscription/output/otps.csv` +
 `manifest.json`, which 4 consumes.** So adopt the foundation instance, then
-provision, then distribute.
+provision, then distribute. (The optional governance path is
+management-account-only: run `governance-shared` once to create the singletons,
+then per-workshop `governance` consumes them as `TF_VAR_*`.)
 
 ---
 
 ## What it does
 
 For a given set of accounts, groups, and user counts, the tooling creates IdC
-users, groups, and their memberships in the management account's organization
-instance via OpenTofu, then walks you through the console-only steps AWS does
+users, groups, and their memberships in the adopted IdC instance (the management
+account's organization instance by default, or a child account's account
+instance in account mode) via OpenTofu, then walks you through the console-only
+steps AWS does
 not expose as a stable API (making MFA optional, enabling Kiro, assigning a
 subscription tier, and generating per-user passwords). It finishes by rendering
 a credentials Markdown file — which you distribute directly or via the optional
@@ -62,11 +79,13 @@ Prerequisites:
 - [mise](https://mise.jdx.dev/) to manage the toolchain and run tasks. It
   installs the pinned tools — Python 3.12, OpenTofu 1.13, the AWS CLI, uv — and
   creates the `.venv`.
-- AWS credentials for the **management account** (the account that owns AWS
-  Organizations and the organization IdC instance; the CSVs land in `creds/`),
-  and IAM Identity Center must already be **enabled** in that account (that is
-  **RUNBOOK Step 0** — a one-time console action; do it before Phase 2's
-  foundation adopt).
+- AWS credentials for the target account (the CSVs land in `creds/`): the
+  **management account** in organization mode (the account that owns AWS
+  Organizations and the organization IdC instance), or a **child/member
+  account** in account mode. IAM Identity Center must already be **enabled** in
+  that account (that is **RUNBOOK Step 0** — a one-time console action; do it
+  before Phase 2's foundation adopt). The optional `governance` /
+  `governance-shared` stacks always require **management-account** credentials.
 
 ```bash
 # 1. Install the toolchain + create the Python venv
@@ -105,13 +124,14 @@ bucket it stores state in).
 
 ```bash
 mise run backend-bootstrap-plan   # DRY RUN: plan the bucket + lock table (creates nothing)
-mise run backend-bootstrap        # create them AND write both stacks' backend.hcl (prompts)
+mise run backend-bootstrap        # create them AND write every stack's backend.hcl (prompts)
 ```
 
 The bootstrap derives the bucket name from your account id and writes the
-backend config for **both** stacks — `subscription/terraform/backend.hcl` and
-`claim-service/terraform/backend.hcl` — so neither needs an account id filled in
-by hand. `provision-*` tasks fail closed until the subscription one exists.
+backend config for **every** stack — `subscription/`, `claim-service/`,
+`foundation/`, `governance/`, and `governance-shared/` — so none needs an
+account id filled in by hand. `provision-*` tasks fail closed until the
+subscription one exists.
 
 → **Details:** [`backend/README.md`](./backend/README.md) and
 [RUNBOOK Step 1b](./subscription/RUNBOOK.md#step-1b--iac-one-time-set-up-the-remote-s3-state-backend-required).
@@ -119,13 +139,16 @@ by hand. `provision-*` tasks fail closed until the subscription one exists.
 
 ---
 
-## Phase 2 — Foundation (adopt the org IdC instance, one-time)
+## Phase 2 — Foundation (adopt the IdC instance, one-time)
 
-The management account's organization IAM Identity Center instance is a
-**long-lived, shared** resource every workshop reuses. `foundation/` is the one
-stack that **adopts (reads)** it; run it **once per management account**, after
-the backend bootstrap and before provisioning. It creates nothing — no instance,
-no users, groups, or memberships — those stay in the subscription stack.
+The IAM Identity Center instance is a **long-lived, shared** resource every
+workshop reuses — the management account's **organization instance** in
+organization mode, or a child account's **account instance** in account mode.
+`foundation/` is the one stack that **adopts (reads)** whichever instance the
+credentialed account exposes; run it **once per account**, after the backend
+bootstrap and before provisioning. It creates nothing — no instance, no users,
+groups, or memberships (those stay in the subscription stack), and no SCPs or
+budgets role (those are the management-only `governance-shared/` stack).
 
 ```bash
 mise run foundation-plan    # DRY RUN: tofu init + plan, a pure read (0 to add)
@@ -135,13 +158,14 @@ mise run foundation-apply   # resolve the IDs AND print the TF_VAR_* export line
 `foundation-apply` emits the `instance_arn` and `identity_store_id`. You export
 those into the subscription stack as `TF_VAR_idc_instance_arn` /
 `TF_VAR_identity_store_id` (or put them in tfvars) — the two stacks are wired by
-these variables, not by remote state. Reading the org instance requires IAM
-Identity Center to be enabled in the management account (a one-time console
-action — RUNBOOK Step 0).
+these variables, not by remote state. Reading the instance requires IAM
+Identity Center to be enabled in the credentialed account first — the management
+account in organization mode, or the child account in account mode (a one-time
+console action — RUNBOOK Step 0).
 
 → **Details:** [`foundation/README.md`](./foundation/README.md) for the concepts
 and [`foundation/RUNBOOK.md`](./foundation/RUNBOOK.md) for the read-then-wire
-run order and the management-account prerequisite. **Next:** Phase 3.
+run order and the per-account prerequisite. **Next:** Phase 3.
 
 ---
 
@@ -162,7 +186,7 @@ cp subscription/terraform/terraform.tfvars.example subscription/terraform/terraf
 
 # 3. Dry run, then apply (prompts) — apply requires WORKSHOP_ID
 mise run subscription-plan   # tofu init + plan, no changes
-mise run subscription-apply        # create users + groups + memberships in the org IdC instance
+mise run subscription-apply        # create users + groups + memberships in the adopted IdC instance
 ```
 
 `tofu apply` only covers what AWS exposes as an API. Provisioning then needs
@@ -172,7 +196,8 @@ credentials` renders `output/credentials.md`. These are all laid out, in order,
 in the RUNBOOK.
 
 → **Follow the full run order:** [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md)
-from **Step 0** (enabling IdC in the management account) through credential
+from **Step 0** (enabling IdC in the target account — management account in
+organization mode, child account in account mode) through credential
 rendering (Step 5). **Next:** Phase 4.
 
 ---
@@ -242,12 +267,22 @@ Kiro-subscription deactivation that must happen first):**
 
 ## Governance (optional track)
 
-Governance (optional) is a separate track — see
-[`governance/README.md`](./governance/README.md). It runs in the same
-management account and governs the member accounts a workshop uses; it is **not
-part of the linear** Phase 0→4 provisioning flow. Run it when you want a
-workshop's member accounts under an OU with a Kiro guardrail SCP and auto-freeze
-budgets.
+Governance (optional) is a separate, **management-account-only** track — see
+[`governance/README.md`](./governance/README.md). It is **not part of the
+linear** Phase 0→4 provisioning flow, and it is **not** dual-mode (it never runs
+in a child account). Run it when you want a workshop's member accounts under an
+OU with a Kiro guardrail SCP and auto-freeze budgets.
+
+It has two stacks:
+
+- **`governance-shared/`** — run **once** per management account. Creates the
+  management-account singleton primitives (the two SCP policy objects +
+  the budgets execution role) and prints the three `TF_VAR_*` to wire forward.
+  These moved out of `foundation/` so `foundation/` can be account-safe
+  (dual-mode). See [`governance-shared/README.md`](./governance-shared/README.md).
+- **`governance/`** — per workshop. A pure **consumer** of those three
+  `TF_VAR_*`; owns the per-workshop OU, the guardrail SCP attachment, and the
+  per-account budgets.
 
 ---
 
@@ -258,13 +293,15 @@ budgets.
 | Doc | Purpose |
 | --- | ------- |
 | [`backend/README.md`](./backend/README.md) | The shared remote-state backend: the S3 bucket + lock table the other stacks store state in |
-| [`foundation/README.md`](./foundation/README.md) | Concepts: adopting (reading) the management account's org IdC instance, the decoupling-via-variables boundary, the shared backend with a foundation-scoped key |
-| [`foundation/RUNBOOK.md`](./foundation/RUNBOOK.md) | Read-then-wire run order: the management-account prerequisite, reading once and exporting the IDs into the subscription stack |
+| [`foundation/README.md`](./foundation/README.md) | Concepts: adopting (reading) whichever IdC instance the credentialed account exposes (org or account), the decoupling-via-variables boundary, the shared backend with a foundation-scoped key |
+| [`foundation/RUNBOOK.md`](./foundation/RUNBOOK.md) | Read-then-wire run order: the per-account IdC prerequisite, reading once and exporting the IDs into the subscription stack |
 | [`subscription/README.md`](./subscription/README.md) | Concepts: what is provisioned, where the identities live, what AWS won't automate, reusability knobs |
 | [`subscription/RUNBOOK.md`](./subscription/RUNBOOK.md) | End-to-end run order, including the console-only steps |
 | [`subscription/TEARDOWN.md`](./subscription/TEARDOWN.md) | Cleanup: remote-state `tofu destroy` (primary) + state-free script (fallback) |
 | [`claim-service/README.md`](./claim-service/README.md) | Optional self-serve distribution: deploy a Lambda Function URL, seed the pool from `subscription/output/`, let participants claim with a workshop code |
-| [`governance/README.md`](./governance/README.md) | Concepts: one OU per workshop, the Kiro guardrail SCP, the unattached freeze SCP, and the per-account budgets that auto-freeze a breaching account; management-account creds |
+| [`governance-shared/README.md`](./governance-shared/README.md) | Concepts: the management-account singleton SCP policies + budgets execution role (moved out of foundation), the wire-forward into per-workshop governance, and the one-time state migration |
+| [`governance-shared/RUNBOOK.md`](./governance-shared/RUNBOOK.md) | Run order: backend bootstrap → governance-shared-apply → export the three TF_VAR_* → governance plan/apply; plus the `tofu state mv` migration from foundation's state |
+| [`governance/README.md`](./governance/README.md) | Concepts: one OU per workshop, the Kiro guardrail SCP attachment, and the per-account budgets that auto-freeze a breaching account; consumes the shared primitives from governance-shared; management-account creds |
 | [`governance/RUNBOOK.md`](./governance/RUNBOOK.md) | Run order: the Step 0 all-features/SCP precondition, backend bootstrap, plan/apply, automatic freeze behavior, the manual un-freeze detach, and typed-phrase teardown |
 
 ### Repo layout
@@ -283,9 +320,9 @@ state:
 ├── backend/                  ← shared remote-state backend (LOCAL state, run once)
 │   ├── README.md             ← why it exists + how to run
 │   └── terraform/            ← S3 state bucket + DynamoDB lock table
-├── foundation/               ← adopts the org IdC instance (shared; run once per management account)
+├── foundation/               ← adopts the IdC instance, dual-mode (org or account); run once per account
 │   ├── README.md             ← concepts + the decoupling-via-variables boundary
-│   ├── RUNBOOK.md            ← read-then-wire run order + the mgmt-account step
+│   ├── RUNBOOK.md            ← read-then-wire run order + the per-account IdC step
 │   └── terraform/            ← data "aws_ssoadmin_instances" (read-only) + wiring outputs
 ├── subscription/             ← IdC users + groups + memberships + Kiro subscription
 │   ├── README.md             ← concepts + reusability
@@ -302,10 +339,14 @@ state:
 │   ├── terraform/            ← DynamoDB + Lambda + Function URL + IAM
 │   ├── scripts/              ← seed_claim_pool.py, export_audit.py
 │   └── tests/                ← pytest + Hypothesis + moto suite
-└── governance/               ← per-workshop OU + guardrails + budget freeze (management account; reuses the shared backend)
+├── governance-shared/        ← management-account singletons: 2 SCP policies + budgets exec role (run once; reuses the shared backend)
+│   ├── README.md             ← concepts + why they left foundation + wire-forward into governance
+│   ├── RUNBOOK.md            ← run order + the one-time tofu state mv migration from foundation
+│   └── terraform/            ← aws_organizations_policy (kiro-guardrail, freeze) + budgets exec role
+└── governance/               ← per-workshop OU + guardrail attachment + budget freeze (management account; consumes governance-shared; reuses the shared backend)
     ├── README.md             ← concepts + the management-account creds + high-blast-radius note
     ├── RUNBOOK.md            ← Step 0 precondition, run order, auto-freeze + manual un-freeze, teardown
-    └── terraform/            ← OU + Kiro guardrail SCP + unattached freeze SCP + per-account budgets
+    └── terraform/            ← OU + guardrail SCP attachment + per-account budgets (SCPs/role from governance-shared)
 ```
 
 **Shared backend relationship.** `backend/` runs first and creates the S3 bucket
@@ -314,14 +355,17 @@ create the bucket it stores state in — run it once per account). `subscription
 then consumes that bucket as its remote backend with the per-workshop state key
 `workshops/<id>/subscription/terraform.tfstate`. Any other stack reuses the same
 bucket under its own distinct key — `foundation/` uses the bare
-`foundation/terraform.tfstate`, `claim-service/` uses
-`workshops/<id>/claim-service/terraform.tfstate`, and `governance/` uses
-`workshops/<id>/governance/terraform.tfstate` — so each stack's `tofu destroy`
-can never touch the identities in `subscription/`'s state.
+`foundation/terraform.tfstate`, `governance-shared/` uses the bare
+`governance-shared/terraform.tfstate` (both management-account singletons),
+`claim-service/` uses `workshops/<id>/claim-service/terraform.tfstate`, and
+`governance/` uses `workshops/<id>/governance/terraform.tfstate` — so each
+stack's `tofu destroy` can never touch the identities in `subscription/`'s
+state.
 
 ### Configuration knobs
 
-Everything that changes between projects — region, management-account profile,
+Everything that changes between projects — region, AWS profile (management
+account in organization mode, child account in account mode), the instance mode,
 the workshop namespace, the accounts/groups/user counts, the account-access
 gate, and the Kiro tier — is a variable. Region and profile live in the
 git-ignored `.env`; the `workshop_accounts` topology, `enable_account_access`,

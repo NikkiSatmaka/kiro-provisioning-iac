@@ -5,10 +5,18 @@ it removes one workshop's provisioning. **Prerequisites:** the workshop was
 provisioned (Phase 3); if you deployed the Phase 4 claim service, tear it down
 first with `mise run claim-destroy`.
 
-Goal: wipe **this workshop's** provisioning from the management account
-completely, and have that stay possible **a month later, from a different
-computer** — without ever touching the shared organization IdC instance or any
-other workshop's identities.
+Goal: wipe **this workshop's** provisioning from the target account completely,
+and have that stay possible **a month later, from a different computer** —
+without ever touching the IdC instance itself or any other workshop's
+identities.
+
+> **Dual-mode.** This teardown applies to both modes. In the default
+> **organization mode** the target is the management account's organization
+> instance; in **account mode** (`instance_mode = "account"`) it is the child
+> account's own account instance. Substitute "the child account" for "the
+> management account" below and use the **child account's** `AWS_PROFILE`. The
+> adopted instance (org or account) is never deleted either way. Account mode
+> never creates permission sets / assignments, so that row is a no-op there.
 
 There are two paths. **Option B (remote state + `tofu destroy`) is the primary
 one.** **Option A (a state-free discovery script) is the fallback** for when

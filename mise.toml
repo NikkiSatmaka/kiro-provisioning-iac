@@ -101,7 +101,7 @@ tofu plan
 """
 
 [tasks.backend-bootstrap]
-description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write the subscription/, claim-service/, foundation/, and governance/ backend.hcl files (prompts to approve)."
+description = "One-time (REQUIRED): create the S3 state bucket + lock table AND write the subscription/, claim-service/, foundation/, governance/, and governance-shared/ backend.hcl files (prompts to approve)."
 dir = "backend/terraform"
 run = """
 set -eu
@@ -124,6 +124,9 @@ cat ../../foundation/terraform/backend.hcl
 tofu output -raw backend_hcl_governance > ../../governance/terraform/backend.hcl
 echo "wrote governance/terraform/backend.hcl"
 cat ../../governance/terraform/backend.hcl
+tofu output -raw backend_hcl_governance_shared > ../../governance-shared/terraform/backend.hcl
+echo "wrote governance-shared/terraform/backend.hcl"
+cat ../../governance-shared/terraform/backend.hcl
 """
 
 [tasks.backend-destroy]
@@ -475,17 +478,19 @@ tofu destroy
 # =============================================================================
 # === foundation/ stack ===
 # =============================================================================
-# The once-per-management-account shared layer. It ADOPTS (reads) the management
-# account's organization IdC instance AND CREATES the shared primitives every
-# workshop's governance stack consumes: the budgets execution role and the two
-# SCP policy objects (Kiro guardrail + deny-all freeze). Read/created ONCE and
-# reused across every workshop (NOT per workshop). Runs in the management
-# account; AWS_PROFILE must be a management-account profile. Excluded from every
-# per-workshop provision/teardown task. backend.hcl must exist first (written by
-# `mise run backend-bootstrap`, same shared bucket as the other stacks).
+# The shared IdC-adoption layer, now DUAL-MODE and account-safe. It only ADOPTS
+# (reads) whichever IAM Identity Center instance the credentialed account
+# exposes — the ORGANIZATION instance when run under a management-account
+# profile, or the account's OWN account instance when run under a child/member
+# account's profile. It owns NOTHING to create or destroy (the shared budgets
+# role + 2 SCP policy objects moved to the management-only governance-shared/
+# stack). Read ONCE and reused across every workshop (NOT per workshop).
+# Excluded from every per-workshop provision/teardown task. backend.hcl must
+# exist first (written by `mise run backend-bootstrap`, same shared bucket as
+# the other stacks).
 
 [tasks.foundation-plan]
-description = "DRY RUN: tofu init + plan (reads the org IdC instance; shows the shared budgets role + 2 SCP policies to create)"
+description = "DRY RUN: tofu init + plan (reads whichever IdC instance the credentialed account exposes — org instance in management, account instance in a child; creates nothing)"
 dir = "foundation/terraform"
 run = """
 set -eu
@@ -500,7 +505,7 @@ tofu plan
 """
 
 [tasks.foundation-apply]
-description = "Apply: read the org IdC instance, create the shared budgets role + 2 SCP policies, and print the wire-forward exports (prompts to approve)"
+description = "Apply: adopt (read) whichever IdC instance the credentialed account exposes and print the IdC wire-forward exports for the subscription stack (prompts to approve)"
 dir = "foundation/terraform"
 run = """
 set -eu
@@ -511,16 +516,13 @@ reject_residual_key
 tofu_init_keyed "foundation/terraform.tfstate" "backend init failed; not applying."
 tofu apply
 # Only reached after a clean apply (set -eu). Surface the values to wire forward.
+# Foundation owns ONLY the IdC handoff now; the shared-primitive exports
+# (budgets role + 2 SCP ids) come from governance-shared-apply.
 echo ""
 echo "Foundation applied. Wire these into the subscription stack (IdC handoff):"
 echo "  export TF_VAR_idc_instance_arn=\"$(tofu output -raw instance_arn)\""
 echo "  export TF_VAR_identity_store_id=\"$(tofu output -raw identity_store_id)\""
 echo "Sign-in URL: $(tofu output -raw sign_in_url)  (region: $(tofu output -raw region))"
-echo ""
-echo "Wire these into the governance stack (shared-primitives handoff):"
-echo "  export TF_VAR_budgets_execution_role_arn=\"$(tofu output -raw budgets_execution_role_arn)\""
-echo "  export TF_VAR_kiro_guardrail_scp_id=\"$(tofu output -raw kiro_guardrail_scp_id)\""
-echo "  export TF_VAR_freeze_scp_id=\"$(tofu output -raw freeze_scp_id)\""
 """
 
 [tasks.foundation-destroy]
@@ -535,24 +537,80 @@ set -eu
 #
 # Disabling the organization IdC instance itself is a deliberate management-
 # account console action, never a repo task.
-echo "foundation-destroy is a no-op: foundation adopts the org IdC instance"
+echo "foundation-destroy is a no-op: foundation adopts the IdC instance"
 echo "read-only and owns nothing to destroy. Nothing was deleted."
 echo "Disabling IdC is a management-account console action, not a repo task."
 """
 
 # =============================================================================
+# === governance-shared/ stack ===
+# =============================================================================
+# The management-account SINGLETON layer. It CREATES the shared primitives every
+# workshop's governance stack consumes: the budgets execution role and the two
+# SCP policy objects (Kiro guardrail + deny-all freeze). These moved OUT of
+# foundation (so foundation is account-safe/dual-mode) into this dedicated
+# management-only stack — they are once-per-management-account singletons with
+# unsuffixed names, so per-workshop governance cannot own them. Created ONCE and
+# reused across every workshop (NOT per workshop). MANAGEMENT ACCOUNT ONLY (it
+# creates Organizations SCPs); AWS_PROFILE must be a management-account profile.
+# This stack is NOT dual-mode and NEVER runs in a child account. Excluded from
+# every per-workshop provision/teardown task. backend.hcl must exist first
+# (written by `mise run backend-bootstrap`, same shared bucket, singleton state
+# key governance-shared/terraform.tfstate). See governance-shared/RUNBOOK.md for
+# run order and the one-time tofu state mv migration from foundation's state.
+
+[tasks.governance-shared-plan]
+description = "DRY RUN: tofu init + plan (shows the shared budgets role + 2 SCP policies to create; MANAGEMENT ACCOUNT ONLY; creates nothing)"
+dir = "governance-shared/terraform"
+run = """
+set -eu
+. ../../scripts/mise-tasks.sh
+require_backend_hcl "governance-shared/terraform/backend.hcl" \
+  "Run the backend bootstrap first (it writes this file):" \
+  "  mise run backend-bootstrap" \
+  "or copy the template by hand: cp backend.hcl.example backend.hcl"
+reject_residual_key
+tofu_init_keyed "governance-shared/terraform.tfstate" "backend init failed; not planning."
+tofu plan
+"""
+
+[tasks.governance-shared-apply]
+description = "Apply: create the shared budgets role + 2 SCP policies and print the wire-forward exports for the governance stack (MANAGEMENT ACCOUNT ONLY; prompts to approve)"
+dir = "governance-shared/terraform"
+run = """
+set -eu
+. ../../scripts/mise-tasks.sh
+require_backend_hcl "governance-shared/terraform/backend.hcl" \
+  "(see governance-shared-plan)"
+reject_residual_key
+tofu_init_keyed "governance-shared/terraform.tfstate" "backend init failed; not applying."
+tofu apply
+# Only reached after a clean apply (set -eu). Surface the shared-primitive
+# values to wire forward into every workshop's governance stack (the SAME three
+# exports foundation used to print — they now originate here).
+echo ""
+echo "governance-shared applied. Wire these into the governance stack (shared-primitives handoff):"
+echo "  export TF_VAR_budgets_execution_role_arn=\"$(tofu output -raw budgets_execution_role_arn)\""
+echo "  export TF_VAR_kiro_guardrail_scp_id=\"$(tofu output -raw kiro_guardrail_scp_id)\""
+echo "  export TF_VAR_freeze_scp_id=\"$(tofu output -raw freeze_scp_id)\""
+"""
+
+# =============================================================================
 # === governance/ stack ===
 # =============================================================================
-# Standalone, MANAGEMENT-ACCOUNT-scoped stack: one OU per workshop, a Kiro
-# guardrail SCP on the OU, an unattached deny-all freeze SCP, a least-privilege
-# budgets execution role, and per-account budgets whose breach AUTOMATICALLY
-# attaches the freeze SCP to the single breaching account. High blast radius —
-# apply mutates the live AWS Organizations management account. backend.hcl must
-# exist first (written by `mise run backend-bootstrap`, same shared bucket as
-# the other stacks). Namespaced per workshop by WORKSHOP_ID, exactly like the
-# subscription/ and claim-service/ stacks. There is intentionally NO un-freeze
-# task: recovering a frozen account is a deliberate manual detach (see
-# governance/RUNBOOK.md).
+# Standalone, MANAGEMENT-ACCOUNT-scoped, per-workshop stack: one OU per workshop,
+# the shared Kiro guardrail SCP attached to the OU, and per-account budgets whose
+# breach AUTOMATICALLY attaches the shared deny-all freeze SCP to the single
+# breaching account. The shared primitives it consumes — the budgets execution
+# role and the two SCP policy objects — are management-account singletons owned
+# by the governance-shared/ stack and wired in as TF_VAR_* (run
+# governance-shared-apply first; this stack is a pure CONSUMER of them). High
+# blast radius — apply mutates the live AWS Organizations management account.
+# backend.hcl must exist first (written by `mise run backend-bootstrap`, same
+# shared bucket as the other stacks). Namespaced per workshop by WORKSHOP_ID,
+# exactly like the subscription/ and claim-service/ stacks. There is
+# intentionally NO un-freeze task: recovering a frozen account is a deliberate
+# manual detach (see governance/RUNBOOK.md).
 
 [tasks.governance-plan]
 description = "DRY RUN: tofu init + plan for a workshop's governance stack (requires WORKSHOP_ID; creates nothing)"
@@ -562,17 +620,17 @@ set -eu
 . ../../scripts/mise-tasks.sh
 # WORKSHOP_ID guard (R6.1, R6.7, R8.4): sets WID; fails closed if unset/invalid.
 require_workshop_id
-# --- Shared-primitive wire-forward guard (from foundation/) --------------------
-# These three come from foundation/ (OpenTofu picks TF_VAR_* up automatically).
-# They have no defaults, so fail closed with a pointer to foundation-apply if any
-# is missing rather than letting tofu prompt for them.
+# --- Shared-primitive wire-forward guard (from governance-shared/) ------------
+# These three come from governance-shared/ (OpenTofu picks TF_VAR_* up automatically).
+# They have no defaults, so fail closed with a pointer to governance-shared-apply
+# if any is missing rather than letting tofu prompt for them.
 MISSING=""
 [ -z "${TF_VAR_budgets_execution_role_arn:-}" ] && MISSING="$MISSING TF_VAR_budgets_execution_role_arn"
 [ -z "${TF_VAR_kiro_guardrail_scp_id:-}" ] && MISSING="$MISSING TF_VAR_kiro_guardrail_scp_id"
 [ -z "${TF_VAR_freeze_scp_id:-}" ] && MISSING="$MISSING TF_VAR_freeze_scp_id"
 if [ -n "$MISSING" ]; then
-  echo "ERROR: missing required input(s) from foundation/:$MISSING" >&2
-  echo "These come from the foundation stack. Run 'mise run foundation-apply' and" >&2
+  echo "ERROR: missing required input(s) from governance-shared/:$MISSING" >&2
+  echo "These come from the governance-shared stack. Run 'mise run governance-shared-apply' and" >&2
   echo "export the three TF_VAR_* it prints before running governance." >&2
   exit 1
 fi
@@ -590,24 +648,24 @@ tofu plan
 """
 
 [tasks.governance-apply]
-description = "Apply: create (or re-converge) a workshop's OU, guardrail SCP attachment, and per-account budgets using the shared SCPs + budgets role from foundation/ (requires WORKSHOP_ID; prompts to approve)"
+description = "Apply: create (or re-converge) a workshop's OU, guardrail SCP attachment, and per-account budgets using the shared SCPs + budgets role from governance-shared/ (requires WORKSHOP_ID; prompts to approve)"
 dir = "governance/terraform"
 run = """
 set -eu
 . ../../scripts/mise-tasks.sh
 # WORKSHOP_ID guard (R6.1, R6.7, R8.4): sets WID; fails closed if unset/invalid.
 require_workshop_id
-# --- Shared-primitive wire-forward guard (from foundation/) --------------------
-# These three come from foundation/ (OpenTofu picks TF_VAR_* up automatically).
-# They have no defaults, so fail closed with a pointer to foundation-apply if any
-# is missing rather than letting tofu prompt for them.
+# --- Shared-primitive wire-forward guard (from governance-shared/) ------------
+# These three come from governance-shared/ (OpenTofu picks TF_VAR_* up automatically).
+# They have no defaults, so fail closed with a pointer to governance-shared-apply
+# if any is missing rather than letting tofu prompt for them.
 MISSING=""
 [ -z "${TF_VAR_budgets_execution_role_arn:-}" ] && MISSING="$MISSING TF_VAR_budgets_execution_role_arn"
 [ -z "${TF_VAR_kiro_guardrail_scp_id:-}" ] && MISSING="$MISSING TF_VAR_kiro_guardrail_scp_id"
 [ -z "${TF_VAR_freeze_scp_id:-}" ] && MISSING="$MISSING TF_VAR_freeze_scp_id"
 if [ -n "$MISSING" ]; then
-  echo "ERROR: missing required input(s) from foundation/:$MISSING" >&2
-  echo "These come from the foundation stack. Run 'mise run foundation-apply' and" >&2
+  echo "ERROR: missing required input(s) from governance-shared/:$MISSING" >&2
+  echo "These come from the governance-shared stack. Run 'mise run governance-shared-apply' and" >&2
   echo "export the three TF_VAR_* it prints before running governance." >&2
   exit 1
 fi
@@ -621,8 +679,8 @@ export TF_VAR_workshop_id="$WID"
 tofu_init_keyed "workshops/${WID}/governance/terraform.tfstate" "backend init failed; not applying."
 tofu apply
 # Only reached after a clean apply (set -eu). Surface the governance-OWNED
-# outputs (the shared SCP ids / budgets role ARN are inputs from foundation/,
-# not outputs of this stack).
+# outputs (the shared SCP ids / budgets role ARN are inputs from
+# governance-shared/, not outputs of this stack).
 echo ""
 echo "Governance stack applied for workshop '$WID':"
 echo "  workshop OU id:      $(tofu output -raw workshop_ou_id)"
@@ -821,17 +879,17 @@ require_typed_phrase "destroy-governance" "destroying nothing."
 
 # WORKSHOP_ID guard (R6.1, R6.7, R8.4): sets WID; fails closed if unset/invalid.
 require_workshop_id
-# --- Shared-primitive wire-forward guard (from foundation/) --------------------
+# --- Shared-primitive wire-forward guard (from governance-shared/) ------------
 # destroy also instantiates the provider/vars, so the three no-default inputs
 # must be present (OpenTofu picks TF_VAR_* up automatically). Fail closed with a
-# pointer to foundation-apply if any is missing.
+# pointer to governance-shared-apply if any is missing.
 MISSING=""
 [ -z "${TF_VAR_budgets_execution_role_arn:-}" ] && MISSING="$MISSING TF_VAR_budgets_execution_role_arn"
 [ -z "${TF_VAR_kiro_guardrail_scp_id:-}" ] && MISSING="$MISSING TF_VAR_kiro_guardrail_scp_id"
 [ -z "${TF_VAR_freeze_scp_id:-}" ] && MISSING="$MISSING TF_VAR_freeze_scp_id"
 if [ -n "$MISSING" ]; then
-  echo "ERROR: missing required input(s) from foundation/:$MISSING" >&2
-  echo "These come from the foundation stack. Run 'mise run foundation-apply' and" >&2
+  echo "ERROR: missing required input(s) from governance-shared/:$MISSING" >&2
+  echo "These come from the governance-shared stack. Run 'mise run governance-shared-apply' and" >&2
   echo "export the three TF_VAR_* it prints before running governance." >&2
   exit 1
 fi

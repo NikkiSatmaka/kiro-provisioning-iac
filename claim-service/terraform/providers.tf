@@ -1,8 +1,12 @@
 # AWS provider.
 #
-# This stack deploys in the AWS Organizations MANAGEMENT account; AWS_PROFILE
-# must be a management-account profile. Many workshops' claim services coexist
-# there, each namespaced by workshop_id with its own lifecycle and billing.
+# This stack is account-agnostic: it deploys regional DynamoDB + Lambda with no
+# Organizations or management-account dependency, so it runs in whichever
+# account the workshop was provisioned in — the AWS Organizations MANAGEMENT
+# account in organization mode, or a CHILD/member account in account mode (see
+# subscription/ instance_mode). AWS_PROFILE must point at that same account.
+# Many workshops' claim services coexist there, each namespaced by workshop_id
+# with its own lifecycle and billing.
 #
 # The deployment region is NEVER hardcoded: it is inherited from AWS_REGION in
 # the environment (mise sources it from the git-ignored .env, which defaults to

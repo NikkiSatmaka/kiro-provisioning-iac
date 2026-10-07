@@ -10,9 +10,11 @@ the local state still on disk).
 This script is the FALLBACK for when `tofu destroy` cannot help: a fresh clone
 on a different machine a month later, with LOCAL state that never traveled with
 the repo, so OpenTofu's state is empty and would delete nothing. This script
-needs NO state. It rediscovers everything from the live management account by
-naming convention and the organization IdC instance, then deletes only this
-workshop's users/groups/memberships.
+needs NO state. It rediscovers everything from the live target account by naming
+convention and the adopted IdC instance (the organization instance in
+organization mode, or the child account's own account instance in account
+mode), then deletes only this workshop's users/groups/memberships. Run it under
+the SAME account/profile the workshop was provisioned in.
 
 WHAT IT DELETES (and in the correct order)
 ------------------------------------------
@@ -20,16 +22,17 @@ WHAT IT DELETES (and in the correct order)
   2. The matched IdC users   (default name prefix: "kiro-user-").
   3. The matched IdC groups  (default name prefix: "kiro-team-").
 
-It NEVER deletes the IAM Identity Center instance. All stacks now run in the
-management account against its single, shared ORGANIZATION instance; deleting it
-would wipe every other workshop's identities, so this script refuses to.
+It NEVER deletes the IAM Identity Center instance. In organization mode this is
+the management account's single, shared ORGANIZATION instance (deleting it would
+wipe every other workshop's identities); in account mode it is the child
+account's own account instance. Either way this script refuses to delete it.
 
 WHAT IT CANNOT DO (prints guided manual steps instead)
 ------------------------------------------------------
   * Deactivate Kiro subscriptions / tier assignments.
   * Remove the Kiro-created IdC application assignment that is NOT auto-removed
     when you stop Kiro access.
-  * Disable IAM Identity Center in the management account (a deliberate console
+  * Disable IAM Identity Center in the target account (a deliberate console
     action; never a per-workshop teardown step).
 These are console-only; the script prints the exact steps at the end.
 
@@ -39,7 +42,12 @@ SAFETY
   * Mutating requires BOTH --delete and typing the confirmation phrase (or
     passing --yes for non-interactive use).
   * It only ever deletes users/groups whose names match the configured
-    prefixes. It NEVER deletes the shared organization IdC instance.
+    prefixes. It NEVER deletes the adopted IdC instance (org or account).
+    NOTE (R-3, pre-existing / out of scope): the default --user-prefix /
+    --group-prefix below ("kiro-user-" / "kiro-team-") predate the current
+    "<workshop_id>-<acct_last4>-<group>-NN" naming scheme and may match nothing;
+    this is an existing bug unrelated to dual-mode and is intentionally left
+    untouched here — pass explicit prefixes to match today's names.
 
 USAGE
 -----

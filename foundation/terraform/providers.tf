@@ -1,13 +1,15 @@
-# This stack targets the AWS Organizations MANAGEMENT account. AWS_PROFILE must
-# be a management-account profile (the account that owns AWS Organizations and
-# the organization IAM Identity Center instance this stack reads).
+# This stack is DUAL-MODE and account-safe: it only READS the IdC instance the
+# credentialed account exposes (no Organizations writes live here anymore — the
+# shared SCPs + budgets role moved to governance-shared/). Use a management-
+# account profile to adopt the ORGANIZATION instance, or a child/member
+# account's profile to adopt that account's OWN account instance.
 #
 # Region and credentials come from the environment so the same config is
 # reusable: AWS_PROFILE / AWS_REGION (set by mise from .env), an explicit
 # `-var aws_region=...`, or the standard AWS SDK credential chain.
 #
 # Region precedence: an explicit -var/tfvars wins; when aws_region is empty (the
-# default) the providers inherit AWS_REGION from the environment. The org IdC
+# default) the providers inherit AWS_REGION from the environment. The IdC
 # instance is READ from whatever region these providers target.
 
 provider "aws" {

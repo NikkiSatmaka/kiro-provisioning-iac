@@ -23,15 +23,17 @@ after apply (the freeze ``policy_id``, the execution-role arn, the budget
 values carry concrete ``target_ids`` per instance even while the surrounding
 references are "known after apply". We read those planned values directly.
 
-Offline-ness: the live config's ``providers.tf`` reads
-``data.aws_caller_identity`` and ``data.aws_region`` and the account placements
-use ``aws_organizations_account`` — all of which would need credentials/network
-at plan. The harness swaps ``providers.tf`` for a credential-free stub (static
-dummy creds + skip_* flags) and, so the plan never has to read live data or
-import real accounts, drops ``organizations.tf`` and feeds the two values the
-rest of the stack needs (the caller account id and region) as locals via an
-override. Nothing here is copied back into the real stack; it is a throwaway
-rendering lens over the committed ``budgets.tf``.
+Offline-ness: the account placements in ``organizations.tf`` use
+``aws_organizations_account`` (live reads/imports), and the live
+``providers.tf`` sets a management-account profile. The harness drops
+``organizations.tf`` and swaps ``providers.tf`` for a credential-free stub
+(static dummy creds + skip_* flags). The current ``budgets.tf`` reads no data
+source — the budgets execution role and the freeze SCP it once resolved via
+``data.aws_caller_identity`` now live in foundation/ and are consumed here as
+``var.budgets_execution_role_arn`` / ``var.freeze_scp_id`` — so the stub
+redeclares nothing and no mock STS is needed. Nothing here is copied back into
+the real stack; it is a throwaway rendering lens over the committed
+``budgets.tf``.
 """
 
 from __future__ import annotations
@@ -41,34 +43,19 @@ import json
 import shutil
 import subprocess
 import tempfile
-import threading
 import uuid
 from functools import lru_cache
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GOVERNANCE_TF_DIR = REPO_ROOT / "governance" / "terraform"
 
-# A fixed management-account id the mock STS returns for GetCallerIdentity. Its
-# value is irrelevant to Property 2 (which is about per-action target_ids); it
-# only has to be a well-formed 12-digit id so the trust-policy data source in
-# budgets.tf resolves offline.
-_STUB_ACCOUNT_ID = "999999999999"
-
-# Credential-free aws provider that points STS at a local mock. Replaces the
-# real providers.tf for the plan. Static dummy creds plus the skip_* flags
-# remove every network dependency EXCEPT the one data.aws_caller_identity read
-# that budgets.tf's trust policy needs — served by the in-process mock STS at
-# var._sts_endpoint (see _MockSTS). The STS endpoint is a VARIABLE so the
-# harness dir can be initialized once and reused across many plans (each plan
-# spins up a fresh mock on an ephemeral port). The real providers.tf's two data
-# sources are redeclared so budgets.tf is used byte-for-byte unchanged.
+# Credential-free aws provider. Replaces the real providers.tf for the plan.
+# Static dummy creds plus the skip_* flags remove every network dependency. The
+# current budgets.tf reads no data source (the budgets role + freeze SCP it once
+# resolved via data.aws_caller_identity moved to foundation/ and are consumed
+# here by variable), so the stub redeclares nothing and needs no mock STS.
 _STUB_PROVIDER_TF = """\
-variable "_sts_endpoint" {
-  type = string
-}
-
 provider "aws" {
   region                      = "us-east-1"
   access_key                  = "test"
@@ -76,54 +63,8 @@ provider "aws" {
   skip_credentials_validation = true
   skip_requesting_account_id  = true
   skip_metadata_api_check     = true
-
-  endpoints {
-    sts = var._sts_endpoint
-  }
 }
-
-# Redeclared from the real providers.tf (removed in the harness) so budgets.tf's
-# trust policy reference, data.aws_caller_identity.current.account_id, resolves.
-# The mock STS answers GetCallerIdentity; data.aws_region reads from the static
-# region above (no network).
-data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
 """
-
-
-class _MockSTS(BaseHTTPRequestHandler):
-    """Answer the single GetCallerIdentity the plan makes with a canned id."""
-
-    def do_POST(self):
-        length = int(self.headers.get("Content-Length", 0))
-        self.rfile.read(length)
-        body = (
-            '<GetCallerIdentityResponse '
-            'xmlns="https://sts.amazonaws.com/doc/2011-06-15/">'
-            "<GetCallerIdentityResult>"
-            f"<Arn>arn:aws:iam::{_STUB_ACCOUNT_ID}:root</Arn>"
-            f"<UserId>{_STUB_ACCOUNT_ID}</UserId>"
-            f"<Account>{_STUB_ACCOUNT_ID}</Account>"
-            "</GetCallerIdentityResult>"
-            "<ResponseMetadata><RequestId>stub</RequestId></ResponseMetadata>"
-            "</GetCallerIdentityResponse>"
-        ).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "text/xml")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, *args):  # silence the handler's stderr logging
-        pass
-
-
-def _start_mock_sts() -> tuple[HTTPServer, str]:
-    """Start the mock STS on an ephemeral localhost port; return (server, url)."""
-    server = HTTPServer(("127.0.0.1", 0), _MockSTS)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    return server, f"http://127.0.0.1:{server.server_address[1]}"
 
 
 def tofu_available() -> bool:
@@ -148,16 +89,15 @@ def _initialized_harness_dir() -> Path:
     """Build + init a throwaway, credential-free copy of the governance stack ONCE.
 
     Copies the committed ``*.tf``, drops the remote backend and the live-only
-    bits (``organizations.tf`` account placement, the data-source-reading
-    ``providers.tf``), and swaps in a static provider stub (STS endpoint supplied
-    as a variable at plan time) plus a stub OU the guardrail attachment needs.
-    The result plans fully offline while leaving ``budgets.tf`` — the code under
-    test — byte-for-byte unchanged.
+    bits (``organizations.tf`` account placement, the profile-bound
+    ``providers.tf``), and swaps in a static provider stub plus a stub OU the
+    guardrail attachment needs. The result plans fully offline while leaving
+    ``budgets.tf`` — the code under test — byte-for-byte unchanged.
 
     Cached for the test session: ``tofu init`` (the slow provider-link step)
     runs once, and each per-example plan reuses this directory's ``.terraform``
-    with a different ``-var-file`` and STS endpoint. ``tofu plan`` does not
-    mutate the directory, so reuse is safe across examples.
+    with a different ``-var-file``. ``tofu plan`` does not mutate the directory,
+    so reuse is safe across examples.
     """
     tmp = Path(tempfile.mkdtemp(prefix="gov-prop2-"))
     for tf in GOVERNANCE_TF_DIR.glob("*.tf"):
@@ -170,8 +110,8 @@ def _initialized_harness_dir() -> Path:
     (tmp / "backend.tf").unlink(missing_ok=True)
     # Account placement reads/imports live accounts; irrelevant to Property 2.
     (tmp / "organizations.tf").unlink(missing_ok=True)
-    # The real providers.tf reads live data sources; replace with the static
-    # stub (which redeclares those data sources and points STS at a var).
+    # The real providers.tf binds a management-account profile; replace with
+    # the static credential-free stub (no data sources, no STS).
     (tmp / "providers.tf").write_text(_STUB_PROVIDER_TF)
     # Stub OU so scps.tf's guardrail attachment resolves without placement.
     (tmp / "_harness_overrides.tf").write_text(_HARNESS_OVERRIDES_TF)
@@ -215,7 +155,6 @@ def plan_budget_action_targets(account_ids: list[str]) -> dict[str, dict]:
         }
     """
     tmp = _initialized_harness_dir()
-    server, sts_endpoint = _start_mock_sts()
     # Unique per-call file names so concurrent/sequential plans in the shared
     # cached dir never clobber each other.
     token = uuid.uuid4().hex
@@ -226,7 +165,6 @@ def plan_budget_action_targets(account_ids: list[str]) -> dict[str, dict]:
         subprocess.run(
             [
                 "tofu", "plan", "-no-color", "-input=false",
-                f"-var=_sts_endpoint={sts_endpoint}",
                 f"-var-file={tfvars.name}", f"-out={plan_bin.name}",
             ],
             cwd=tmp,
@@ -248,7 +186,6 @@ def plan_budget_action_targets(account_ids: list[str]) -> dict[str, dict]:
             facts.update(config_refs)
         return result
     finally:
-        server.shutdown()
         tfvars.unlink(missing_ok=True)
         plan_bin.unlink(missing_ok=True)
 

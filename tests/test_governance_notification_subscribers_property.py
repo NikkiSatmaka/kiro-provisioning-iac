@@ -26,13 +26,13 @@ and non-mutating:
   * the stack is copied to a throwaway dir with ``backend.tf`` dropped, so
     ``tofu init -backend=false`` initializes locally from the committed lock;
   * ``providers.tf`` is replaced with a mock-credential, skip-everything aws
-    provider so no STS/SSO/metadata call happens at plan time;
-  * the stack's two data sources (``aws_caller_identity`` / ``aws_region``) —
-    which would hit the API — are removed and the single
-    ``data.aws_caller_identity.current.account_id`` reference in the trust
-    policy is repointed at a fixed stub id. Neither data source feeds the
-    budget notifications this property exercises, so the rendered notification
-    is identical to a real plan's.
+    provider so no STS/SSO/metadata call happens at plan time. The real
+    ``providers.tf`` declares ``data.aws_region.current`` for region reporting,
+    but no resource in the current stack references it (the SCP policy objects
+    and the budgets execution role, which once read ``data.aws_caller_identity``,
+    now live in foundation/ and are consumed here by variable), so the stub
+    needs to redeclare nothing. The rendered budget notifications are therefore
+    identical to a real plan's.
 
 No ``tofu apply`` ever runs: the property reads a saved plan file only.
 
@@ -55,15 +55,14 @@ from hypothesis import strategies as st
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GOVERNANCE_TF_DIR = REPO_ROOT / "governance" / "terraform"
 
-# A fixed, obviously-fake id used only to satisfy the trust-policy reference
-# offline; it never reaches the budget notifications under test.
-_STUB_ACCOUNT_ID = "999999999999"
-
-# The mock-credential, skip-everything provider plus the account-id stub local.
-# This REPLACES the real providers.tf in the throwaway copy only.
-_TEST_PROVIDERS_TF = f"""\
+# The mock-credential, skip-everything provider. This REPLACES the real
+# providers.tf in the throwaway copy only. No resource in the current governance
+# stack reads a data source (the SCP policy objects + budgets role that once
+# read data.aws_caller_identity now live in foundation/ and are consumed here by
+# variable), so the stub redeclares nothing beyond the provider itself.
+_TEST_PROVIDERS_TF = """\
 # TEST-ONLY provider override (offline plan harness) — not the real stack.
-provider "aws" {{
+provider "aws" {
   region                      = "us-east-1"
   access_key                  = "mock_access_key_id"
   secret_key                  = "mock_secret_access_key"
@@ -72,17 +71,10 @@ provider "aws" {{
   skip_metadata_api_check     = true
   skip_region_validation      = true
 
-  default_tags {{
+  default_tags {
     tags = var.default_tags
-  }}
-}}
-
-# The real stack reads data.aws_caller_identity/aws_region (both hit the API).
-# Offline we drop them and feed the single account_id reference a stub, which
-# does not affect the budget-notification rendering this property checks.
-locals {{
-  _test_account_id = "{_STUB_ACCOUNT_ID}"
-}}
+  }
+}
 """
 
 
@@ -99,10 +91,9 @@ requires_tofu = pytest.mark.skipif(
 def _initialized_tf_dir() -> Path:
     """Copy the governance stack to a temp dir and init it offline, once.
 
-    Drops the S3 backend so ``tofu init -backend=false`` stays local; swaps in
-    the mock provider; and repoints the trust-policy's caller-identity
-    reference at the stub local. Cached for the session so every planned
-    example reuses the one init (plan is the per-example cost).
+    Drops the S3 backend so ``tofu init -backend=false`` stays local and swaps
+    in the mock provider. Cached for the session so every planned example reuses
+    the one init (plan is the per-example cost).
     """
     tmp = Path(tempfile.mkdtemp(prefix="governance-prop3-"))
     for tf in GOVERNANCE_TF_DIR.glob("*.tf"):
@@ -114,22 +105,10 @@ def _initialized_tf_dir() -> Path:
     # Local, offline init: no remote backend.
     (tmp / "backend.tf").unlink(missing_ok=True)
 
-    # Mock provider + account-id stub in place of the real providers.tf.
+    # Mock provider in place of the real providers.tf. The current stack reads
+    # no data source, so there is nothing to repoint — the mutated copy differs
+    # from the real stack only by the provider override above.
     (tmp / "providers.tf").write_text(_TEST_PROVIDERS_TF)
-
-    # Repoint the one caller-identity reference at the stub local so no STS
-    # call is needed at plan time. (budgets.tf trust policy, Requirement 6.2.)
-    budgets = tmp / "budgets.tf"
-    src = budgets.read_text()
-    patched = src.replace(
-        "data.aws_caller_identity.current.account_id",
-        "local._test_account_id",
-    )
-    assert patched != src, (
-        "expected to repoint data.aws_caller_identity.current.account_id in the "
-        "harness copy; the reference was not found — the stack may have changed."
-    )
-    budgets.write_text(patched)
 
     subprocess.run(
         ["tofu", "init", "-backend=false", "-input=false", "-no-color"],

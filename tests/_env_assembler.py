@@ -116,6 +116,18 @@ def resolve_env(overrides: dict[str, str] | None = None) -> dict[str, str]:
         # Don't let a stale global config or an ambient MISE_ENV perturb the
         # isolated resolution.
         child_env.pop("MISE_ENV", None)
+        # Strip mise's activate-session state too. When the test runner is
+        # launched from a shell with `mise activate` on, `__MISE_SESSION` /
+        # `__MISE_DIFF` carry a cached snapshot of the REAL repo .env resolution
+        # (every region pinned to the operator's value). mise restores that
+        # snapshot in the child, which masks our override whenever the override
+        # happens to equal the cached value (e.g. IDC_REGION=us-east-1) — so the
+        # template resolves to the snapshot's region, not the injected one. The
+        # throwaway config has no .env, so dropping the session makes resolution
+        # depend solely on the temp [env] block + the override, which is exactly
+        # the relationship this harness exists to test.
+        for mise_session_key in ("__MISE_SESSION", "__MISE_DIFF"):
+            child_env.pop(mise_session_key, None)
 
         # Trust the throwaway config so `mise env` will evaluate it. Scoped to
         # this temp file; the TemporaryDirectory cleanup removes it after.

@@ -25,8 +25,11 @@
 #     <bucket>/workshops/<WID>/.
 #
 # POSIX sh: no bashisms (no `local`, no arrays, no `[[ ]]`). Runs under `set -eu`.
-# Reads backend.hcl from the CURRENT directory (the mise task sets dir =
-# backend/terraform, where require_backend_hcl has just verified it exists).
+# Reads the shared bucket + lock table from the environment: STATE_BUCKET and
+# LOCK_TABLE. The mise task resolves them from the backend/ stack's OWN Terraform
+# outputs (`tofu output -raw state_bucket_name` / `lock_table_name`) and exports
+# them before invoking us — the backend/ stack is the bootstrap stack with LOCAL
+# state and no backend.hcl of its own, so there is nothing to grep.
 # =============================================================================
 set -eu
 
@@ -55,15 +58,13 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-# --- Parse backend.hcl (same idiom as subscription-apply) --------------------
-if [ ! -f backend.hcl ]; then
-  echo "ERROR: backend.hcl not found in $(pwd); cannot resolve the state bucket/table." >&2
-  exit 1
-fi
-BUCKET="$(grep -E '^[[:space:]]*bucket' backend.hcl | sed -E 's/.*= *"(.*)".*/\1/')"
-TABLE="$(grep -E '^[[:space:]]*dynamodb_table' backend.hcl | sed -E 's/.*= *"(.*)".*/\1/')"
+# --- Resolve the shared bucket + lock table from the environment -------------
+# STATE_BUCKET/LOCK_TABLE come from the backend/ stack's own Terraform outputs
+# (the mise task exports them). Fail closed if either is empty.
+BUCKET="${STATE_BUCKET:-}"
+TABLE="${LOCK_TABLE:-}"
 if [ -z "$BUCKET" ] || [ -z "$TABLE" ]; then
-  echo "ERROR: could not parse bucket/dynamodb_table from backend.hcl." >&2
+  echo "ERROR: STATE_BUCKET and LOCK_TABLE must both be set (the mise task resolves them from the backend stack outputs)." >&2
   exit 1
 fi
 

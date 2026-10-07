@@ -1,8 +1,9 @@
 # Raw credentials provided for setup — never commit
 creds/
 
-# Project-local AWS credentials (contains secret access key)
-.aws/credentials
+# Project-local AWS settings — nothing under .aws/ is tracked (the config is
+# machine-local and the credentials file carries a secret access key).
+.aws/
 
 # mise local/secret overrides
 mise.local.toml

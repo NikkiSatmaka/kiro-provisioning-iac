@@ -142,8 +142,8 @@ def test_task_description_states_scope_and_contrast():
     )
 
 
-def test_task_body_sources_lib_and_calls_guards():
-    """The body sources the shared lib and runs the three guards."""
+def test_task_body_sources_lib_and_guards_workshop_id():
+    """The body sources the shared lib and runs the WORKSHOP_ID guard."""
     run = _task_run(TASK_NAME)
     assert LIB_SOURCE_LINE in run, (
         f"task {TASK_NAME} does not source {LIB_SOURCE_LINE!r}"
@@ -151,11 +151,32 @@ def test_task_body_sources_lib_and_calls_guards():
     assert "require_workshop_id" in run, (
         f"task {TASK_NAME} does not call require_workshop_id"
     )
-    assert "require_backend_hcl" in run, (
-        f"task {TASK_NAME} does not call require_backend_hcl"
+
+
+def test_task_resolves_bucket_table_from_tofu_outputs():
+    """The body resolves the bucket + table from the backend stack outputs.
+
+    The backend/ stack is the bootstrap stack (LOCAL state, no backend.hcl of its
+    own), so the purge must read the shared bucket + lock table from THIS stack's
+    own Terraform outputs — never from a phantom backend.hcl. Assert the body
+    reads both outputs, exports them for the script, and no longer references the
+    backend.hcl-based guards (require_backend_hcl / reject_residual_key).
+    """
+    run = _task_run(TASK_NAME)
+    assert "tofu output -raw state_bucket_name" in run, (
+        f"task {TASK_NAME} does not read state_bucket_name from tofu output"
     )
-    assert "reject_residual_key" in run, (
-        f"task {TASK_NAME} does not call reject_residual_key"
+    assert "tofu output -raw lock_table_name" in run, (
+        f"task {TASK_NAME} does not read lock_table_name from tofu output"
+    )
+    assert "STATE_BUCKET" in run and "LOCK_TABLE" in run, (
+        f"task {TASK_NAME} does not pass STATE_BUCKET/LOCK_TABLE to the script"
+    )
+    assert "require_backend_hcl" not in run, (
+        f"task {TASK_NAME} must not call require_backend_hcl (no backend.hcl here)"
+    )
+    assert "reject_residual_key" not in run, (
+        f"task {TASK_NAME} must not call reject_residual_key (no backend.hcl here)"
     )
 
 
@@ -244,13 +265,25 @@ def test_task_fails_closed_without_workshop_id():
     )
 
 
-def test_task_fails_closed_without_backend_hcl():
-    """WID set but no backend.hcl -> non-zero exit naming backend.hcl."""
-    body = _task_run(TASK_NAME)
-    rc, _out, err = _run_task_body(
-        body, backend_hcl=None, env_extra={"WORKSHOP_ID": "kiro-2025-10-10"}
+def test_script_fails_closed_without_bucket_table_env():
+    """The script fails closed (naming the env contract) when bucket/table unset.
+
+    The purge now reads STATE_BUCKET/LOCK_TABLE from the environment (resolved by
+    the task from the backend stack outputs). With a valid workshop id but
+    neither var set, the script must exit non-zero before touching AWS and name
+    the missing contract — no tofu/AWS needed to prove the fail-closed guard.
+    """
+    env = dict(os.environ)
+    for _var in ("STATE_BUCKET", "LOCK_TABLE"):
+        env.pop(_var, None)
+    proc = subprocess.run(
+        ["sh", str(SCRIPT), "kiro-2025-10-10"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
     )
-    assert rc != 0, "task did not fail with a missing backend.hcl"
-    assert "backend.hcl not found" in err, (
-        f"error does not name the missing backend.hcl: {err!r}"
+    assert proc.returncode != 0, "script did not fail with STATE_BUCKET/LOCK_TABLE unset"
+    assert "STATE_BUCKET and LOCK_TABLE" in proc.stderr, (
+        f"error does not name the missing env contract: {proc.stderr!r}"
     )

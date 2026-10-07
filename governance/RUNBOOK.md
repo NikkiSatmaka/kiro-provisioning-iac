@@ -3,7 +3,17 @@
 This is the **optional Governance track** (root [`README.md`](../README.md)),
 run in the management account against a workshop's **member accounts**; it is
 not part of the linear Phase 0→4 flow. **Prerequisites:** Phase 0 auth +
-Phase 1 backend, and member accounts already in the organization.
+Phase 1 backend, the management-only `governance-shared/` stack applied, and
+member accounts already in the organization.
+
+> **Shared primitives come from `governance-shared/`.** This stack is a pure
+> **consumer** of the budgets execution role and the two SCP policy objects. Run
+> [`../governance-shared/RUNBOOK.md`](../governance-shared/RUNBOOK.md) once
+> first, then export the three `TF_VAR_*` it prints
+> (`TF_VAR_budgets_execution_role_arn`, `TF_VAR_kiro_guardrail_scp_id`,
+> `TF_VAR_freeze_scp_id`) before `governance-apply`. The `governance-*` tasks
+> fail closed if any is unset. (These used to come from `foundation/`; they
+> moved to `governance-shared/` when the SCPs left foundation.)
 
 End-to-end order of operations for the **management-account-scoped** governance
 stack: one OU per workshop, a Kiro-only guardrail SCP on the OU, an unattached
@@ -51,11 +61,13 @@ Verify (from the management account):
 - Organizations reports **all features** enabled.
 - The **Service control policies** policy type shows **enabled** on the root.
 
-If you skip this, Step 2's `tofu apply` **fails with an AWS Organizations
-authorization / policy-type error** — typically an `AccessDeniedException` or a
-`PolicyTypeNotEnabledException` on the `aws_organizations_policy` /
-`aws_organizations_policy_attachment` resources. That error *is* the missing
-Step 0 precondition; nothing in this repo can enable it for you.
+If you skip this, apply **fails with an AWS Organizations authorization /
+policy-type error** — typically an `AccessDeniedException` or a
+`PolicyTypeNotEnabledException`. The policy *objects* are created by
+`governance-shared/` (`aws_organizations_policy`), so that stack hits the error
+first if the policy type is missing; this stack's
+`aws_organizations_policy_attachment` needs the same precondition. That error
+*is* the missing Step 0 precondition; nothing in this repo can enable it for you.
 
 Docs (rephrased for compliance):
 [Enabling all features](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_org_support-all-features.html)
@@ -87,8 +99,8 @@ files.
 **Mandatory. Do it before Step 2** — the governance tasks fail closed without
 it. The `../backend/` stack creates the shared S3 bucket + lock table and writes
 `governance/terraform/backend.hcl` for you (the same bootstrap writes the
-foundation, subscription, and claim-service files, so you run it once for every
-stack).
+foundation, governance-shared, subscription, and claim-service files, so you run
+it once for every stack).
 
 ```bash
 mise run backend-bootstrap-plan      # DRY RUN: what the bucket + lock table bootstrap would create
@@ -179,7 +191,7 @@ aws organizations move-account \
 
 It is **idempotent** — an account already in the destination OU is skipped with
 no error — and it echoes every move. It runs only `tofu output` (never
-`tofu apply`), so it does **not** need the three foundation `TF_VAR_*`
+`tofu apply`), so it does **not** need the three governance-shared `TF_VAR_*`
 wire-forwards, but it does need a working `tofu init`; if `workshop_ou_id` cannot
 be read it fails closed (run `governance-apply` for this workshop first).
 

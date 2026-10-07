@@ -1,4 +1,4 @@
-# Kiro Subscription Provisioning (management-account organization IdC)
+# Kiro Subscription Provisioning (dual-mode: organization or account IdC)
 
 This is **Phase 3** of the root README journey.
 
@@ -9,9 +9,18 @@ This is **Phase 3** of the root README journey.
   or the direct-handout path ([`RUNBOOK.md`](./RUNBOOK.md) Step 6).
 
 Infrastructure-as-Code (**OpenTofu**) + Python tooling to provision **Kiro
-enterprise subscriptions** for a workshop's users in the AWS Organizations
-**management account**, using its **IAM Identity Center _organization
-instance_** as the identity source.
+enterprise subscriptions** for a workshop's users, using an **IAM Identity
+Center** instance as the identity source. The stack is **dual-mode** via
+`instance_mode`:
+
+- **`organization`** (default) — the AWS Organizations **management account**'s
+  **organization instance** (today's behavior; per-group account assignments
+  available when `enable_account_access = true`).
+- **`account`** — a **child/member account**'s **own IdC account instance**.
+  Only users, groups, and memberships are created; account instances do **not**
+  support permission sets or account assignments, so `enable_account_access`
+  **must** be `false` (a plan-time precondition enforces this). See
+  [Dual-mode: organization vs account instance](#dual-mode-organization-vs-account-instance).
 
 The identity users this creates are, by default, intended for **Kiro login
 only** — they are granted **zero AWS console access**. No permission sets and no
@@ -35,7 +44,8 @@ state backend, and distributing the result), start at the
 
 For a given set of workshop accounts and group/user counts:
 
-1. **IdC users** in the management-account organization instance, named
+1. **IdC users** in the adopted instance (org instance in organization mode, or
+   the child's account instance in account mode), named
    `<workshop_id>-<acct_last4>-<group>-<NN>` (workshop-namespaced).
 2. **IdC groups**, with workshop-namespaced display names
    `<workshop_id>-<group>` so many workshops coexist in the one shared directory.
@@ -57,13 +67,13 @@ distribution phase, owned by the root README and `../claim-service/`.
 
 ---
 
-## Where the identities live (the one organization instance)
+## Where the identities live
 
-All stacks in this repo now provision under the AWS Organizations **management
-account**. Identities are created in that account's single **organization**
-Identity Center instance — the one the `foundation/` stack adopts (reads) and
-hands forward via `idc_instance_arn` / `identity_store_id`. This stack consumes
-that instance; it never creates or destroys it.
+Identities are created in whichever IdC instance `foundation/` adopts (reads)
+and hands forward via `idc_instance_arn` / `identity_store_id`. In the default
+`organization` mode that is the management account's single **organization**
+instance; in `account` mode it is the child account's own **account** instance.
+This stack consumes that instance; it never creates or destroys it.
 
 Because **many workshops' users and groups coexist in this one shared
 directory**, names are workshop-namespaced:
@@ -80,16 +90,58 @@ flag `false` (the default) they grant no console access whatsoever.
 
 **Preconditions and limits:**
 
-- IAM Identity Center must be **enabled in the management account** (a one-time
-  console action; see [`RUNBOOK.md`](./RUNBOOK.md) step 0). If it is not, there
-  is no organization instance to write identities into.
-- Exactly one organization instance exists per management account.
-- Kiro subscriptions are supported on the organization instance.
+- IAM Identity Center must be **enabled in the target account first** (a
+  one-time console action; see [`RUNBOOK.md`](./RUNBOOK.md) step 0) — the
+  management account in organization mode, or the child account in account mode.
+  If it is not, there is no instance to write identities into.
+- Exactly one organization instance exists per management account; a child
+  account exposes exactly one account instance.
+- Kiro subscriptions are supported on both instance types (account instances
+  carry one documented caveat — see the dual-mode section below).
 
 Sources (rephrased for compliance with licensing restrictions):
 [IAM Identity Center organization vs account instances](https://docs.aws.amazon.com/singlesignon/latest/userguide/identity-center-instances.html),
 [Kiro deployment options](https://kiro.dev/docs/enterprise/deployment-options/),
 [Enable Kiro with IdC](https://repost.aws/articles/AR3YUupHzQQ2mqMzL5Y8KvbQ).
+
+---
+
+## Dual-mode: organization vs account instance
+
+Set `instance_mode` (variable, default `organization`) to choose where this
+stack writes:
+
+| | `organization` (default) | `account` |
+| --- | --- | --- |
+| Instance | management account's org instance | child account's own account instance |
+| `AWS_PROFILE` | management-account profile | **child account's** profile |
+| `enable_account_access` | may be `true` or `false` | **must be `false`** |
+| Account assignments | available | **not supported** (precondition fails the plan if attempted) |
+| `foundation` adopts | the org instance | the child's account instance (run foundation under the child profile) |
+| `workshop_accounts` shape | identical | identical (account-id key is naming metadata only) |
+
+Account-mode operator checklist:
+
+1. **Enable IAM Identity Center in the child account first** — this creates its
+   account instance (the per-account equivalent of the org-mode Step 0).
+2. Run `foundation` and `subscription` with the **child account's**
+   `AWS_PROFILE`, and point `idc_instance_arn` / `identity_store_id` at the
+   child's instance (foundation resolves them).
+3. Keep `instance_mode = "account"` and `enable_account_access = false`.
+
+**Cautions:**
+
+- **R-2 (wrong profile silently targets the org instance).** If you run with a
+  **management-account** profile while intending account mode, foundation and
+  subscription silently resolve and write to the **organization** instance.
+  Double-check `AWS_PROFILE` points at the child account before applying.
+- **OQ-1 (Kiro web-feature caveat).** AWS supports Kiro on account instances
+  **unless** users need the full set of Kiro features on AWS websites. For
+  login-only workshops the impact is minimal; verify against a real
+  child-account account instance before a production workshop.
+- **governance / governance-shared are management-only** and are **not**
+  dual-mode. Account mode provisions users/groups/memberships only — there is no
+  OU, SCP, or budget governance in a child account.
 
 ---
 
@@ -165,7 +217,7 @@ subscription/
 ├── TEARDOWN.md               ← cleanup: remote-state destroy (B) + fallback script (A)
 ├── terraform/                ← OpenTofu config (reusable via variables)
 │   ├── versions.tf           ← required providers + backend notes
-│   ├── providers.tf          ← AWS provider wired to the management-account profile/region
+│   ├── providers.tf          ← AWS provider (dual-mode: management or child account profile/region)
 │   ├── variables.tf          ← idc inputs, workshop_id, workshop_accounts, enable_account_access, tier
 │   ├── locals.tf             ← user/group name generation (workshop-namespaced)
 │   ├── identity_center.tf    ← users + groups + memberships (+ gated permission set / assignments)
@@ -202,21 +254,24 @@ is a variable:
 | Knob | Where | Example |
 | ---- | ----- | ------- |
 | AWS region | `.env` (git-ignored; `AWS_REGION`) | `us-east-1` (default) → any Kiro-supported region |
-| AWS profile (management account) | `.env` (git-ignored; `AWS_PROFILE`) | `kiro-mgmt` |
+| Instance mode | `variables.tf` `instance_mode` | `organization` (default) or `account` |
+| AWS profile (management or child account) | `.env` (git-ignored; `AWS_PROFILE`) | `kiro-mgmt` (org) / child profile (account) |
 | Workshop namespace | `WORKSHOP_ID` / tfvars `workshop_id` | `kiro-2025-10-10` |
 | Accounts, groups, user counts | `variables.tf` `workshop_accounts` | `{ "1111…" = { groups = { team-a = { user_count = 10 } } } }` |
 | Account access gate | `variables.tf` `enable_account_access` | `false` (default) → zero console access |
 | Kiro tier | `variables.tf` + script | `PRO`, `PRO_PLUS`, `PRO_MAX`, `POWER` |
 
 Region and profile come from the git-ignored `.env` at the repo root (set up in
-the root README's Phase 0; `AWS_PROFILE` must be a management-account profile);
-the account/group/user topology, the access gate, and the Kiro tier live in
-`terraform/terraform.tfvars` (copy `terraform.tfvars.example`).
+the root README's Phase 0; `AWS_PROFILE` must be a management-account profile in
+organization mode, or the child account's profile in account mode); the
+account/group/user topology, the instance mode, the access gate, and the Kiro
+tier live in `terraform/terraform.tfvars` (copy `terraform.tfvars.example`).
 
 ---
 
 ## Running it
 
-The step-by-step order — the management-account prerequisite, provisioning, the
+The step-by-step order — the IdC-enablement prerequisite (management account in
+organization mode, child account in account mode), provisioning, the
 console-only Kiro steps, and rendering the credentials file — lives in
 [`RUNBOOK.md`](./RUNBOOK.md). Teardown lives in [`TEARDOWN.md`](./TEARDOWN.md).

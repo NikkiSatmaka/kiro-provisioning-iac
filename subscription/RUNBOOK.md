@@ -1,17 +1,28 @@
-# Runbook — Provision Kiro subscriptions in the management account
+# Runbook — Provision Kiro subscriptions (organization or account IdC)
 
 This is **Phase 3** of the journey (root [`README.md`](../README.md)).
 **Prerequisites:** Phase 2 (foundation adopt) complete and the two IDs
 exported as `TF_VAR_idc_instance_arn` / `TF_VAR_identity_store_id`.
 
+> **Dual-mode.** This runbook is written for the default **organization mode**
+> (management account, organization IdC instance). The stack also supports
+> **account mode** (`instance_mode = "account"`): a **child/member account**'s
+> **own IdC account instance**. In account mode, substitute "the child account"
+> wherever this runbook says "the management account", use the **child
+> account's** `AWS_PROFILE`, keep `enable_account_access = false`, and skip the
+> OU/SCP/budget governance steps entirely (governance is management-only). See
+> [`README.md`](./README.md#dual-mode-organization-vs-account-instance) for the
+> account-mode checklist and cautions (R-2 wrong-profile, OQ-1 web-feature
+> caveat).
+
 End-to-end order of operations. Steps marked **(IaC)** or **(script)** are
 automated here; steps marked **(console)** are AWS platform limits you must do
 by hand. Nothing in this repo runs on its own — you invoke each step.
 
-> Legend: **(mgmt account)** = the AWS Organizations management account, where
-> every stack in this repo now provisions · **(this account)** = the same
-> management account · **(IaC)** = `tofu` · **(script)** = Python ·
-> **(console)** = AWS web console.
+> Legend: **(mgmt account)** = in organization mode, the AWS Organizations
+> management account (in account mode, the child/member account you target) ·
+> **(this account)** = the same account · **(IaC)** = `tofu` ·
+> **(script)** = Python · **(console)** = AWS web console.
 
 ---
 
@@ -49,11 +60,17 @@ Assumes the toolchain + AWS auth are already set up (root README, Phase 0).
 mise run verify          # aws sts get-caller-identity
 ```
 
-Confirm the account is the intended **management** account and the region is one
-Kiro supports for IdC. `AWS_PROFILE` must be a management-account profile.
-Profile and region come from the git-ignored `.env` (default region
-`us-east-1`); see the root README's Phase 0 if `mise run verify` resolves the
-wrong account.
+Confirm the account is the intended one — the **management** account in
+organization mode, or the **child/member** account in account mode — and the
+region is one Kiro supports for IdC. `AWS_PROFILE` must match the chosen mode's
+account (management-account profile for organization mode, the child account's
+profile for account mode). Profile and region come from the git-ignored `.env`
+(default region `us-east-1`); see the root README's Phase 0 if `mise run verify`
+resolves the wrong account.
+
+> ⚠️ **R-2:** in account mode a management-account profile silently targets the
+> **organization** instance. Verify `mise run verify` shows the **child**
+> account before applying.
 
 ---
 

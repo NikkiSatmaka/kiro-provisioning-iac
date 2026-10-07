@@ -4,8 +4,11 @@ This is **Phase 1** of the root README journey: the S3 bucket + DynamoDB lock
 table that hold the other stacks' OpenTofu state. Run it **once per account**,
 before the `subscription/` stack.
 
-- **Prerequisites:** Phase 0 (toolchain + management-account AWS auth) — see the
-  root [`README.md`](../README.md).
+- **Prerequisites:** Phase 0 (toolchain + AWS auth) — see the root
+  [`README.md`](../README.md). The backend stack is account-agnostic: it derives
+  the state bucket from the caller's own account id, so it works whether you run
+  under a management-account profile (organization mode) or a child account's
+  profile (account mode).
 - **Next:** Phase 2 — Foundation ([`../foundation/README.md`](../foundation/README.md)).
 
 ## Why it exists (and why its own state)

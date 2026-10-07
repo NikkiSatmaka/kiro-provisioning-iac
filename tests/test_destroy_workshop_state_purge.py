@@ -8,8 +8,10 @@ to end. The script shells out to the AWS CLI, which moto's in-process
 of ``mock_aws`` we stand up a ``moto.server.ThreadedMotoServer`` and point BOTH
 the subprocess (via ``AWS_ENDPOINT_URL`` + dummy creds + region, honored by AWS
 CLI v2) and the boto3 seed/assert clients at the same ``http://127.0.0.1:<port>``
-endpoint. The script runs in a tmp dir holding a 4-line keyless ``backend.hcl``
-naming the moto bucket + table.
+endpoint. The script resolves the shared bucket + lock table from the
+STATE_BUCKET / LOCK_TABLE environment contract (the mise task exports them from
+the backend/ stack's own Terraform outputs), so the tests pin those two vars to
+the moto fixtures instead of writing a backend.hcl.
 
 The cases prove the cleanup is surgical:
 
@@ -19,7 +21,7 @@ The cases prove the cleanup is surgical:
   companion), leaving another workshop's rows;
 * a dry run deletes NOTHING for either prefix and prints ``would delete:`` lines;
 * an empty target prefix is a no-op success (exit 0);
-* a missing/unparseable ``backend.hcl`` fails closed (non-zero + stderr) and
+* a missing bucket/table env contract fails closed (non-zero + stderr) and
   deletes nothing.
 """
 
@@ -165,25 +167,24 @@ def _all_lock_ids(client, table):
 
 # --- script runner -----------------------------------------------------------
 
-def _write_backend_hcl(dirpath, bucket, table):
-    (dirpath / "backend.hcl").write_text(
-        f'bucket         = "{bucket}"\n'
-        f'region         = "{REGION}"\n'
-        f'dynamodb_table = "{table}"\n'
-        "encrypt        = true\n"
-    )
+def _run_script(tmp_path, endpoint, wid, *flags, set_env=True, bucket=BUCKET, table=TABLE):
+    """Run the cleanup script in ``tmp_path`` against the moto endpoint.
 
-
-def _run_script(tmp_path, endpoint, wid, *flags, write_hcl=True, bucket=BUCKET, table=TABLE):
-    """Run the cleanup script in ``tmp_path`` against the moto endpoint."""
-    if write_hcl:
-        _write_backend_hcl(tmp_path, bucket, table)
+    The script resolves the shared bucket + lock table from the STATE_BUCKET /
+    LOCK_TABLE environment contract (exported by the mise task from the backend
+    stack's own Terraform outputs). When ``set_env`` is True (default) both are
+    pinned to the moto fixtures; pass ``set_env=False`` to exercise the
+    fail-closed path with neither var set.
+    """
     env = dict(os.environ)
     # The dev shell may export AWS_PROFILE/AWS_CONFIG_FILE pointing at a real
     # profile the moto subprocess must NOT consult; drop them and pin dummy
     # static creds + the moto endpoint instead.
     for _var in ("AWS_PROFILE", "AWS_DEFAULT_PROFILE", "AWS_CONFIG_FILE",
                  "AWS_SHARED_CREDENTIALS_FILE"):
+        env.pop(_var, None)
+    # Always start from a clean slate for the bucket/table contract.
+    for _var in ("STATE_BUCKET", "LOCK_TABLE"):
         env.pop(_var, None)
     env.update(
         {
@@ -195,6 +196,9 @@ def _run_script(tmp_path, endpoint, wid, *flags, write_hcl=True, bucket=BUCKET, 
             "AWS_DEFAULT_REGION": REGION,
         }
     )
+    if set_env:
+        env["STATE_BUCKET"] = bucket
+        env["LOCK_TABLE"] = table
     return subprocess.run(
         ["sh", str(SCRIPT), wid, *flags],
         cwd=str(tmp_path),
@@ -322,8 +326,8 @@ def test_empty_prefix_is_noop_success(s3, ddb, moto_endpoint, tmp_path):
     assert _all_lock_ids(ddb, TABLE) == locks_before
 
 
-def test_missing_backend_hcl_fails_closed(s3, ddb, moto_endpoint, tmp_path):
-    """No backend.hcl in cwd -> non-zero exit, stderr, and nothing deleted."""
+def test_missing_bucket_table_env_fails_closed(s3, ddb, moto_endpoint, tmp_path):
+    """Neither STATE_BUCKET nor LOCK_TABLE set -> non-zero exit, nothing deleted."""
     _make_versioned_bucket(s3, BUCKET)
     _make_lock_table(ddb, TABLE)
     _seed_objects(s3, BUCKET, "workshops/alpha/")
@@ -332,9 +336,9 @@ def test_missing_backend_hcl_fails_closed(s3, ddb, moto_endpoint, tmp_path):
     v_before, m_before = _versions_and_markers(s3, BUCKET, "workshops/alpha/")
     locks_before = _all_lock_ids(ddb, TABLE)
 
-    proc = _run_script(tmp_path, moto_endpoint, "alpha", "--apply", write_hcl=False)
+    proc = _run_script(tmp_path, moto_endpoint, "alpha", "--apply", set_env=False)
     assert proc.returncode != 0
-    assert "backend.hcl not found" in proc.stderr
+    assert "STATE_BUCKET and LOCK_TABLE" in proc.stderr
 
     v_after, m_after = _versions_and_markers(s3, BUCKET, "workshops/alpha/")
     assert {(v["Key"], v["VersionId"]) for v in v_after} == {
@@ -344,26 +348,3 @@ def test_missing_backend_hcl_fails_closed(s3, ddb, moto_endpoint, tmp_path):
         (m["Key"], m["VersionId"]) for m in m_before
     }
     assert _all_lock_ids(ddb, TABLE) == locks_before
-
-
-def test_unparseable_backend_hcl_fails_closed(s3, ddb, moto_endpoint, tmp_path):
-    """A backend.hcl lacking bucket/table -> non-zero exit, nothing deleted."""
-    _make_versioned_bucket(s3, BUCKET)
-    _make_lock_table(ddb, TABLE)
-    _seed_objects(s3, BUCKET, "workshops/alpha/")
-
-    (tmp_path / "backend.hcl").write_text("encrypt = true\n")
-
-    v_before, m_before = _versions_and_markers(s3, BUCKET, "workshops/alpha/")
-
-    proc = _run_script(tmp_path, moto_endpoint, "alpha", "--apply", write_hcl=False)
-    assert proc.returncode != 0
-    assert "backend.hcl" in proc.stderr
-
-    v_after, m_after = _versions_and_markers(s3, BUCKET, "workshops/alpha/")
-    assert {(v["Key"], v["VersionId"]) for v in v_after} == {
-        (v["Key"], v["VersionId"]) for v in v_before
-    }
-    assert {(m["Key"], m["VersionId"]) for m in m_after} == {
-        (m["Key"], m["VersionId"]) for m in m_before
-    }

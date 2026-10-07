@@ -150,13 +150,21 @@ set -eu
 . ../../scripts/mise-tasks.sh
 # WORKSHOP_ID guard: sets WID; fails closed if unset/whitespace/invalid.
 require_workshop_id
-# backend.hcl names the shared bucket + lock table the script reads from.
-require_backend_hcl "backend/terraform/backend.hcl" \\
-  "Run the backend bootstrap first (it writes this file):" \\
-  "  mise run backend-bootstrap" \\
-  "or copy the template by hand: cp backend.hcl.example backend.hcl"
-# A residual 'key' in backend.hcl conflicts with the init-time key convention.
-reject_residual_key
+# The backend/ stack is the BOOTSTRAP stack: it keeps its OWN local state and
+# never has a backend.hcl of its own (bootstrap writes backend.hcl only for the
+# CONSUMER stacks). Resolve the shared bucket + lock table from THIS stack's own
+# Terraform outputs instead. `tofu init -input=false` (non-interactive, no key —
+# this is a local-backend stack) makes `tofu output` readable from a fresh clone.
+tofu init -input=false >/dev/null
+STATE_BUCKET="$(tofu output -raw state_bucket_name)"
+LOCK_TABLE="$(tofu output -raw lock_table_name)"
+if [ -z "$STATE_BUCKET" ] || [ -z "$LOCK_TABLE" ]; then
+  echo "ERROR: could not resolve state_bucket_name/lock_table_name from the backend stack outputs." >&2
+  echo "Run the backend bootstrap first (it creates + populates this local state):" >&2
+  echo "  mise run backend-bootstrap" >&2
+  exit 1
+fi
+export STATE_BUCKET LOCK_TABLE
 # ../scripts/... is relative to dir backend/terraform -> resolves to
 # backend/scripts/destroy_workshop_state.sh. The typed-phrase gate lives ONLY in
 # the APPLY branch so the script stays non-interactive (tests drive --apply).

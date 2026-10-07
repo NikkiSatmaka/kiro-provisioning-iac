@@ -35,12 +35,13 @@ locals {
     encrypt        = true
   EOT
 
-  # Both stacks share the identical keyless body.
+  # All stacks share the identical keyless body.
   _backend_hcl_for = {
-    subscription  = local._backend_hcl_body
-    claim_service = local._backend_hcl_body
-    foundation    = local._backend_hcl_body
-    governance    = local._backend_hcl_body
+    subscription      = local._backend_hcl_body
+    claim_service     = local._backend_hcl_body
+    foundation        = local._backend_hcl_body
+    governance        = local._backend_hcl_body
+    governance_shared = local._backend_hcl_body
   }
 }
 
@@ -76,4 +77,14 @@ output "backend_hcl_foundation" {
 output "backend_hcl_governance" {
   description = "The full governance/terraform/backend.hcl body (mise writes it for you; tofu init -backend-config=backend.hcl reads it)."
   value       = local._backend_hcl_for["governance"]
+}
+
+# Ready-to-use backend.hcl body for the governance-shared stack. Same shared
+# bucket + lock table as the other stacks, isolated by a distinct init-time
+# state key (governance-shared/terraform.tfstate — a management-account
+# singleton, no workshops/<id>/ prefix). `mise run backend-bootstrap` writes
+# this to ../../governance-shared/terraform/backend.hcl.
+output "backend_hcl_governance_shared" {
+  description = "The full governance-shared/terraform/backend.hcl body (mise writes it for you; tofu init -backend-config=backend.hcl reads it)."
+  value       = local._backend_hcl_for["governance_shared"]
 }

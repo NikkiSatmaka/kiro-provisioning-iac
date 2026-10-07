@@ -2,14 +2,16 @@
 # budgets_role.tf — the shared budgets EXECUTION ROLE
 #
 # A least-privilege IAM role AWS Budgets assumes to attach/detach the freeze SCP,
-# with an aws:SourceAccount confused-deputy guard on the trust policy. Defined
-# ONCE per management account here in foundation/ and consumed by every
-# workshop's governance/ stack (via var.budgets_execution_role_arn) — it is no
-# longer recreated per workshop, so its name carries no workshop_id suffix.
+# with an aws:SourceAccount confused-deputy guard on the trust policy. A
+# management-account SINGLETON defined ONCE here in governance-shared/ (it was
+# previously in foundation/) and consumed by every workshop's governance/ stack
+# (via var.budgets_execution_role_arn, wired forward as TF_VAR_*). Its name
+# carries no workshop_id suffix — it is shared, not per workshop.
 # =============================================================================
 
 # The management account id — used for the aws:SourceAccount confused-deputy
-# guard on the budgets role trust policy.
+# guard on the budgets role trust policy. This stack runs management-account
+# only, so this resolves to the management account id (the correct value).
 data "aws_caller_identity" "current" {}
 
 # --- Budgets execution role (least privilege + confused-deputy guard) --------

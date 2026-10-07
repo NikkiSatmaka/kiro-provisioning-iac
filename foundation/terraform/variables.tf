@@ -1,7 +1,9 @@
 variable "aws_region" {
   description = <<-EOT
-    Region the IAM Identity Center ORGANIZATION instance lives in / is read
-    from. Must match the region where IdC was enabled in the management account.
+    Region the IAM Identity Center instance this stack adopts lives in / is read
+    from. Must match the region where IdC was enabled in the credentialed
+    account — the ORGANIZATION instance in the management account, or the
+    account instance in a child/member account.
 
     Leave empty (the default) to inherit AWS_REGION from the environment — mise
     sources it from the git-ignored .env file, so change the region there
@@ -13,7 +15,7 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS CLI/SDK profile to use (MUST be a management-account profile). Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
+  description = "AWS CLI/SDK profile to use. Use a management-account profile to adopt the organization instance, or a child/member account's profile to adopt that account's own IdC account instance. Empty string falls back to the default SDK credential chain / AWS_PROFILE env var."
   type        = string
   default     = ""
 }
@@ -31,24 +33,6 @@ variable "default_tags" {
   }
 }
 
-# --- Kiro guardrail SCP ------------------------------------------------------
-
-variable "kiro_allowed_actions" {
-  description = <<-EOT
-    Allowlist of IAM actions the shared Kiro guardrail SCP permits
-    (deny-by-default). The default is a CONSERVATIVE STARTER permitting Kiro +
-    IAM Identity Center sign-in plus read-only basics; it is a single
-    org-standard allowlist tuned ONCE here in foundation and shared by every
-    workshop (widen or narrow it here, not per workshop — see README).
-  EOT
-  type        = list(string)
-  default = [
-    "sso:*",
-    "sso-directory:*",
-    "identitystore:*",
-    "signin:*",
-    "sts:GetCallerIdentity",
-    "codewhisperer:*",
-    "q:*",
-  ]
-}
+# NOTE: kiro_allowed_actions moved to governance-shared/ along with the shared
+# Kiro guardrail SCP. Foundation no longer creates any SCP, so it no longer
+# needs that variable.

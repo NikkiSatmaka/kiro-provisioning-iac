@@ -12,7 +12,9 @@
 # ---- Provider / environment (override) --------------------------------------
 # Region/profile usually come from the environment (mise sources them from the
 # git-ignored .env). Leave aws_region empty to inherit AWS_REGION. Uncomment to
-# pin instead; this stack targets the management account's org IdC instance.
+# pin instead. This stack is dual-mode: a management-account profile adopts the
+# organization IdC instance; a child/member account's profile adopts that
+# account's own IdC account instance.
 # aws_region  = "us-east-1"
 # aws_profile = "kiro-mgmt"
 

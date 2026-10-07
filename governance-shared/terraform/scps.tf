@@ -1,9 +1,13 @@
 # scps.tf — the shared Service Control Policy OBJECTS.
 #
-# Both SCP policy objects are defined ONCE per management account here in
-# foundation/ and consumed by every workshop's governance/ stack (by id, via
-# var.kiro_guardrail_scp_id / var.freeze_scp_id). This stack creates the policy
-# OBJECTS only; it attaches neither:
+# Both SCP policy objects are management-account SINGLETONS, defined ONCE here in
+# governance-shared/ (they were previously in foundation/, but foundation is now
+# dual-mode and account-safe, and Organizations SCPs cannot be created in a
+# child account). They are consumed by every workshop's governance/ stack (by
+# id, via var.kiro_guardrail_scp_id / var.freeze_scp_id, wired forward as
+# TF_VAR_* — see governance-shared/RUNBOOK.md). Per-workshop governance/ cannot
+# own them because their names are unsuffixed and would collide across
+# workshops. This stack creates the policy OBJECTS only; it attaches neither:
 #   - Kiro guardrail: a deny-by-default allowlist. governance/ ATTACHES it to
 #     each workshop OU, so every account in that OU is bounded to the
 #     Kiro-relevant actions.

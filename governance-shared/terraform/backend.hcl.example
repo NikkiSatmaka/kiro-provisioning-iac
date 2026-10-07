@@ -1,4 +1,4 @@
-# Template for the foundation stack's git-ignored backend.hcl (manual intervention).
+# Template for the governance-shared stack's git-ignored backend.hcl (manual intervention).
 #
 # You normally DON'T touch this: `mise run backend-bootstrap` creates the bucket
 # + lock table AND writes backend.hcl for you, with the bucket name derived from
@@ -7,13 +7,13 @@
 #
 #   cp backend.hcl.example backend.hcl   # then edit
 #   tofu init -backend-config=backend.hcl \
-#     -backend-config="key=foundation/terraform.tfstate"
+#     -backend-config="key=governance-shared/terraform.tfstate"
 #
 # This stack REUSES the shared state bucket created by the backend/ stack — do
 # NOT create a new bucket. The state key is supplied at init time and is NOT in
-# this file; the foundation key is `foundation/terraform.tfstate` (no
-# workshops/<id>/ prefix, since the adopted IdC instance is a single per-account
-# resource).
+# this file; the governance-shared key is `governance-shared/terraform.tfstate`
+# (no workshops/<id>/ prefix, since these are management-account singletons —
+# mirroring the foundation key `foundation/terraform.tfstate`).
 #
 # backend.hcl is git-ignored (it names your account's bucket); this .example is
 # the tracked template. backend.tf (tracked, value-free) supplies the partial

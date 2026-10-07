@@ -1,14 +1,15 @@
 terraform {
-  # OpenTofu is pinned in the project mise.toml. This stack no longer *creates*
-  # an Identity Center instance; it READS the management account's existing
-  # organization instance via the `data "aws_ssoadmin_instances"` data source,
-  # which resolves through hashicorp/aws >= 5.56.0. Only the aws provider is
-  # needed — no Cloud Control provider.
+  # OpenTofu is pinned in the project mise.toml. This stack never *creates* an
+  # Identity Center instance; it READS whichever instance the credentialed
+  # account exposes (organization instance in the management account, account
+  # instance in a child account) via the `data "aws_ssoadmin_instances"` data
+  # source, which resolves through hashicorp/aws >= 5.56.0. Only the aws
+  # provider is needed — no Cloud Control provider.
   required_version = ">= 1.6"
 
   required_providers {
-    # Reads the organization IdC instance (data "aws_ssoadmin_instances") and
-    # resolves the concrete region for the `region` output.
+    # Reads the IdC instance (data "aws_ssoadmin_instances") and resolves the
+    # concrete region for the `region` output.
     aws = {
       source  = "hashicorp/aws"
       version = ">= 5.56.0"

@@ -337,14 +337,23 @@ require_backend_hcl "claim-service/terraform/backend.hcl" \
   "Create it from the template (reuses the shared state bucket):" \
   "  cp claim-service/terraform/backend.hcl.example claim-service/terraform/backend.hcl" \
   "then set your 12-digit <account_id> in the bucket name and re-run."
+# --- WORKSHOP_ID guard (namespace; previews the same per-workshop state apply uses) ---
+require_workshop_id
+# --- WORKSHOP_CODE guard (access gate; distinct from the namespace) ------------
 if [ -z "${WORKSHOP_CODE:-}" ]; then
   echo "ERROR: WORKSHOP_CODE is not set." >&2
   echo "Set it in the git-ignored .env (see .env.example), e.g.:" >&2
   echo "  WORKSHOP_CODE=my-workshop-2026" >&2
   exit 1
 fi
+
+# A residual 'key' in backend.hcl conflicts with the init-time key.
+reject_residual_key
+
+export TF_VAR_workshop_id="$WID"
 export TF_VAR_workshop_code="$WORKSHOP_CODE"
-tofu init -input=false -backend-config=backend.hcl
+# Reconfigure to THIS workshop's claim-service key BEFORE plan; fail closed.
+tofu_init_keyed "workshops/${WID}/claim-service/terraform.tfstate" "backend init failed; not planning."
 tofu plan
 """
 

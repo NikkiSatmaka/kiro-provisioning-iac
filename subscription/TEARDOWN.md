@@ -202,3 +202,43 @@ Start with `mise run subscription-teardown-plan` to see exactly what would be re
   new laptop and don't have the state or the bucket name, `python teardown.py`
   will still find and remove this workshop's identities. Then do the manual
   console steps.
+
+---
+
+## Per-workshop state cleanup
+
+Tearing a finished workshop's stacks down by hand runs the destroys in this
+order:
+
+1. `mise run claim-destroy`
+2. `mise run subscription-destroy`
+3. `mise run governance-destroy`
+4. `mise run backend-destroy-workshop`
+
+The first three delete the workshop's live resources, but the remote state they
+used lives in the **shared** S3 bucket + DynamoDB lock table that every workshop
+shares. Those stacks leave behind their state objects — all S3 object versions
+and delete markers under `workshops/<WORKSHOP_ID>/` — plus the DynamoDB lock
+rows keyed to that prefix. `backend-destroy-workshop` is the surgical step that
+removes exactly that leftover state for the one finished workshop.
+
+It requires `WORKSHOP_ID` and is **dry-run by default** — it only lists what it
+would delete and changes nothing:
+
+```sh
+mise run backend-destroy-workshop            # DRY RUN: lists what would be purged
+APPLY=1 mise run backend-destroy-workshop    # PURGE: prompts for the typed phrase
+```
+
+The `APPLY=1` run prompts you to type `destroy-workshop-state` before it deletes
+anything; a mismatch exits non-zero and deletes nothing.
+
+### Contrast with `backend-destroy`
+
+Do not confuse this with `backend-destroy`. That task deletes the **entire
+shared** S3 state bucket and DynamoDB lock table — it is all-or-nothing and must
+run only when **every** workshop is done. `backend-destroy-workshop` is
+surgical: it is safe to run while other workshops are still live because it only
+touches `workshops/<WORKSHOP_ID>/` and that workshop's lock rows. It never
+touches the bucket itself, the lock table itself, or any other workshop's
+prefix.

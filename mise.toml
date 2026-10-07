@@ -139,6 +139,34 @@ tofu apply -var force_destroy=true
 tofu destroy -var force_destroy=true
 """
 
+[tasks.backend-destroy-workshop]
+description = "Purge ONE finished workshop's leftover remote state: all S3 object versions + delete markers under workshops/<WORKSHOP_ID>/ and its DynamoDB lock rows. Surgical and safe while other workshops are live — never touches the shared bucket, the lock table, or any other workshop. Requires WORKSHOP_ID; dry-run by default (set APPLY=1 to delete, which prompts for the typed phrase). Contrast with backend-destroy, which deletes the WHOLE shared bucket + lock table and must run only when ALL workshops are done."
+dir = "backend/terraform"
+run = """
+set -eu
+. ../../scripts/mise-tasks.sh
+# WORKSHOP_ID guard: sets WID; fails closed if unset/whitespace/invalid.
+require_workshop_id
+# backend.hcl names the shared bucket + lock table the script reads from.
+require_backend_hcl "backend/terraform/backend.hcl" \\
+  "Run the backend bootstrap first (it writes this file):" \\
+  "  mise run backend-bootstrap" \\
+  "or copy the template by hand: cp backend.hcl.example backend.hcl"
+# A residual 'key' in backend.hcl conflicts with the init-time key convention.
+reject_residual_key
+# ../scripts/... is relative to dir backend/terraform -> resolves to
+# backend/scripts/destroy_workshop_state.sh. The typed-phrase gate lives ONLY in
+# the APPLY branch so the script stays non-interactive (tests drive --apply).
+if [ "${APPLY:-0}" = "1" ]; then
+  printf 'WARNING: about to PURGE workshop "%s" remote state (all S3 versions + delete markers under workshops/%s/ and its DynamoDB lock rows).\\n' "$WID" "$WID"
+  require_typed_phrase "destroy-workshop-state" "deleting nothing."
+  ../scripts/destroy_workshop_state.sh "$WID" --apply
+else
+  printf 'DRY RUN: listing what would be purged for workshop "%s" (set APPLY=1 to delete).\\n' "$WID"
+  ../scripts/destroy_workshop_state.sh "$WID"
+fi
+"""
+
 # =============================================================================
 # === subscription/ stack ===
 # =============================================================================

@@ -2,17 +2,40 @@
 #
 #   cp terraform.tfvars.example terraform.tfvars
 
+# ---- Instance mode: organization (default) OR account -----------------------
+# This stack supports two IdC instance modes:
+#
+#   instance_mode = "organization"  (default; today's behavior)
+#     Writes into the AWS Organizations MANAGEMENT account's ORGANIZATION
+#     instance. AWS_PROFILE must be a management-account profile. Per-group
+#     account assignments ARE available (enable_account_access may be true).
+#
+#   instance_mode = "account"
+#     Writes into a CHILD/member account's OWN IdC ACCOUNT INSTANCE. AWS_PROFILE
+#     must be that CHILD account's profile, and idc_instance_arn /
+#     identity_store_id must point at the child's instance. Only users, groups,
+#     and memberships are created — account assignments are NOT available on an
+#     account instance, so enable_account_access MUST be false (a precondition
+#     fails the plan otherwise). See the account-mode block at the bottom.
+#
+# Leave this unset to get the default "organization" mode.
+# instance_mode = "organization"
+
 # ---- Provider / environment -------------------------------------------------
-# This stack targets the AWS Organizations MANAGEMENT account. AWS_PROFILE must
-# be a management-account profile. Usually left to the environment (mise sources
-# AWS_PROFILE / AWS_REGION from the git-ignored .env). Leave aws_region empty to
-# inherit AWS_REGION. Uncomment to pin explicitly instead.
+# In organization mode this stack targets the AWS Organizations MANAGEMENT
+# account (AWS_PROFILE must be a management-account profile); in account mode it
+# targets the child account (AWS_PROFILE must be the child account's profile).
+# Usually left to the environment (mise sources AWS_PROFILE / AWS_REGION from the
+# git-ignored .env). Leave aws_region empty to inherit AWS_REGION. Uncomment to
+# pin explicitly instead.
 # aws_region  = "us-east-1"
 # aws_profile = "kiro-mgmt"
 
 # ---- Foundation IdC interface (consumed, never created) ---------------------
-# Export these from the foundation stack (tofu output). They point at the
-# management account's existing ORGANIZATION IdC instance.
+# Export these from the foundation stack (tofu output). In organization mode
+# they point at the management account's ORGANIZATION instance; in account mode
+# (run foundation under the child account's profile) they point at the child
+# account's OWN account instance.
 # idc_instance_arn  = "arn:aws:sso:::instance/ssoins-xxxxxxxxxxxx"
 # identity_store_id = "d-xxxxxxxxxx"
 
@@ -55,3 +78,30 @@ default_tags = {
   ManagedBy = "opentofu"
   Purpose   = "kiro-login-only"
 }
+
+# =============================================================================
+# ---- ACCOUNT MODE (child-account IdC account instance) — alternative ---------
+# =============================================================================
+# To provision against a CHILD/member account's OWN IdC account instance instead
+# of the organization instance, swap the block above for the account-mode shape
+# below. The workshop_accounts SHAPE is identical; the account-id key is only
+# naming/namespacing metadata in this mode (never an assignment target).
+#
+#   instance_mode         = "account"
+#   enable_account_access = false   # REQUIRED in account mode — account
+#                                   # instances do not support permission sets
+#                                   # or account assignments. A precondition
+#                                   # fails the plan if this is true here.
+#
+# Operator checklist for account mode (see subscription/README.md + RUNBOOK.md):
+#   - Enable IAM Identity Center IN THE CHILD ACCOUNT first (creates its account
+#     instance). This is the per-account equivalent of the org-mode Step 0.
+#   - Run with the CHILD ACCOUNT's AWS_PROFILE, and point idc_instance_arn /
+#     identity_store_id at the child's instance (foundation, run under the child
+#     profile, resolves them). CAUTION (R-2): running with a MANAGEMENT-account
+#     profile while intending account mode silently writes to the ORGANIZATION
+#     instance — double-check the profile.
+#   - Known limitation (OQ-1): AWS supports Kiro on account instances UNLESS
+#     users need the full set of Kiro features on AWS websites. For login-only
+#     workshops the impact is minimal; verify against a real child-account
+#     instance before a production workshop.

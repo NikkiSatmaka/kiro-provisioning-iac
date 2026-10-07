@@ -2,12 +2,17 @@
 # IAM Identity Center — users, groups, and memberships
 # ===========================================================================
 #
-# This module consumes the long-lived management-account ORGANIZATION IdC
-# instance as an interface; it neither creates nor destroys that instance. The
-# instance ARN and identity store ID are operator-supplied inputs (see
-# var.idc_instance_arn and var.identity_store_id); the foundation locals resolve
-# from those variables. Many workshops' identities coexist in this one directory,
-# so group display names are workshop-namespaced (see locals.tf).
+# This module consumes a long-lived IdC instance as an interface; it neither
+# creates nor destroys that instance. Which instance depends on var.instance_mode:
+#   - "organization" (default): the management account's ORGANIZATION instance
+#     (today's behavior; account assignments available).
+#   - "account": a child/member account's OWN account instance (users, groups,
+#     and memberships only — account assignments are unavailable there, enforced
+#     by the precondition below).
+# The instance ARN and identity store ID are operator-supplied inputs (see
+# var.idc_instance_arn and var.identity_store_id); the foundation stack resolves
+# them per-account. Many workshops' identities can coexist in one directory, so
+# group display names are workshop-namespaced (see locals.tf).
 
 # ---------------------------------------------------------------------------
 # Users
@@ -89,6 +94,21 @@ resource "aws_ssoadmin_permission_set" "this" {
   instance_arn = var.idc_instance_arn
   description  = "Account access for Kiro workshop ${var.workshop_id} groups."
   tags         = var.default_tags
+
+  # Dual-mode guard: account instances do NOT support permission sets /
+  # aws_ssoadmin_account_assignment, so the account-access path is only valid
+  # against an ORGANIZATION instance. This resource exists only when
+  # enable_account_access is true (count = 1), so the precondition is always
+  # evaluated for the invalid combo (instance_mode = "account" AND
+  # enable_account_access = true) and fails the plan there — rather than letting
+  # it reach apply and error against the account instance. In account mode the
+  # operator must keep enable_account_access = false (users/groups only).
+  lifecycle {
+    precondition {
+      condition     = !(var.instance_mode == "account" && var.enable_account_access)
+      error_message = "instance_mode = \"account\" cannot be combined with enable_account_access = true: IdC account instances do not support permission sets or aws_ssoadmin_account_assignment. Set enable_account_access = false for account mode (users/groups/memberships only), or use instance_mode = \"organization\" to grant account access."
+    }
+  }
 }
 
 # One assignment per group, binding the group to its owning account (R2.2, R2.3).

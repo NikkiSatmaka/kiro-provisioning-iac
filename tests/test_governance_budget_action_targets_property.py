@@ -8,8 +8,10 @@ Property 2: *For any* set of supplied ``account_ids``, every generated
 ``aws_budgets_budget_action.freeze`` instance's
 ``scp_action_definition.target_ids`` equals exactly the singleton list of its
 OWN account id — never the workshop OU id, never another account's id — and
-every action references the freeze policy (``aws_organizations_policy.freeze``)
-and the budgets execution role (``aws_iam_role.budgets_execution``).
+every action references the shared freeze SCP and budgets execution role —
+now consumed from foundation/ as ``var.freeze_scp_id`` and
+``var.budgets_execution_role_arn`` (the policy object + role were moved out of
+this stack into foundation/).
 
 How it is exercised: ``aws_budgets_budget_action`` references ids/arns known
 only after apply (the freeze policy id, the role arn, the budget name), so a
@@ -18,8 +20,8 @@ full offline render is harder than a pure value check. ``target_ids =
 ``for_each`` key), so we render ``governance/terraform`` with ``tofu plan`` over
 a multi-account set and read the planned ``target_ids`` per instance directly;
 the still-unknown ``policy_id`` / ``execution_role_arn`` are asserted via the
-plan's config-level reference expressions (which name the freeze policy and the
-role). See ``governance_budget_action_plan`` for the harness.
+plan's config-level reference expressions (which name the shared freeze SCP
+variable and the execution-role variable). See ``governance_budget_action_plan`` for the harness.
 
 Harness note: ``governance_budget_action_plan`` lives under ``tests/`` and is
 importable via the shared conftest ``sys.path`` shim, mirroring the sibling
@@ -107,20 +109,21 @@ def test_each_action_targets_only_its_own_account(account_ids):
         )
 
     # 4. Config-level wiring (shared by the for_each block): policy_id points at
-    #    the FREEZE policy, execution_role_arn at the budgets execution role, and
-    #    target_ids is each.key (so every instance targets its own account).
+    #    the shared freeze SCP var, execution_role_arn at the shared budgets-role
+    #    var (both from foundation/), and target_ids is each.key (so every
+    #    instance targets its own account).
     any_facts = next(iter(rendered.values()))
-    assert "aws_organizations_policy.freeze" in " ".join(
+    assert "var.freeze_scp_id" in " ".join(
         any_facts["policy_id_references"]
     ), (
-        "scp_action_definition.policy_id does not reference "
-        f"aws_organizations_policy.freeze; got {any_facts['policy_id_references']!r}"
+        "scp_action_definition.policy_id does not reference the shared "
+        f"var.freeze_scp_id; got {any_facts['policy_id_references']!r}"
     )
-    assert "aws_iam_role.budgets_execution" in " ".join(
+    assert "var.budgets_execution_role_arn" in " ".join(
         any_facts["role_references"]
     ), (
-        "execution_role_arn does not reference aws_iam_role.budgets_execution; "
-        f"got {any_facts['role_references']!r}"
+        "execution_role_arn does not reference the shared "
+        f"var.budgets_execution_role_arn; got {any_facts['role_references']!r}"
     )
     assert any_facts["target_ids_references"] == ["each.key"], (
         "scp_action_definition.target_ids is not [each.key]; "

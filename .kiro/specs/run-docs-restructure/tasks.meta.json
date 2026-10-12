@@ -1,0 +1,302 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Rewrite the root `README.md` as the overview-and-navigation entry point": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219194
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775228056
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775334514
+      }
+    ],
+    "2.1 Author `TEARDOWN.md` at the repo root following the Teardown_Document outline": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219250
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775338812
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775460617
+      }
+    ],
+    "2.2 Delete `subscription/TEARDOWN.md`": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219293
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775620690
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775728217
+      }
+    ],
+    "3. Consolidate `backend/README.md` into the Step_Document template (step 1)": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219355
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775465825
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775611386
+      }
+    ],
+    "4.1 Merge `foundation/README.md` + `foundation/RUNBOOK.md` into the Step_Document template": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219394
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775467257
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775610005
+      }
+    ],
+    "4.2 Delete `foundation/RUNBOOK.md`": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219429
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775734191
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775831659
+      }
+    ],
+    "5.1 Merge `governance-shared/README.md` + `RUNBOOK.md`, opening with the Decision_Checkpoint": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219479
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775468658
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775613763
+      }
+    ],
+    "5.2 Delete `governance-shared/RUNBOOK.md`": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219527
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775735524
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775833087
+      }
+    ],
+    "6.1 Merge `governance/README.md` + `RUNBOOK.md`, opening with the Decision_Checkpoint": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219563
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775470044
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775615030
+      }
+    ],
+    "6.2 Delete `governance/RUNBOOK.md`": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219610
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775736927
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775834486
+      }
+    ],
+    "7.1 Merge `subscription/README.md` + `RUNBOOK.md` into the Step_Document template": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219647
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775470925
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775612348
+      }
+    ],
+    "7.2 Delete `subscription/RUNBOOK.md`": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219697
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775737660
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775835253
+      }
+    ],
+    "8. Consolidate `claim-service/README.md` into the Step_Document template (step 6)": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219757
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775619656
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775729243
+      }
+    ],
+    "9.1 Run the VC-1..VC-8 structural checks across the completed Documentation_Set": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219796
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775839888
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791776034360
+      }
+    ],
+    "9.2 Run the VC-9 plain-language editorial review": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775219842
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775841075
+      },
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791776035428
+      }
+    ],
+    "2. Create the single root `TEARDOWN.md` and delete `subscription/TEARDOWN.md`": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775728288
+      }
+    ],
+    "4. Consolidate `foundation/README.md` and delete `foundation/RUNBOOK.md` (step 2)": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775831717
+      }
+    ],
+    "5. Consolidate `governance-shared/README.md` and delete its `RUNBOOK.md` (step 3)": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775833123
+      }
+    ],
+    "6. Consolidate `governance/README.md` and delete its `RUNBOOK.md` (step 4)": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775834523
+      }
+    ],
+    "7. Consolidate `subscription/README.md` and delete `subscription/RUNBOOK.md` (step 5)": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791775835287
+      }
+    ],
+    "9. Verification pass — structural checks and editorial review": [
+      {
+        "executionId": "c8496812-284a-4a1f-831f-3d331eb854b9",
+        "chatSessionId": "sess_b7c9fa37-1279-4a2e-89e1-1910941c5b36",
+        "timestamp": 1791776035463
+      }
+    ]
+  }
+}

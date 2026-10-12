@@ -208,7 +208,7 @@ def _render(manifest: dict, otps: dict[str, str], note: str) -> str:
     lines.append("")
     if missing_otp:
         lines.append(f"> {missing_otp} user(s) still need a one-time password. "
-                     f"See RUNBOOK.md step 5, then re-run with `--otp-csv`.")
+                     f"See subscription/README.md step 6, then re-run with `--otp-csv`.")
         lines.append("")
     lines.append("## Reminder on passwords")
     lines.append("")

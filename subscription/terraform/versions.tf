@@ -17,7 +17,7 @@ terraform {
   # ---------------------------------------------------------------------------
   # Backend: remote S3 state is REQUIRED (it is what makes teardown work from a
   # different machine later), and it is always active — the backend block lives
-  # in the tracked backend.tf. Set it up before provisioning (RUNBOOK step 1b);
+  # in the tracked backend.tf. Set it up before provisioning (see subscription/README.md "Step 1 backend done" prerequisite);
   # the backend spans these files:
   #
   #   ../../backend/terraform/  sibling stack: creates the S3 bucket + DynamoDB lock table (run once)
@@ -25,7 +25,7 @@ terraform {
   #   backend.hcl            git-ignored; auto-written by `mise run backend-bootstrap`
   #                          (or copy backend.hcl.example and edit it by hand)
   #
-  # See RUNBOOK.md step 1b and TEARDOWN.md ("Option B") for the full walkthrough.
+  # See subscription/README.md and the root TEARDOWN.md ("Option B") for the full walkthrough.
   # State contains user and group IDs — treat it as sensitive, but it holds NO
   # passwords (those never touch state; see scripts/).
   # ---------------------------------------------------------------------------

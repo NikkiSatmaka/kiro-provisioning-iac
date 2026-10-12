@@ -20,6 +20,6 @@ terraform {
   # governance-shared state key `governance-shared/terraform.tfstate` supplied as
   # an init-time argument. This is a management-account SINGLETON state (no
   # workshops/<id>/ prefix, mirroring foundation/terraform.tfstate). See
-  # RUNBOOK.md and backend/README.md.
+  # governance-shared/README.md and backend/README.md.
   # ---------------------------------------------------------------------------
 }

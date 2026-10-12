@@ -15,15 +15,16 @@ Remote S3 state is MANDATORY for the main config. Step 1 inits with
 `-backend-config=backend.hcl`. `backend.tf` is tracked and always present (its
 `backend "s3" {}` block is value-free), so the only account-specific file is
 `backend.hcl` — it must exist in ../terraform first (written once by
-`mise run backend-bootstrap`, or copied from backend.hcl.example — see RUNBOOK
-step 1b). If `backend.hcl` is missing the script FAILS CLOSED (prints the fix
+`mise run backend-bootstrap`, or copied from backend.hcl.example — see
+subscription/README.md (the "Step 1 backend done" prerequisite) and
+backend/README.md). If `backend.hcl` is missing the script FAILS CLOSED (prints the fix
 and exits non-zero); it never silently falls back to local state, because local
 state is git-ignored and would make teardown from a fresh clone impossible.
 `--render-only` is exempt — it runs no tofu.
 
 It then PRINTS the console-only steps it cannot do (make MFA optional, enable
 Kiro, assign the tier, generate one-time passwords) as a checklist. It never
-pretends to have done them. See RUNBOOK.md for the full walkthrough.
+pretends to have done them. See subscription/README.md for the full walkthrough.
 
 Mirrors teardown.py's conventions: DRY RUN by default (plan only), mutation is
 opt-in (--apply), and it refuses to invent success.
@@ -75,7 +76,7 @@ BACKEND_HCL = TERRAFORM_DIR / "backend.hcl"
 CONSOLE_STEPS = """\
 ================================================================================
 CONSOLE-ONLY STEPS — AWS exposes no stable API for these. Do them by hand.
-(Full detail + verification in RUNBOOK.md.)
+(Full detail + verification in subscription/README.md.)
 ================================================================================
 [ ] Step 2b  Make MFA optional:
              IAM Identity Center -> Settings -> Authentication ->
@@ -98,7 +99,7 @@ CONSOLE-ONLY STEPS — AWS exposes no stable API for these. Do them by hand.
 BACKEND_SETUP_HELP = """\
 ================================================================================
 REMOTE S3 STATE IS REQUIRED — set it up once, then re-run (fail closed).
-(Full detail in RUNBOOK.md step 1b.)
+(Full detail in subscription/README.md "Step 1 backend done" prerequisite and backend/README.md.)
 ================================================================================
 Why: `tofu destroy` can only delete what is in its STATE. Local state is
 git-ignored and does not travel with the repo, so teardown a month later from a
@@ -265,7 +266,7 @@ def main(argv: list[str]) -> int:
           "in account mode) must already be done, or there is no IdC instance "
           "to write identities into and `apply` will fail.")
     print("Reminder: remote S3 state is required and set up once via "
-          "`mise run backend-bootstrap` (writes backend.hcl; RUNBOOK step 1b); "
+          "`mise run backend-bootstrap` (writes backend.hcl; see subscription/README.md \"Step 1 backend done\" prerequisite); "
           "init uses backend.hcl.")
 
     # Reconfigure the backend to THIS workshop's key before plan/apply, exactly

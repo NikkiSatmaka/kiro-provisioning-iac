@@ -27,8 +27,8 @@ child account.
 
 The same `data "aws_ssoadmin_instances"` lookup resolves per account, so there
 is no `instance_mode` input here — the credentialed account decides which
-instance is adopted. The adopted instance is read and **reused across every
-workshop**, never created per workshop, so this stack sits outside the
+instance is adopted. The adopted instance is read and **reused across every workshop**,
+never created per workshop, so this stack sits outside the
 per-workshop provision/teardown loop:
 
 ```
@@ -73,9 +73,10 @@ selects the mode.
 
 1. **Phase 0 setup done** — toolchain installed and AWS sign-in complete (see
    the [root README](../README.md) Phase 0 section).
-2. **Step 1 backend bootstrap done** ([`../backend/README.md`](../backend/README.md)).
-   The bootstrap creates the shared S3 bucket and lock table and writes
-   `foundation/terraform/backend.hcl` for you. Foundation reuses that one shared
+2. **Step 1 backend done** — run `mise run backend-bootstrap`
+   ([`../backend/README.md`](../backend/README.md)).
+   The `backend-bootstrap` task creates the shared S3 bucket and lock table and
+   writes `foundation/terraform/backend.hcl` for you. Foundation reuses that one shared
    bucket under its own state key `foundation/terraform.tfstate` (no
    `workshops/<id>/` prefix, because the adopted instance is a single per-account
    resource). The foundation tasks fail closed if this is missing.
@@ -102,7 +103,9 @@ empty result *is* the missing Step 0. Enable IdC, then re-run.
 
 Reference (rephrased for compliance):
 [Enable IAM Identity Center](https://docs.aws.amazon.com/singlesignon/latest/userguide/get-set-up-for-idc.html).
-Exactly one instance is exposed per account.
+Exactly one instance is exposed per account: there is one organization instance
+per management account, and at most one account instance per child/member
+account.
 
 > **Note (SCP policy type).** The all-features-mode + `SERVICE_CONTROL_POLICY`
 > enablement is **not** a foundation prerequisite — the SCPs moved to
@@ -165,8 +168,8 @@ and reuse the same IDs for every subsequent workshop. The three governance IDs
 [`../governance-shared/README.md`](../governance-shared/README.md).
 
 Re-running is always safe: the data source resolves the same single instance on
-every run, foundation owns no managed resources, and a re-run converges to
-`0 to change`.
+every run, foundation owns no managed resources — so there is nothing to import
+into state — and a re-run converges to `0 to change`.
 
 Prefer raw tofu? The equivalent of steps 2–3 by hand:
 
@@ -182,4 +185,6 @@ tofu apply      # resolves the data source; creates nothing
 
 See the root [`TEARDOWN.md`](../TEARDOWN.md) for how to remove this stack —
 `foundation-destroy` is a documented no-op (foundation adopts the instance
-read-only and owns nothing to destroy).
+read-only and owns nothing to destroy, and the shared org instance is
+never deleted by this stack — disabling IdC is a deliberate management-account
+console action).

@@ -5,7 +5,7 @@
 # dual-mode and account-safe, and Organizations SCPs cannot be created in a
 # child account). They are consumed by every workshop's governance/ stack (by
 # id, via var.kiro_guardrail_scp_id / var.freeze_scp_id, wired forward as
-# TF_VAR_* — see governance-shared/RUNBOOK.md). Per-workshop governance/ cannot
+# TF_VAR_* — see governance-shared/README.md). Per-workshop governance/ cannot
 # own them because their names are unsuffixed and would collide across
 # workshops. This stack creates the policy OBJECTS only; it attaches neither:
 #   - Kiro guardrail: a deny-by-default allowlist. governance/ ATTACHES it to

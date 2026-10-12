@@ -9,7 +9,7 @@
 #   - in a CHILD/member account it adopts that account's OWN account instance.
 # The same `data "aws_ssoadmin_instances"` source resolves per-account, so no
 # instance_mode input is needed here. Enabling IdC in the target account is the
-# one-time console Step 0 (see RUNBOOK). The adopted instance is what the
+# one-time console Step 0 (see foundation/README.md). The adopted instance is what the
 # subscription stack consumes via var.idc_instance_arn / var.identity_store_id.
 #
 # If IdC has never been enabled in the credentialed account, the data source

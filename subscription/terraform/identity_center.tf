@@ -23,7 +23,7 @@
 #
 # NOTE: aws_identitystore_user cannot set a password and does not send an
 # invitation email — AWS exposes neither via API. Password setup is a console
-# step handled after apply (see scripts/ and RUNBOOK.md).
+# step handled after apply (see scripts/ and subscription/README.md).
 
 resource "aws_identitystore_user" "this" {
   for_each = local.users

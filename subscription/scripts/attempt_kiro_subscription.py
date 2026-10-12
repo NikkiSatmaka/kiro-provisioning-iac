@@ -56,7 +56,7 @@ Could not assign the Kiro tier via API. Do it in the console (reliable path):
      source; click Enable. Note the Sign-in URL.
   2. Users & Groups -> Groups tab -> Add group.
   3. Select each group listed below and choose the desired tier.
-See RUNBOOK.md for the full walkthrough and verification.
+See subscription/README.md for the full walkthrough and verification.
 """
 
 

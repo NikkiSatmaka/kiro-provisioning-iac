@@ -1,5 +1,5 @@
 # ===========================================================================
-# Remote S3 state backend — REQUIRED (foundation RUNBOOK)
+# Remote S3 state backend — REQUIRED (foundation README)
 # ===========================================================================
 #
 # This file is TRACKED and intentionally VALUE-FREE. The `backend "s3" {}` block

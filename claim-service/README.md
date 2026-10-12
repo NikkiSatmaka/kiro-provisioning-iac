@@ -1,160 +1,157 @@
-# Credential Claim Service
+# Claim-service (step 6 of the flow) — optional self-serve credential distribution
 
-This is the optional self-serve path of **Phase 4 — Distribute** (root
-[`README.md`](../README.md)).
+> Phase link: this is **Step 6** of the root [`README.md`](../README.md) flow.
+> Prerequisites: Step 5 subscription
+> ([`../subscription/README.md`](../subscription/README.md)) — it produces the
+> credential files this stack hands out · Next: none; this is the last step.
 
-Self-serve, race-proof distribution of pre-provisioned Kiro IAM Identity Center
-credentials to workshop participants. Participants scan a QR code (or open a
-short link), enter their email and a workshop code, and receive exactly one
-username + one-time password — with concurrency guarantees that no credential
-is handed out twice and no email claims twice.
+## What it is
 
-This is an opt-in, self-contained subtree with its own OpenTofu state. It does
-not alter or depend on the `../subscription/` provisioning flow and can be torn
-down independently without touching provisioned identities.
+The claim-service is an **opt-in** way to hand each workshop participant exactly
+one of the Kiro credentials that Step 5 (subscription) created. Participants
+scan a QR code or open a short link, enter their email and a workshop code, and
+get back one username and one one-time password. Two guarantees hold even when
+many people claim at once: no credential is handed out twice, and no email
+claims twice.
 
-It deploys in the AWS Organizations **management account**, alongside every
-other stack. Many workshops' claim services coexist there side by side: every
-resource name derives from `local.name = credential-claim-<workshop_id>`, so
-each workshop gets its own table, Lambda, Function URL, IAM role, and policy
-with an independent lifecycle, and its spend is attributable through the
-unconditional `workshop_id` cost tag. One Function URL serves one workshop; a
-single workshop can serve participants across multiple member accounts.
-`AWS_PROFILE` must be a management-account profile.
+The whole service is **one Python Lambda behind exactly one AWS Lambda Function
+URL** — a single public HTTPS address AWS gives you when you deploy. A browser
+`GET` to that URL returns the claim page; a form `POST` to the *same* URL runs
+the claim. There is no API Gateway, no separate web host, and no WAF — the page
+and the API share one URL. State is a single on-demand DynamoDB table, so the
+cost at workshop scale is about zero.
+
+The URL AWS assigns looks like
+`https://<random-id>.lambda-url.<region>.on.aws/`. It is HTTPS-only (AWS
+terminates TLS with its own browser-trusted certificate — nothing to provision),
+and the `<random-id>` is fixed for the life of the Function URL. Because the URL
+is public, the only barriers are the **workshop code** and a **per-IP attempt
+cap** enforced inside the handler, so don't publish the URL or the code before
+the event. The random id is long, so put the URL behind a **QR code** or a
+**short link** rather than asking people to type it. There is no custom domain
+out of the box; adding one would require CloudFront or API Gateway plus Route 53
+and ACM, which this service deliberately avoids.
+
+This is a self-contained subtree with its **own** OpenTofu state. It does not
+alter or depend on the running of the `../subscription/` stack and can be torn
+down on its own without touching any provisioned identity. It deploys in the AWS
+Organizations **management account**, alongside every other stack, so
+`AWS_PROFILE` must be a management-account profile. Many workshops' claim
+services coexist there side by side: every resource name derives from
+`credential-claim-<workshop_id>`, so each workshop gets its own table, Lambda,
+Function URL, IAM role, and policy with an independent lifecycle, and its spend
+is attributable through the `workshop_id` cost tag. One Function URL serves one
+workshop; a single workshop can serve participants across multiple member
+accounts.
 
 The full requirements and design live in the specs, not here:
-
-- `.kiro/specs/credential-claim-service/` — the service (table, Lambda, scripts).
-- `.kiro/specs/claim-handler-entrypoint/` — the handler entrypoint + wiring.
-
-## Architecture at a glance
-
-One Python 3.12 Lambda behind **exactly one AWS Lambda Function URL** serves the
-whole thing: a GET returns the inline claim page, a POST runs the claim. There
-is no API Gateway, no WAF, and no separate frontend host — the page and the API
-are the same URL. State is one on-demand DynamoDB table (`CRED#` / `EMAIL#` /
-`RATE#` items). Cost at workshop scale is ≈ $0.
-
-```
-participant ──GET──▶  https://<id>.lambda-url.<region>.on.aws/   ──▶ claim page
-            ──POST─▶  (same URL)                                 ──▶ claim result
-                                   │
-                                   ▼
-                        DynamoDB (single table, on-demand)
-```
-
-## How participants reach it
-
-After you deploy, AWS assigns a single public HTTPS URL of the form:
-
-```
-https://<random-id>.lambda-url.<region>.on.aws/
-```
-
-- It is **HTTPS-only** — AWS terminates TLS with its own managed, browser-trusted
-  certificate. There is no HTTP variant and nothing to provision.
-- The `<random-id>` is assigned at creation and stays stable for the life of the
-  Function URL. You don't choose it; print it with `mise run claim-url`.
-- The URL is **public** (`authorization_type = NONE`). Access is gated inside the
-  handler by the **workshop code** and a **per-IP attempt cap** — so treat the
-  URL + workshop code as the only barriers and don't publish them before the
-  event.
-
-Because the id is a long random string, put the URL behind a **QR code** or a
-**short link** for the workshop — participants scan/click rather than type it.
-(There is no custom domain out of the box; adding one would mean CloudFront or
-API Gateway + Route 53 + ACM, which this service deliberately avoids.)
+`.kiro/specs/credential-claim-service/` (the service — table, Lambda, scripts)
+and `.kiro/specs/claim-handler-entrypoint/` (the handler entrypoint and wiring).
 
 ## Prerequisites
 
-**Phase 3 provisioning must be complete first.** The seed step consumes the
-Subscription→Claim handoff files — `../../subscription/output/otps.csv` and
-`../../subscription/output/manifest.json` — so they must already exist (the
-"Notes on the steps" Seed bullet below names the same files).
+Before you run this step, these must be true:
 
-From the repo root, once:
+1. **Phase 0 toolchain + AWS auth done** (root [`README.md`](../README.md)), and
+   `AWS_PROFILE` is a **management-account** profile. The region comes from
+   `AWS_REGION` (default `us-east-1`) and is never hardcoded.
+2. **Step 1 backend done** — the shared S3 remote-state bucket from the
+   `backend/` stack exists, and `mise run backend-bootstrap` has written
+   `claim-service/terraform/backend.hcl` for you (this stack reuses the shared
+   bucket under its own state key, so there is no separate bootstrap). See
+   [`../backend/README.md`](../backend/README.md). Only if you must create the
+   file by hand — e.g. the bucket predates that output — copy
+   `claim-service/terraform/backend.hcl.example` to
+   `claim-service/terraform/backend.hcl` and set your 12-digit account id in the
+   bucket name.
+3. **Step 5 subscription done** — the seed step consumes the subscription step's
+   handoff files, `../subscription/output/otps.csv` (header `username,otp`) and
+   `../subscription/output/manifest.json` (for the sign-in URL and region), so
+   those must already exist. Run Step 5 first
+   ([`../subscription/README.md`](../subscription/README.md)).
+4. **`WORKSHOP_CODE` set in `.env`** — the shared gate secret for this workshop;
+   deploy requires it.
+5. **`WORKSHOP_ID` set in `.env`** — the per-workshop namespace. The deploy,
+   seed, and audit tasks fail closed without it, because every resource and the
+   state key are derived from it (`credential-claim-<WORKSHOP_ID>`).
 
-```bash
-mise install          # tools + .venv
-mise run setup        # sync Python deps
-cp .env.example .env  # then edit .env
-```
+## How to run
 
-In `.env` set at least:
+Follow these in order, all from the repo root. Each mutating step has a safe
+`*-plan` dry-run sibling listed before it; apply, seed, and destroy prompt before
+they change anything.
 
-- `AWS_PROFILE` / `AWS_REGION` — `AWS_PROFILE` must be a management-account
-  profile; region defaults to `us-east-1`. The provider also accepts an explicit
-  `aws_profile` variable (empty by default, falling back to `AWS_PROFILE` / the
-  SDK chain), mirroring the other stacks.
-- `WORKSHOP_CODE` — the shared gate secret for this workshop (required by deploy).
+1. **Test — validate the service logic locally.** Runs the full suite (pytest +
+   Hypothesis + moto) against an in-memory DynamoDB. **No AWS needed**, so run it
+   first. Expect a green suite.
 
-The remote state bucket must already exist (created by the `backend/` stack —
-see the root `README.md`). This service **reuses** that shared bucket under a
-distinct state key (`claim-service/terraform.tfstate`), so there is no separate
-bootstrap. `mise run backend-bootstrap` already writes
-`claim-service/terraform/backend.hcl` for you alongside the subscription one —
-if you have run it, there is nothing to do here.
+   ```bash
+   mise run claim-test
+   ```
 
-Only if you need to create it by hand (e.g. the bucket predates this output):
+2. **Deploy (dry run) — review what will be created.** Runs `tofu init` and
+   `plan`; reports the table, Lambda, and Function URL it would create and
+   changes nothing.
 
-```bash
-cp claim-service/terraform/backend.hcl.example claim-service/terraform/backend.hcl
-# then set your 12-digit <account_id> in the bucket name
-```
+   ```bash
+   mise run claim-deploy-plan
+   ```
 
-## Run order
+3. **Deploy — create the table, Lambda, and Function URL.** Reads `WORKSHOP_CODE`
+   from `.env` and passes it to OpenTofu as the sensitive `workshop_code`
+   variable (so the secret is never typed on the command line or written to a
+   tracked file). Prompts to approve, then prints the claim URL. Expect the three
+   resources to exist and a public HTTPS URL to be printed.
 
-Operator steps, in lifecycle order. Each mutating step has a safe `*-plan`
-dry-run sibling, and apply/seed/destroy prompt before they change anything.
-All are run from the repo root.
+   ```bash
+   mise run claim-deploy
+   ```
 
-| # | Step | Task | What it does |
-|---|------|------|--------------|
-| 1 | Test | `mise run claim-test` | Run the full suite (pytest + Hypothesis + moto). **No AWS needed.** |
-| 2 | Deploy (dry run) | `mise run claim-deploy-plan` | `tofu init` + `plan`; reports changes, applies none. |
-| 3 | Deploy | `mise run claim-deploy` | Apply the table, Lambda, and Function URL (prompts), then print the claim URL. |
-| — | Get URL | `mise run claim-url` | Print the deployed claim URL any time (for the QR / short link). |
-| 4 | Seed (dry run) | `mise run claim-seed-plan` | Classify `otps.csv` rows and report what would be seeded; writes nothing. |
-| 5 | Seed | `mise run claim-seed` | Write one `CRED#` item per credential from the `subscription/` outputs. Conditional, so safe to re-run. |
-| — | _(workshop runs)_ | — | Participants claim credentials at the URL. |
-| 6 | Audit | `mise run claim-audit` | Export who claimed what to a git-ignored CSV under `output/` (contains PII). |
-| 7 | Destroy | `mise run claim-destroy` | Tear down the table, Lambda, and Function URL (prompts). Never touches `subscription/` identities. |
+4. **Get the URL — any time after deploy.** Prints the deployed claim URL so you
+   can put it behind the workshop QR code or short link.
 
-### Notes on the steps
+   ```bash
+   mise run claim-url
+   ```
 
-- **Deploy** reads `WORKSHOP_CODE` from `.env` and passes it to OpenTofu as the
-  sensitive `workshop_code` variable (via `TF_VAR_workshop_code`), so the secret
-  is never written to a tracked file or typed on the command line.
-- **Seed** reads `../../subscription/output/otps.csv` (header `username,otp`) and
-  `../../subscription/output/manifest.json` (for `sign_in_url` and `region`). Run
-  the `subscription/` flow first so those files exist. A row missing a username
-  or OTP is reported and skipped.
-- **Audit** writes `output/audit-<timestamp>.csv`. The `output/` directory is
-  git-ignored because the rows contain participant emails (PII).
-- **Region** everywhere is derived from `AWS_REGION` (default `us-east-1`); it is
-  never hardcoded in the handler, scripts, or Terraform.
+5. **Seed (dry run) — classify what would be seeded.** Reads
+   `../subscription/output/otps.csv` and `manifest.json`, classifies each row,
+   and reports what it would write — writing nothing. A row missing a username or
+   OTP is reported and skipped.
 
-> **Next:** Teardown — see [`../subscription/TEARDOWN.md`](../subscription/TEARDOWN.md);
-> `mise run claim-destroy` tears down just this stack (never touches
-> `subscription/` identities).
+   ```bash
+   mise run claim-seed-plan
+   ```
 
-## Testing it: local vs. deployed
+6. **Seed — populate the claim pool.** Writes one `CRED#` item per credential
+   from the subscription outputs into this workshop's table. The write is
+   conditional, so it is safe to re-run.
 
-You do **not** need AWS to validate the service logic.
+   ```bash
+   mise run claim-seed
+   ```
 
-- **Local, automated (recommended first):** `mise run claim-test` exercises the
-  handler end-to-end — routing, the workshop-code gate, the race-proof claim
-  transaction, idempotent re-claim, CORS headers, and error mapping — against an
-  in-memory DynamoDB (moto). This is the main correctness lever.
-- **Local, by hand:** you can import `claim_handler` and call
-  `handler(event, context)` with a synthetic Function URL event against a moto
-  table for a quick smoke test (see the tests under `tests/` for the event shape
-  and the moto fixture pattern).
-- **Deployed only:** the live Function URL, its HTTPS certificate, and a real
-  browser loading the page can only be verified against an actual deploy. The
-  handler logic itself is fully covered locally.
+   The participants then claim their credentials at the URL during the workshop.
 
-## Layout
+7. **Audit — export who claimed what.** After the workshop, exports the claimed
+   records to a timestamped CSV under `output/`. That directory is git-ignored
+   because the rows contain participant emails (PII).
+
+   ```bash
+   mise run claim-audit
+   ```
+
+### Testing it: local vs. deployed
+
+You do **not** need AWS to validate the service logic. `mise run claim-test`
+(step 1 above) exercises the handler end to end — routing, the workshop-code
+gate, the race-proof claim transaction, idempotent re-claim, CORS headers, and
+error mapping — against an in-memory DynamoDB, and is the main correctness lever.
+Only the live Function URL, its HTTPS certificate, and a real browser loading the
+page require an actual deploy to verify; the handler logic itself is fully
+covered locally.
+
+### Layout
 
 ```
 claim-service/
@@ -167,3 +164,7 @@ claim-service/
 ├── tests/                    ← pytest + Hypothesis + moto suite
 └── output/                   ← git-ignored audit CSVs (PII)
 ```
+
+## Teardown
+
+See the root [`TEARDOWN.md`](../TEARDOWN.md) for how to remove this stack.

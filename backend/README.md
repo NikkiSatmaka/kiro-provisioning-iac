@@ -1,97 +1,72 @@
-# Phase 1 — Shared remote-state backend
+# Backend (step 1 of the flow) — the shared remote-state backend
 
-This is **Phase 1** of the root README journey: the S3 bucket + DynamoDB lock
-table that hold the other stacks' OpenTofu state. Run it **once per account**,
-before the `subscription/` stack.
+> Phase link: this is **Step 1** of the root [`README.md`](../README.md) flow.
+> Prerequisites: Phase 0 (toolchain + AWS sign-in) · Next: Step 2 — Foundation
+> ([`../foundation/README.md`](../foundation/README.md)).
 
-- **Prerequisites:** Phase 0 (toolchain + AWS auth) — see the root
-  [`README.md`](../README.md). The backend stack is account-agnostic: it derives
-  the state bucket from the caller's own account id, so it works whether you run
-  under a management-account profile (organization mode) or a child account's
-  profile (account mode).
-- **Next:** Phase 2 — Foundation ([`../foundation/README.md`](../foundation/README.md)).
+## What it is
 
-## Why it exists (and why its own state)
+The backend stack prepares the shared *remote state* for every other stack —
+the place OpenTofu records what it has created. It provisions an S3 bucket and a
+DynamoDB lock table, and nothing else.
 
-A remote backend cannot create the bucket it stores state in — classic
-chicken-and-egg. So this stack runs **first** and keeps its **own local**
-state. It only tracks the state bucket and the lock table.
+A remote backend cannot create the bucket it stores its own state in — a
+chicken-and-egg problem. So this stack runs **first** and keeps its state
+**locally**, tracking only the state bucket and the lock table. Every later
+stack then stores its state in that one bucket.
 
-## What it creates
+It creates:
 
 - A versioned, AES256-encrypted, public-access-blocked S3 bucket named
-  `kiro-tofu-state-<ACCOUNT_ID>` (derived from your account id, so it is
-  globally unique with nothing to fill in; override with `var.state_bucket_name`).
-- The `kiro-tofu-locks` DynamoDB table used by OpenTofu for state locking.
+  `kiro-tofu-state-<ACCOUNT_ID>`. The name is derived from your AWS account id,
+  so it is globally unique with nothing to fill in (override with
+  `var.state_bucket_name` if you need to).
+- The `kiro-tofu-locks` DynamoDB table that OpenTofu uses for state locking.
 
-## How to run (prefer mise)
+Every consuming stack reuses that **same bucket** under its own distinct state
+key, so each stack's state stays isolated — a `tofu destroy` on one stack can
+never touch another's state.
 
-```bash
-mise run backend-bootstrap-plan   # DRY RUN: tofu init + plan, creates nothing
-mise run backend-bootstrap        # apply AND auto-write both stacks' backend.hcl
-```
+This stack is account-agnostic: because it derives the bucket name from the
+caller's own account id, it works the same whether you run under a
+management-account profile (organization mode) or a child account's profile
+(account mode).
 
-A single bootstrap writes the backend config for **every** consuming stack —
-`subscription/terraform/backend.hcl` and `claim-service/terraform/backend.hcl`.
-Both point at this one bucket + lock table and differ only by their state
-`key`, so you never fill in an account id by hand.
+**Cost allocation.** Every stack stamps a `workshop_id` tag on each taggable
+resource. The backend and the other shared resources stamp
+`workshop_id = "shared"`, because one state bucket and lock table back every
+workshop and their (negligible) cost cannot be split per workshop. A
+user-defined tag does nothing for cost reporting until it is activated once in
+the Billing console, which is a manual management-account step: **Billing → Cost
+allocation tags → User-defined cost allocation tags →** select **`workshop_id`**
+→ **Activate**. Activation is not retroactive; AWS populates the tag going
+forward, after which you can group or filter cost by `workshop_id`.
 
-Raw equivalent:
+This stack's local state is git-ignored (see [`.gitignore`](./.gitignore)); the
+provider lock file `terraform/.terraform.lock.hcl` stays tracked so versions
+stay reproducible.
 
-```bash
-cd backend/terraform
-tofu init
-tofu apply
-tofu output -raw backend_hcl              > ../../subscription/terraform/backend.hcl
-tofu output -raw backend_hcl_claim_service > ../../claim-service/terraform/backend.hcl
-```
+## Prerequisites
 
-## Who consumes it
+- Phase 0 is complete: the toolchain is installed and you are signed in to AWS.
+  See the root [`README.md`](../README.md).
+- You are signed in under the AWS profile for the account you want to hold the
+  shared state (management account for organization mode, or a child account for
+  account mode).
 
-- `subscription/` — remote state with key `subscription/terraform.tfstate`.
-- `claim-service/` — remote state with key `claim-service/terraform.tfstate`.
+## How to run
 
-Both reuse the **same bucket** under their own distinct state key, so each
-stack's state stays isolated (a `tofu destroy` on one can never touch the
-other's state). Any future stack follows the same pattern: add a
-`backend_hcl_<stack>` output here and have the bootstrap write it.
+Run the dry run first to see what would happen, then run the mutating task.
+
+1. `mise run backend-bootstrap-plan` — dry run. Initializes and plans; creates
+   nothing. Review the plan.
+2. `mise run backend-bootstrap` — creates the state bucket and lock table, then
+   writes every consuming stack's `backend.hcl` so none of them needs an account
+   id filled in by hand. Prompts you to approve before it changes anything.
+
+Expected result: the S3 state bucket and DynamoDB lock table exist, and each
+consuming stack has a `backend.hcl` pointing at them. You are ready for Step 2.
 
 ## Teardown
 
-Destroy the consuming stacks first, then tear this down last:
-
-```bash
-mise run backend-destroy   # flips force_destroy=true, empties + deletes the bucket + table
-```
-
-See [`../subscription/TEARDOWN.md`](../subscription/TEARDOWN.md) ("Option B")
-for the full order.
-
-## Cost allocation
-
-Every stack stamps a `workshop_id` tag on every taggable resource via the
-provider's `default_tags`. The workshop-scoped stacks (`subscription/`,
-`claim-service/`, `governance/`) use the real workshop id, so their costs
-attribute per workshop in Cost Explorer / CUR. The shared stacks (`backend/`
-and this remote-state backend, plus `foundation/`'s IdC instance) stamp
-`workshop_id = "shared"`: a single S3 state bucket, DynamoDB lock table, and
-IdC instance back **every** workshop, so their (negligible) cost is shared
-overhead that cannot be split per workshop.
-
-**One-time manual activation (management account).** A user-defined tag does
-nothing for cost reporting until it is activated once in the Billing console —
-this is not a reliable Terraform resource/API, so it stays a manual step:
-
-> **Billing → Cost allocation tags → User-defined cost allocation tags →**
-> select **`workshop_id`** → **Activate**.
-
-After activation, AWS begins populating the tag in Cost Explorer and the CUR
-going forward (it is not retroactive). From then on you can group or filter cost
-by `workshop_id` to see each workshop's spend, with `shared` collecting the
-backend/foundation overhead.
-
-## State note
-
-This stack's local state is git-ignored (see [`.gitignore`](./.gitignore)); the
-provider lock file `terraform/.terraform.lock.hcl` stays tracked for
-reproducible versions.
+See the root [`TEARDOWN.md`](../TEARDOWN.md) for how to remove this stack.

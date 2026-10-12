@@ -1,120 +1,152 @@
-# Foundation stack (adopt the IdC instance — dual-mode, read-only)
+# Foundation (step 2 of the flow) — adopt the IAM Identity Center instance, read-only
 
-This is **Phase 2** of the root README journey.
+> Phase link: this is **Step 2** of the [root README](../README.md) flow.
+> Prerequisites: Step 1 — Backend ([`../backend/README.md`](../backend/README.md)) · Next: Step 5 — Subscription ([`../subscription/README.md`](../subscription/README.md))
 
-- **Prerequisites:** Phase 1 backend bootstrap done
-  ([`../backend/README.md`](../backend/README.md)) and IAM Identity Center
-  **enabled in the credentialed account** — the management account in
-  organization mode, or the child/member account in account mode
-  ([`RUNBOOK.md`](./RUNBOOK.md) Step 0).
-- **Next:** Phase 3 — Provision ([`../subscription/README.md`](../subscription/README.md)).
+> ⚠️ **Nothing here runs automatically.** Every step is a command you invoke
+> yourself with `mise run`. `foundation-apply` is a **pure read**: it adopts the
+> Identity Center instance, prints the two IDs to carry forward, and changes
+> nothing in AWS.
 
-The stack that **adopts (reads) the IAM Identity Center instance once per
-account and hands its IDs forward** to every workshop's `subscription/` stack.
-It is **dual-mode** and **account-safe**: it creates nothing, so it runs equally
-in the management account or a child account.
+## What it is
 
-- **organization mode** (default) — run under a management-account profile; it
-  adopts the single **organization** instance (today's behavior).
-- **account mode** — run under a **child/member account**'s profile; it adopts
-  that account's **own IdC account instance**.
+**IAM Identity Center (IdC)** is the AWS service that holds the users, groups,
+and sign-in portal a workshop's people log in through. This stack has one job:
+**adopt (read) the IdC instance once per account and hand its two IDs forward**
+so every workshop's `subscription/` stack can consume them without hunting them
+down.
 
-The same `data "aws_ssoadmin_instances"` data source resolves per-account, so
-there is no `instance_mode` input here — the credentialed account decides which
-instance is adopted.
+It is **read-only and account-safe**: it creates nothing, so it runs the same
+way whether you point it at an organization's management account or at a single
+child account.
 
-> ⚠️ **Nothing here runs automatically.** Every step is manual or driven by an
-> explicit `mise run` task you invoke. [`RUNBOOK.md`](./RUNBOOK.md) is the
-> end-to-end read-then-wire order. `foundation-apply` is a **pure read** — it
-> adopts the instance and prints the two IDs to wire forward; it mutates
-> nothing.
+- **Organization mode** (default) — run under a management-account profile; it
+  adopts the one shared **organization** instance.
+- **Account mode** — run under a **child/member account**'s profile; it adopts
+  that account's **own account instance**.
 
-> **What moved out.** Foundation used to also create the shared budgets
-> execution role and the two SCP policy objects (Kiro guardrail + deny-all
-> freeze). Those are AWS Organizations / management-account resources that
-> **fail in a child account**, so they moved to the new management-only
-> [`../governance-shared/`](../governance-shared/README.md) stack. Foundation is
-> now purely read-only IdC adoption, which is what lets it run in a child
-> account.
-
-**Scope of this doc.** This README explains the concepts behind the foundation
-stack — the adopted IdC instance, the dual-mode behavior, the decoupling
-boundary, and the shared backend. For the step-by-step run order, use
-[`RUNBOOK.md`](./RUNBOOK.md). For the overall repo journey, start at the
-[root `README.md`](../README.md).
-
-## Why it exists
-
-One job: **adopt the IdC instance once per account and expose its IDs so the
-per-workshop subscription stack never has to hunt them down.**
-
-The `subscription/` stack **consumes** the IdC instance through two
-operator-supplied inputs (`var.idc_instance_arn`, `var.identity_store_id`)
-instead of creating it. This stack resolves those two IDs from whichever
-instance the credentialed account exposes (the organization instance in the
-management account, or the account instance in a child account) so the
-subscription stack is free to consume them.
-
-The adopted instance is **read/reused across every workshop** — never per
-workshop. The foundation stack sits outside the per-workshop provision/teardown
-loop entirely:
+The same `data "aws_ssoadmin_instances"` lookup resolves per account, so there
+is no `instance_mode` input here — the credentialed account decides which
+instance is adopted. The adopted instance is read and **reused across every
+workshop**, never created per workshop, so this stack sits outside the
+per-workshop provision/teardown loop:
 
 ```
-backend/        (run once; local state; S3 bucket + lock table)
+backend/        (step 1; shared S3 bucket + lock table)
     │
     ▼
-foundation/     (run once per account; state key foundation/terraform.tfstate)
+foundation/     (step 2; run once per account; state key foundation/terraform.tfstate)
     reads  ONE IdC instance (data "aws_ssoadmin_instances")
            - organization instance   (management account), or
            - account instance         (child/member account)
     emits   instance_arn / identity_store_id / region / sign_in_url
-    │  operator exports the IDs forward (NOT remote state)
-    └──────────────▶ subscription/ (per workshop; consumes the two IdC IDs)
+    │  you export the IDs forward (NOT remote state)
+    └──────────────▶ subscription/ (step 5; per workshop; consumes the two IdC IDs)
 ```
 
-## Dual-mode: organization vs account instance
+The stack reads **exactly one** IdC instance and touches **nothing else** on the
+Identity Center surface — no users, groups, memberships, permission sets, or
+account assignments. Those all belong to the `subscription/` stack. The shared
+budgets execution role and the two Service Control Policy (SCP) objects — an SCP
+is an organization-wide permission boundary — that it used to create are now
+owned by the management-only [`../governance-shared/`](../governance-shared/README.md)
+stack; moving them out is what lets foundation run read-only in a child account.
 
-Foundation adopts whichever instance the credentialed account exposes — no
-input selects the mode:
+### Dual-mode caution
 
-| | organization mode (default) | account mode |
+Foundation adopts whichever instance the credentialed account exposes — no input
+selects the mode.
+
+| | Organization mode (default) | Account mode |
 | --- | --- | --- |
 | `AWS_PROFILE` | management-account profile | **child/member account's** profile |
-| Adopted instance | the org instance | the child's own account instance |
-| Downstream subscription | run in management account | run in the same child account (`instance_mode = "account"`) |
+| Adopted instance | the organization instance | the child's own account instance |
+| Downstream subscription | run in the management account | run in the same child account (`instance_mode = "account"`) |
 
-**Caution (R-2).** If you run foundation with a **management-account** profile
-while intending account mode, the data source silently resolves the
-**organization** instance and you will wire the wrong IDs forward. Confirm the
-profile points at the intended account (`mise run verify`) before applying.
+> ⚠️ **Confirm the account before you apply.** If you run foundation with a
+> **management-account** profile while intending account mode, the lookup
+> silently resolves the **organization** instance and you carry the wrong IDs
+> forward. Run `mise run verify` and confirm it reports the account you intend
+> before applying.
 
-## The adopted IdC instance (read-only)
+## Prerequisites
 
-This stack **reads exactly one** IdC instance via
-`data "aws_ssoadmin_instances" "this"` and touches **nothing else** from the
-Identity Center surface — no users, groups, memberships, permission sets, or
-account assignments. Those all stay in the `subscription/` stack. It never
-creates or destroys the instance.
+1. **Phase 0 setup done** — toolchain installed and AWS sign-in complete (see
+   the [root README](../README.md) Phase 0 section).
+2. **Step 1 backend bootstrap done** ([`../backend/README.md`](../backend/README.md)).
+   The bootstrap creates the shared S3 bucket and lock table and writes
+   `foundation/terraform/backend.hcl` for you. Foundation reuses that one shared
+   bucket under its own state key `foundation/terraform.tfstate` (no
+   `workshops/<id>/` prefix, because the adopted instance is a single per-account
+   resource). The foundation tasks fail closed if this is missing.
+3. **Step 0 — IAM Identity Center enabled in the credentialed account**
+   (one-time console action; see below).
 
-The `hashicorp/aws` provider is the only provider this stack needs; the
-`data "aws_ssoadmin_instances"` data source returns the adopted instance's ARN
-and identity store id, and `data.aws_region.current` resolves the concrete
-region for the `region` output.
+### Step 0 — enable IAM Identity Center (one-time, console)
 
-Exactly **one instance is exposed per account** (one organization instance in
-the management account, or one account instance in a child account). Enabling
-IdC in that account is a one-time console action (Step 0 in the RUNBOOK). If IdC
-has never been enabled, the data source returns no instance and plan fails —
-that is the missing Step 0 (now applicable per-account), not something this
-stack repairs.
+This repo **adopts** an existing IdC instance; it does not create one. If IdC has
+never been enabled in the account, there is no instance to read and the plan
+fails.
 
-## Decoupling via variables (not remote state)
+1. Sign in to the **target account** — your AWS Organizations management account
+   (organization mode) or the child/member account (account mode).
+2. Open **IAM Identity Center** in the AWS console.
+3. **Enable** IAM Identity Center. This creates the account's instance — an
+   organization instance in the management account, or an account instance in a
+   child account.
 
-The stacks are wired together **by the operator through explicit variables**,
-never by a remote-state reference. The foundation stack EMITS outputs; the
-operator copies/exports the IDs into the subscription stack's inputs.
+Expected result: IAM Identity Center shows one enabled instance. If you skip
+this, `mise run foundation-plan` finds no instance (the
+`data "aws_ssoadmin_instances"` lookup returns an empty list) and fails — that
+empty result *is* the missing Step 0. Enable IdC, then re-run.
 
-Into the **subscription** stack (the IdC handoff):
+Reference (rephrased for compliance):
+[Enable IAM Identity Center](https://docs.aws.amazon.com/singlesignon/latest/userguide/get-set-up-for-idc.html).
+Exactly one instance is exposed per account.
+
+> **Note (SCP policy type).** The all-features-mode + `SERVICE_CONTROL_POLICY`
+> enablement is **not** a foundation prerequisite — the SCPs moved to
+> `governance-shared/`. See [`../governance-shared/README.md`](../governance-shared/README.md)
+> if you use the governance track.
+
+## How to run
+
+Run from the repo root; mise exports `AWS_PROFILE` / `AWS_REGION` from your
+`.env` automatically. The order is: **plan → apply → wire the IDs forward.**
+
+1. **Confirm the account.** Run `mise run verify` (it calls
+   `aws sts get-caller-identity`) and confirm it reports the account you intend —
+   the management account in organization mode, or the child/member account in
+   account mode. This guards against the dual-mode caution above.
+2. **`mise run foundation-plan`** — dry run. Runs `tofu init` + `plan`, a pure
+   read of the IdC instance. Expect `0 to add`; it changes nothing.
+3. **`mise run foundation-apply`** — adopts (reads) the IdC instance and prints
+   the exact `TF_VAR_*` export lines to carry forward. It prompts to approve and
+   still creates nothing.
+4. **Wire the IDs into the subscription step (step 5).** Export the two outputs
+   so the subscription stack picks them up through its existing variables:
+
+   ```bash
+   cd foundation/terraform
+   export TF_VAR_idc_instance_arn="$(tofu output -raw instance_arn)"
+   export TF_VAR_identity_store_id="$(tofu output -raw identity_store_id)"
+
+   # Informational only:
+   tofu output -raw sign_in_url     # https://<identity-store-id>.awsapps.com/start
+   tofu output -raw region
+   ```
+
+   The outputs are plain strings, so `tofu output -raw` emits a bare value you
+   can assign straight to a `TF_VAR_*` variable. Prefer a file? Write them into
+   the subscription stack's `terraform.tfvars` instead:
+
+   ```hcl
+   # subscription/terraform/terraform.tfvars
+   idc_instance_arn  = "arn:aws:sso:::instance/ssoins-xxxxxxxxxxxx"
+   identity_store_id = "d-xxxxxxxxxx"
+   ```
+
+The two IDs map forward as:
 
 | Foundation output   | Subscription input          |
 | ------------------- | --------------------------- |
@@ -123,84 +155,31 @@ Into the **subscription** stack (the IdC handoff):
 | `region`            | (informational)             |
 | `sign_in_url`       | (informational)             |
 
-The three shared-primitive IDs the `governance/` stack consumes
+The stacks are wired together **by you, through variables** — never through a
+remote-state reference. No stack declares a `data "terraform_remote_state"`
+pointing at another, so each can be planned, applied, or destroyed on its own.
+Because foundation runs once per account and is reused, you do this wiring once
+and reuse the same IDs for every subsequent workshop. The three governance IDs
 (`budgets_execution_role_arn`, `kiro_guardrail_scp_id`, `freeze_scp_id`) are
-**no longer emitted here** — they come from
-[`../governance-shared/`](../governance-shared/README.md).
+**not** emitted here — get them from
+[`../governance-shared/README.md`](../governance-shared/README.md).
 
-Because the handoff is explicit:
+Re-running is always safe: the data source resolves the same single instance on
+every run, foundation owns no managed resources, and a re-run converges to
+`0 to change`.
 
-- The foundation stack exposes its values **only as outputs** — never anywhere
-  the consuming stack reads via remote state.
-- The subscription stack keeps reading `var.idc_instance_arn` /
-  `var.identity_store_id`, exactly as it does today.
-- No stack declares a `data "terraform_remote_state"` referencing another. Each
-  stack can be planned, applied, or destroyed on its own.
-
-## Shared backend with a foundation-scoped key
-
-The foundation stack uses the **same shared S3 backend** as the other stacks:
-a tracked, value-free `backend "s3" {}` block (`backend.tf`) plus a git-ignored,
-keyless `backend.hcl` whose values are supplied at `tofu init` time. The
-`backend-bootstrap` task writes that `backend.hcl` for you (same bucket + lock
-table as the other stacks).
-
-The one difference from the per-workshop stacks is the state **key**. Because
-the adopted IdC instance is a single per-account resource — not workshop-scoped
-— the key is the bare `foundation/terraform.tfstate`, with **no
-`workshops/<id>/` prefix**:
-
-```
-foundation/terraform.tfstate                      ← this stack (no workshop prefix)
-governance-shared/terraform.tfstate               ← management-account singletons
-workshops/<id>/subscription/terraform.tfstate
-workshops/<id>/claim-service/terraform.tfstate
-```
-
-The `backend.hcl` body is byte-identical across every stack (keyless); isolation
-comes entirely from the init-time key, not from the file. See
-[`../backend/README.md`](../backend/README.md) for how the bootstrap renders and
-writes each stack's `backend.hcl`.
-
-## Repo layout
-
-```
-foundation/
-├── README.md                 ← you are here (concepts)
-├── RUNBOOK.md                ← read-then-wire run order + the per-account IdC step
-└── terraform/
-    ├── versions.tf           ← required providers (hashicorp/aws only)
-    ├── providers.tf          ← aws provider (dual-mode: management or child account profile/region)
-    ├── variables.tf          ← aws_region, aws_profile, default_tags
-    ├── identity_center.tf    ← data "aws_ssoadmin_instances" "this" (read-only adopt)
-    ├── outputs.tf            ← instance_arn, identity_store_id, region, sign_in_url
-    ├── backend.tf            ← tracked, value-free S3 backend block (partial config)
-    └── backend.hcl.example   ← template for manual backend.hcl (normally auto-written)
-```
-
-This stack is dual-mode: `AWS_PROFILE` is a management-account profile in
-organization mode, or the child account's profile in account mode.
-
-## Inputs
-
-| Variable       | Purpose                                                        |
-| -------------- | -------------------------------------------------------------- |
-| `aws_region`   | Provider region; empty falls back to `AWS_REGION`.             |
-| `aws_profile`  | Management-account profile (org mode) or the child account's profile (account mode); empty falls back to the env. |
-| `default_tags` | Tags applied to every taggable resource via the provider.      |
-
-## Outputs
-
-Read-only IdC handoff: `instance_arn`, `identity_store_id`, `region`,
-`sign_in_url`.
-
-## Running it
-
-The step-by-step order — the per-account IdC prerequisite, the
-backend-bootstrap → foundation-apply → wire-forward sequence, idempotency, and
-why there is nothing to tear down — lives in [`RUNBOOK.md`](./RUNBOOK.md).
+Prefer raw tofu? The equivalent of steps 2–3 by hand:
 
 ```bash
-mise run foundation-plan     # DRY RUN: tofu init + plan, a pure read (0 to add)
-mise run foundation-apply    # adopt the IdC instance AND print the TF_VAR_* export lines
+cd foundation/terraform
+tofu init -reconfigure -input=false -backend-config=backend.hcl \
+  -backend-config="key=foundation/terraform.tfstate"
+tofu plan       # a pure read of the IdC instance (0 to add)
+tofu apply      # resolves the data source; creates nothing
 ```
+
+## Teardown
+
+See the root [`TEARDOWN.md`](../TEARDOWN.md) for how to remove this stack —
+`foundation-destroy` is a documented no-op (foundation adopts the instance
+read-only and owns nothing to destroy).

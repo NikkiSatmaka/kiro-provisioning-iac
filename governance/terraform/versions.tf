@@ -16,6 +16,6 @@ terraform {
   # tracked backend.tf (not here); the account-specific values come from the
   # git-ignored, keyless backend.hcl at `tofu init` time, with the governance
   # state key `workshops/<WORKSHOP_ID>/governance/terraform.tfstate` supplied as
-  # an init-time argument. See RUNBOOK.md and backend/README.md.
+  # an init-time argument. See governance/README.md and backend/README.md.
   # ---------------------------------------------------------------------------
 }

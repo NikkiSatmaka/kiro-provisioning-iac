@@ -1,5 +1,5 @@
 # ===========================================================================
-# Remote S3 state backend — REQUIRED (RUNBOOK step 1b)
+# Remote S3 state backend — REQUIRED (see subscription/README.md + backend/README.md)
 # ===========================================================================
 #
 # This file is TRACKED and intentionally VALUE-FREE. The `backend "s3" {}` block

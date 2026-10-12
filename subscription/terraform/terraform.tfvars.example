@@ -93,7 +93,7 @@ default_tags = {
 #                                   # or account assignments. A precondition
 #                                   # fails the plan if this is true here.
 #
-# Operator checklist for account mode (see subscription/README.md + RUNBOOK.md):
+# Operator checklist for account mode (see subscription/README.md):
 #   - Enable IAM Identity Center IN THE CHILD ACCOUNT first (creates its account
 #     instance). This is the per-account equivalent of the org-mode Step 0.
 #   - Run with the CHILD ACCOUNT's AWS_PROFILE, and point idc_instance_arn /

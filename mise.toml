@@ -61,7 +61,7 @@ description = "Resolve and update uv.lock from pyproject.toml"
 run = "uv lock"
 
 # --- First-run bootstrap -----------------------------------------------------
-# Bridges the gap between the quick start and RUNBOOK.md. The `cp` of the
+# Bridges the gap between the quick start and the stack READMEs. The `cp` of the
 # example config files is a manual step (see README quick start); only the
 # AWS sign-in is wrapped here, since it runs `aws login`.
 
@@ -91,7 +91,8 @@ run = "aws sts get-caller-identity"
 # then WRITE subscription/terraform/backend.hcl for you from the bootstrap
 # output — the bucket name is derived from your account id, so there is nothing
 # to fill in. subscription/terraform/backend.tf is tracked + value-free, so no
-# activation copy is needed; see subscription/RUNBOOK.md step 1b. provision.py
+# activation copy is needed; see subscription/README.md (the "Step 1 backend
+# done" prerequisite). provision.py
 # fails closed until backend.hcl exists. Prefer manual control?
 # `cp subscription/terraform/backend.hcl.example subscription/terraform/backend.hcl`
 # and edit it instead — the escape hatch backend.hcl.example exists for that.
@@ -186,7 +187,7 @@ fi
 # =============================================================================
 # === subscription/ stack ===
 # =============================================================================
-# Provisioning entrypoints — see subscription/RUNBOOK.md. These drive only the
+# Provisioning entrypoints — see subscription/README.md. These drive only the
 # AUTOMATABLE steps; the entrypoint prints the console-only steps (MFA optional,
 # enable Kiro, assign tier, one-time passwords) as a checklist. Nothing mutates
 # the account by default:
@@ -266,7 +267,7 @@ run = """
 set -eu
 if [ ! -f ../output/otps.csv ]; then
   echo "ERROR: ../output/otps.csv not found." >&2
-  echo "Collect one-time passwords from the console (RUNBOOK.md step 5) into a" >&2
+  echo "Collect one-time passwords from the console (subscription/README.md step 6) into a" >&2
   echo "CSV with the header 'username,otp', e.g.:" >&2
   echo "" >&2
   echo "  username,otp" >&2
@@ -278,7 +279,7 @@ fi
 python provision.py --render-only --otp-csv ../output/otps.csv
 """
 
-# Teardown entrypoints — see subscription/TEARDOWN.md. Nothing here mutates the
+# Teardown entrypoints — see the root TEARDOWN.md. Nothing here mutates the
 # account by default:
 #   - subscription-teardown-plan is a safe DRY RUN (Option A discovery, reports only).
 #   - subscription-destroy runs `tofu destroy` (Option B) and still prompts for yes.
@@ -569,7 +570,7 @@ echo "Disabling IdC is a management-account console action, not a repo task."
 # This stack is NOT dual-mode and NEVER runs in a child account. Excluded from
 # every per-workshop provision/teardown task. backend.hcl must exist first
 # (written by `mise run backend-bootstrap`, same shared bucket, singleton state
-# key governance-shared/terraform.tfstate). See governance-shared/RUNBOOK.md for
+# key governance-shared/terraform.tfstate). See governance-shared/README.md for
 # run order and the one-time tofu state mv migration from foundation's state.
 
 [tasks.governance-shared-plan]
@@ -623,7 +624,7 @@ echo "  export TF_VAR_freeze_scp_id=\"$(tofu output -raw freeze_scp_id)\""
 # shared bucket as the other stacks). Namespaced per workshop by WORKSHOP_ID,
 # exactly like the subscription/ and claim-service/ stacks. There is
 # intentionally NO un-freeze task: recovering a frozen account is a deliberate
-# manual detach (see governance/RUNBOOK.md).
+# manual detach (see governance/README.md).
 
 [tasks.governance-plan]
 description = "DRY RUN: tofu init + plan for a workshop's governance stack (requires WORKSHOP_ID; creates nothing)"

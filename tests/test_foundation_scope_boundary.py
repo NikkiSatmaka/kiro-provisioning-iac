@@ -19,7 +19,7 @@ guarantee rests on:
   state; the handoff is operator-supplied variables, not state coupling
   (R3.3, R3.4).
 
-It also pins the documentation facts the RUNBOOK/README must carry so the
+It also pins the documentation facts the README must carry so the
 end-to-end read-then-wire workflow and its guardrails stay documented:
 
 * The read-then-wire order and the once-and-reused statement (R10.1-R10.4).
@@ -31,8 +31,8 @@ end-to-end read-then-wire workflow and its guardrails stay documented:
 
 Every assertion reads the committed sources directly, so the suite always runs
 with no toolchain. Documentation phrases are matched case-insensitively on the
-concatenated README + RUNBOOK so a wording tweak that keeps the fact does not
-break the test, while a dropped fact does.
+README so a wording tweak that keeps the fact does not break the test, while a
+dropped fact does.
 """
 
 from __future__ import annotations
@@ -48,7 +48,6 @@ SUBSCRIPTION_TF_DIR = REPO_ROOT / "subscription" / "terraform"
 FOUNDATION_TF_DIR = REPO_ROOT / "foundation" / "terraform"
 
 FOUNDATION_README = REPO_ROOT / "foundation" / "README.md"
-FOUNDATION_RUNBOOK = REPO_ROOT / "foundation" / "RUNBOOK.md"
 
 # The subscription inputs the stack keeps consuming the IdC instance through.
 SUBSCRIPTION_FOUNDATION_VARS = ("idc_instance_arn", "identity_store_id")
@@ -60,10 +59,8 @@ def _concat_tf(tf_dir: Path) -> str:
 
 
 def _docs_text() -> str:
-    """The foundation README + RUNBOOK concatenated, lower-cased for matching."""
-    return (
-        FOUNDATION_README.read_text() + "\n" + FOUNDATION_RUNBOOK.read_text()
-    ).lower()
+    """The foundation README, lower-cased for matching."""
+    return FOUNDATION_README.read_text().lower()
 
 
 # ===========================================================================
@@ -118,7 +115,7 @@ def test_foundation_declares_no_terraform_remote_state():
 
 
 # ===========================================================================
-# Documentation facts carried by the README / RUNBOOK
+# Documentation facts carried by the README
 # ===========================================================================
 
 # --- Create-then-wire order + once-and-reused (R10.1-R10.4) ----------------

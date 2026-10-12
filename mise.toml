@@ -28,6 +28,9 @@ _.file = ".env"
 # and your global ~/.aws is left untouched.
 AWS_CONFIG_FILE = "{{config_root}}/.aws/config"
 AWS_SHARED_CREDENTIALS_FILE = "{{config_root}}/.aws/credentials"
+# Keep the `aws login` token/SSO cache project-local too, so sign-in sessions
+# are scoped here and never land in the global ~/.aws/cli/cache or ~/.aws/sso.
+AWS_LOGIN_CACHE_DIRECTORY = "{{config_root}}/.aws/login-cache"
 
 # Fallbacks only. `.env` (or the shell) overrides these; `default` keeps any
 # existing non-empty value and applies the fallback only when unset.
@@ -60,15 +63,17 @@ run = "uv lock"
 # --- First-run bootstrap -----------------------------------------------------
 # Bridges the gap between the quick start and RUNBOOK.md. The `cp` of the
 # example config files is a manual step (see README quick start); only the
-# AWS profile generation is wrapped here, since it runs `aws configure`.
+# AWS sign-in is wrapped here, since it runs `aws login`.
 
-[tasks.aws-configure]
-description = "Create/update the project-local AWS profile via `aws configure` (writes to .aws/, not ~/.aws)"
+[tasks.aws-login]
+description = "Sign in via `aws login` (browser-based console sign-in; caches short-term creds in project-local .aws/login-cache, not ~/.aws)"
 run = """
 set -eu
-echo "Configuring AWS profile '$AWS_PROFILE' into project-local .aws/ (region: $AWS_REGION)."
-echo "Have your access key id + secret access key ready (from creds/)."
-aws configure --profile "$AWS_PROFILE"
+echo "Signing in to AWS profile '$AWS_PROFILE' via `aws login` (region: $AWS_REGION)."
+echo "A browser window opens for console sign-in; the CLI then caches short-term"
+echo "credentials in the project-local .aws/login-cache (AWS_LOGIN_CACHE_DIRECTORY)."
+echo "On a remote/SSH host with no browser, run: aws login --remote --profile \\"$AWS_PROFILE\\""
+aws login --profile "$AWS_PROFILE"
 """
 
 [tasks.verify]

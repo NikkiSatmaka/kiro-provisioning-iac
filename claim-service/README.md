@@ -81,15 +81,7 @@ Follow these in order, all from the repo root. Each mutating step has a safe
 `*-plan` dry-run sibling listed before it; apply, seed, and destroy prompt before
 they change anything.
 
-1. **Test — validate the service logic locally.** Runs the full suite (pytest +
-   Hypothesis + moto) against an in-memory DynamoDB. **No AWS needed**, so run it
-   first. Expect a green suite.
-
-   ```bash
-   mise run claim-test
-   ```
-
-2. **Deploy (dry run) — review what will be created.** Runs `tofu init` and
+1. **Deploy (dry run) — review what will be created.** Runs `tofu init` and
    `plan`; reports the table, Lambda, and Function URL it would create and
    changes nothing.
 
@@ -97,7 +89,7 @@ they change anything.
    mise run claim-deploy-plan
    ```
 
-3. **Deploy — create the table, Lambda, and Function URL.** Reads `WORKSHOP_CODE`
+2. **Deploy — create the table, Lambda, and Function URL.** Reads `WORKSHOP_CODE`
    from `.env` and passes it to OpenTofu as the sensitive `workshop_code`
    variable (so the secret is never typed on the command line or written to a
    tracked file). Prompts to approve, then prints the claim URL. Expect the three
@@ -107,14 +99,14 @@ they change anything.
    mise run claim-deploy
    ```
 
-4. **Get the URL — any time after deploy.** Prints the deployed claim URL so you
+3. **Get the URL — any time after deploy.** Prints the deployed claim URL so you
    can put it behind the workshop QR code or short link.
 
    ```bash
    mise run claim-url
    ```
 
-5. **Seed (dry run) — classify what would be seeded.** Reads
+4. **Seed (dry run) — classify what would be seeded.** Reads
    `../subscription/output/otps.csv` and `manifest.json`, classifies each row,
    and reports what it would write — writing nothing. A row missing a username or
    OTP is reported and skipped.
@@ -123,7 +115,7 @@ they change anything.
    mise run claim-seed-plan
    ```
 
-6. **Seed — populate the claim pool.** Writes one `CRED#` item per credential
+5. **Seed — populate the claim pool.** Writes one `CRED#` item per credential
    from the subscription outputs into this workshop's table. The write is
    conditional, so it is safe to re-run.
 
@@ -133,7 +125,7 @@ they change anything.
 
    The participants then claim their credentials at the URL during the workshop.
 
-7. **Audit — export who claimed what.** After the workshop, exports the claimed
+6. **Audit — export who claimed what.** After the workshop, exports the claimed
    records to a timestamped CSV under `output/`. That directory is git-ignored
    because the rows contain participant emails (PII).
 

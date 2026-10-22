@@ -19,6 +19,15 @@ This README is the **starting point**. It carries the one-time setup (Phase 0)
 itself, then links out to one document per step. Read it top to bottom, then
 follow each step's linked document in order.
 
+> **Running more than one workshop?** This repo stack provisions **one
+> workshop per directory**. To run another workshop, use a **separate directory**
+> (clone again or unzip elsewhere). And when several workshops **share one AWS
+> account**, only the first directory bootstraps the shared backend (Step 1);
+> every later directory **copies** the backend wiring (`backend.hcl`) across by
+> hand rather than bootstrapping again. Both rules are documented in
+> [`MULTI-WORKSHOP.md`](./MULTI-WORKSHOP.md) — read it before setting up a
+> second workshop.
+
 ## Organization vs account — which steps apply to you
 
 Before you start, know which of two modes you are in. It decides whether the
@@ -123,6 +132,7 @@ state:
 ```
 .
 ├── README.md                 ← you are here (overview + the ordered flow)
+├── MULTI-WORKSHOP.md         ← running >1 workshop: one dir per workshop + sharing an account
 ├── TEARDOWN.md               ← the single teardown document (reverse order)
 ├── mise.toml                 ← toolchain (python, opentofu, aws-cli, uv) + task runner
 ├── pyproject.toml / uv.lock  ← Python deps (boto3) managed by uv

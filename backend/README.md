@@ -32,6 +32,14 @@ caller's own account id, it works the same whether you run under a
 management-account profile (organization mode) or a child account's profile
 (account mode).
 
+> **Sharing one account across workshops.** The bucket + lock table are created
+> **once per account**. Only the first repo directory for an account runs
+> `backend-bootstrap`; every later directory on the **same account** reuses the
+> same backend by **copying** each stack's `backend.hcl` across by hand instead
+> of bootstrapping again. And each directory runs exactly **one workshop** — use
+> a separate directory per workshop. Both rules, with the copy procedure, are in
+> [`../MULTI-WORKSHOP.md`](../MULTI-WORKSHOP.md).
+
 **Cost allocation.** Every stack stamps a `workshop_id` tag on each taggable
 resource. The backend and the other shared resources stamp
 `workshop_id = "shared"`, because one state bucket and lock table back every

@@ -134,7 +134,7 @@ state:
 ├── README.md                 ← you are here (overview + the ordered flow)
 ├── MULTI-WORKSHOP.md         ← running >1 workshop: one dir per workshop + sharing an account
 ├── TEARDOWN.md               ← the single teardown document (reverse order)
-├── mise.toml                 ← toolchain (python, opentofu, aws-cli, uv) + task runner
+├── mise.toml                 ← toolchain (opentofu, aws-cli, uv) + task runner
 ├── pyproject.toml / uv.lock  ← Python deps (boto3) managed by uv
 ├── .env.example              ← per-run settings template (AWS_PROFILE / AWS_REGION / WORKSHOP_CODE)
 ├── .aws/                     ← project-local AWS config/credentials (git-ignored secrets)

@@ -3,18 +3,19 @@
 # in your shell rc, or use `mise exec` / `mise run`).
 #
 # Quick start:
-#   mise install        # install all tools below + create the Python venv
-#   mise run setup      # sync Python deps into .venv via uv
+#   mise install        # install all tools below
+#   mise run setup      # create .venv + sync Python deps via uv (uv manages Python)
 #   mise run verify     # confirm AWS auth with the project profile
 
 [tools]
-python = "3.12"
 opentofu = "1.13"
 aws-cli = "latest"
 uv = "latest"
 
 [env]
-_.python.venv = { path = ".venv", create = true }
+# Python (interpreter + .venv) is managed by uv, not mise. `mise run setup`
+# (uv sync) creates .venv; put its bin on PATH so tasks can call `python`.
+_.path = [".venv/bin"]
 
 # All per-run / per-account values live in a single git-ignored `.env` file at
 # the repo root. Copy the template and edit it — nothing else here needs touching:

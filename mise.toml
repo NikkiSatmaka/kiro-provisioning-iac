@@ -12,11 +12,13 @@ opentofu = "1.13"
 aws-cli = "latest"
 uv = "latest"
 
-[env]
-# Python (interpreter + .venv) is managed by uv, not mise. `mise run setup`
-# (uv sync) creates .venv; put its bin on PATH so tasks can call `python`.
-_.path = [".venv/bin"]
+[settings]
+# Python (interpreter + .venv) is managed by uv, not mise. "source" makes mise
+# activate the uv-managed .venv (it never creates it) so tasks can call
+# `python`. `mise run setup` (uv sync) creates the venv.
+python.uv_venv_auto = "source"
 
+[env]
 # All per-run / per-account values live in a single git-ignored `.env` file at
 # the repo root. Copy the template and edit it — nothing else here needs touching:
 #   cp .env.example .env   # then set AWS_PROFILE / AWS_REGION / ...

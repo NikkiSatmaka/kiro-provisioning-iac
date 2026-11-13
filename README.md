@@ -53,7 +53,7 @@ toolchain, points it at your AWS account, and signs you in. Do it once before
 Step 1.
 
 You need [mise](https://mise.jdx.dev/) to manage the toolchain and run the
-tasks. It installs the pinned tools — Python 3.12, OpenTofu 1.13, the AWS CLI,
+tasks. It installs the pinned tools — Python 3.14, OpenTofu 1.13, the AWS CLI,
 uv — and creates the Python `.venv`.
 
 Run these in order:

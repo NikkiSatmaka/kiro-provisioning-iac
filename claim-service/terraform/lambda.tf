@@ -2,7 +2,7 @@
 # Lambda + Function URL + least-privilege IAM role
 # =============================================================================
 #
-# One Python 3.12 Lambda, fronted by exactly ONE Function URL, serves the whole
+# One Python 3.14 Lambda, fronted by exactly ONE Function URL, serves the whole
 # service: GET returns the inline claim page, POST runs the claim pipeline
 # (design: "Function URL and request routing"). There is deliberately NO API
 # Gateway and NO WAF (Requirements 9.1, 9.3). The deployment package is just the
@@ -93,7 +93,7 @@ resource "aws_lambda_function" "claim_handler" {
   function_name = local.name
   role          = aws_iam_role.claim_handler.arn
 
-  runtime = "python3.12"
+  runtime = "python3.14"
   handler = "claim_handler.handler"
 
   filename         = data.archive_file.claim_handler.output_path

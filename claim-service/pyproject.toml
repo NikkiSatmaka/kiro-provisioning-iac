@@ -10,7 +10,12 @@ dependencies = [
 
 [dependency-groups]
 # Test tooling, scoped to this subtree so the root project stays lean.
-dev = ["pytest>=9.2.0", "hypothesis>=6.170.15", "moto[dynamodb]>=5.2.5"]
+dev = [
+    "pytest>=9.2.0",
+    "hypothesis>=6.170.15",
+    "moto[dynamodb]>=5.2.5",
+    "pytest-cov>=7.1.0",
+]
 
 [tool.uv]
 package = false
